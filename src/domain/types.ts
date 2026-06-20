@@ -105,6 +105,12 @@ export interface CommandSnippet {
   sortOrder: number;
 }
 
+export interface SftpEntry {
+  name: string;
+  isDir: boolean;
+  size: number;
+}
+
 export type SearchKind = "business" | "project" | "task" | "document";
 
 export interface SearchHit {

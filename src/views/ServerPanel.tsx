@@ -16,13 +16,14 @@ export interface ServerPanelProps {
   onArchive: (id: number) => void;
   onSetSecret: (id: number, secret: string) => void;
   onConnect: (server: ServerConnection) => void;
+  onBrowse?: (server: ServerConnection) => void;
 }
 
 const AUTH_LABEL: Record<AuthType, string> = { key: "키 기반", password: "비밀번호", agent: "에이전트" };
 
 const EMPTY: ServerFormData = { name: "", host: "", port: 22, username: "", authType: "key", keyPath: null };
 
-export function ServerPanel({ servers, onCreate, onArchive, onSetSecret, onConnect }: ServerPanelProps) {
+export function ServerPanel({ servers, onCreate, onArchive, onSetSecret, onConnect, onBrowse }: ServerPanelProps) {
   const [form, setForm] = useState<ServerFormData>(EMPTY);
   const [secretInputs, setSecretInputs] = useState<Record<number, string>>({});
 
@@ -70,6 +71,9 @@ export function ServerPanel({ servers, onCreate, onArchive, onSetSecret, onConne
             </div>
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
               <button onClick={() => onConnect(s)} style={primaryBtn}>접속</button>
+              {onBrowse && (
+                <button onClick={() => onBrowse(s)} style={secondaryBtn} aria-label={`${s.name} 파일`}>파일</button>
+              )}
               {s.authType !== "agent" && (
                 <>
                   <input

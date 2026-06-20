@@ -3,6 +3,7 @@ import type { ServerConnection } from "../domain/types";
 import { useServers } from "../hooks/useServers";
 import { ServerPanel } from "./ServerPanel";
 import { Terminal } from "./Terminal";
+import { SftpBrowser } from "./SftpBrowser";
 
 export interface ServerViewProps {
   businessId: number;
@@ -13,14 +14,16 @@ export interface ServerViewProps {
 export function ServerView({ businessId, projectId }: ServerViewProps) {
   const s = useServers(businessId, projectId);
   const [connecting, setConnecting] = useState<ServerConnection | null>(null);
+  const [browsing, setBrowsing] = useState<ServerConnection | null>(null);
+  const paneOpen = connecting || browsing;
 
   return (
     <div style={{ display: "flex", height: "100%", minHeight: 0 }}>
       <div
         style={{
-          flex: connecting ? "0 0 300px" : 1,
+          flex: paneOpen ? "0 0 300px" : 1,
           overflow: "auto",
-          borderRight: connecting ? "1px solid var(--border)" : "none",
+          borderRight: paneOpen ? "1px solid var(--border)" : "none",
         }}
       >
         <ServerPanel
@@ -28,12 +31,24 @@ export function ServerView({ businessId, projectId }: ServerViewProps) {
           onCreate={(d) => void s.create(d)}
           onArchive={(id) => void s.archive(id)}
           onSetSecret={(id, secret) => void s.setSecret(id, secret)}
-          onConnect={setConnecting}
+          onConnect={(srv) => {
+            setBrowsing(null);
+            setConnecting(srv);
+          }}
+          onBrowse={(srv) => {
+            setConnecting(null);
+            setBrowsing(srv);
+          }}
         />
       </div>
       {connecting && (
         <div style={{ flex: 1, minWidth: 0 }}>
           <Terminal server={connecting} onClose={() => setConnecting(null)} />
+        </div>
+      )}
+      {browsing && !connecting && (
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <SftpBrowser server={browsing} onClose={() => setBrowsing(null)} />
         </div>
       )}
     </div>

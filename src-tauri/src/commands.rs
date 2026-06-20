@@ -531,6 +531,20 @@ pub fn ssh_disconnect(term: State<crate::terminal::TerminalManager>, id: i64) ->
     crate::terminal::disconnect(&term, id)
 }
 
+/// SFTP 디렉터리 나열 (키 기반 인증).
+#[tauri::command]
+pub fn sftp_list(
+    state: State<AppState>,
+    id: i64,
+    path: String,
+) -> Result<Vec<crate::sftp::SftpEntry>> {
+    let server = {
+        let conn = state.db.lock().unwrap();
+        repo::server::get(&conn, id)?
+    };
+    crate::sftp::list(&server, &path)
+}
+
 // ---- 템플릿 ----
 
 #[derive(Deserialize)]

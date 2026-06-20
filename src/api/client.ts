@@ -20,6 +20,7 @@ import type {
   SearchHit,
   SearchKind,
   ServerConnection,
+  SftpEntry,
   Task,
   TaskLabel,
   TaskStatus,
@@ -177,6 +178,9 @@ export const api = {
     resize: (id: number, rows: number, cols: number) =>
       invoke<void>("ssh_resize", { id, rows, cols }),
     disconnect: (id: number) => invoke<void>("ssh_disconnect", { id }),
+  },
+  sftp: {
+    list: (id: number, path: string) => invoke<SftpEntry[]>("sftp_list", { id, path }),
   },
   template: {
     list: () => invoke<Template[]>("template_list"),

@@ -5,6 +5,7 @@ mod export;
 mod models;
 mod repo;
 mod secrets;
+mod sftp;
 mod terminal;
 
 use std::sync::Mutex;
@@ -74,6 +75,7 @@ pub fn run() {
             commands::ssh_write,
             commands::ssh_resize,
             commands::ssh_disconnect,
+            commands::sftp_list,
             commands::template_list,
             commands::template_create,
             commands::template_delete,
