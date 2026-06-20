@@ -85,6 +85,16 @@ export function MainView({
     }
   };
 
+  const onImport = async () => {
+    try {
+      await api.backup.importJson();
+      setBackupMsg("backup.json 에서 가져왔습니다.");
+      onDataChanged();
+    } catch (e) {
+      setBackupMsg(`가져오기 실패: ${String(e)}`);
+    }
+  };
+
   const openTrash = async () => {
     setTrashItems(await api.trash.list());
     setTrashOpen(true);
@@ -149,6 +159,9 @@ export function MainView({
         </button>
         <button onClick={onExport} style={exportBtn} title="전체 데이터를 JSON으로 백업">
           내보내기
+        </button>
+        <button onClick={onImport} style={exportBtn} title="backup.json에서 가져오기">
+          가져오기
         </button>
       </div>
       {backupMsg && (

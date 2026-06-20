@@ -562,3 +562,31 @@ pub fn export_json(
         .map_err(|e| AppError::Invalid(format!("파일 쓰기 실패: {e}")))?;
     Ok(target.to_string_lossy().to_string())
 }
+
+/// JSON 백업 파일을 현재 DB에 추가 가져오기. path 미지정 시 앱 데이터 폴더의 backup.json.
+#[tauri::command]
+pub fn import_json(
+    app: tauri::AppHandle,
+    state: State<AppState>,
+    path: Option<String>,
+) -> Result<()> {
+    use crate::error::AppError;
+    use tauri::Manager;
+
+    let target = match path {
+        Some(p) => std::path::PathBuf::from(p),
+        None => {
+            let dir = app
+                .path()
+                .app_data_dir()
+                .map_err(|e| AppError::Invalid(format!("앱 데이터 경로 오류: {e}")))?;
+            dir.join("backup.json")
+        }
+    };
+    let text = std::fs::read_to_string(&target)
+        .map_err(|e| AppError::Invalid(format!("파일 읽기 실패: {e}")))?;
+    let value: serde_json::Value =
+        serde_json::from_str(&text).map_err(|e| AppError::Invalid(format!("JSON 파싱 실패: {e}")))?;
+    let conn = state.db.lock().unwrap();
+    crate::export::import_data(&conn, &value)
+}

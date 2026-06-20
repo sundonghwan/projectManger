@@ -115,6 +115,8 @@ export const api = {
   backup: {
     /** path 미지정 시 앱 데이터 폴더의 backup.json. 저장 경로 반환. */
     exportJson: (path?: string | null) => invoke<string>("export_json", { path: path ?? null }),
+    /** path 미지정 시 앱 데이터 폴더의 backup.json 에서 가져오기(추가). */
+    importJson: (path?: string | null) => invoke<void>("import_json", { path: path ?? null }),
   },
   deliverable: {
     list: (businessId: number) => invoke<Deliverable[]>("deliverable_list", { businessId }),

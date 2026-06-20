@@ -76,6 +76,7 @@ pub fn run() {
             commands::trash_restore,
             commands::trash_purge,
             commands::export_json,
+            commands::import_json,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
