@@ -13,13 +13,22 @@ import { DocEditor } from "./DocEditor";
 import { TaskEditor } from "./TaskEditor";
 import { DeliverablesView } from "./DeliverablesView";
 import { ServerView } from "./ServerView";
+import { TimelineView } from "./TimelineView";
 
-export type ViewKind = "dashboard" | "kanban" | "list" | "doc" | "deliverables" | "ssh";
+export type ViewKind =
+  | "dashboard"
+  | "kanban"
+  | "list"
+  | "timeline"
+  | "doc"
+  | "deliverables"
+  | "ssh";
 
 const TABS: { key: ViewKind; label: string }[] = [
   { key: "dashboard", label: "대시보드" },
   { key: "kanban", label: "칸반" },
   { key: "list", label: "리스트" },
+  { key: "timeline", label: "타임라인" },
   { key: "doc", label: "문서" },
   { key: "deliverables", label: "산출물" },
   { key: "ssh", label: "터미널" },
@@ -29,6 +38,7 @@ const VIEW_LABEL: Record<ViewKind, string> = {
   dashboard: "대시보드",
   kanban: "칸반",
   list: "리스트",
+  timeline: "타임라인",
   doc: "문서",
   deliverables: "산출물",
   ssh: "SSH 터미널",
@@ -213,6 +223,8 @@ export function MainView({
             labelsByTask={labelsByTask}
             onRowClick={setEditingTaskId}
           />
+        ) : view === "timeline" ? (
+          <TimelineView tasks={tasks} />
         ) : view === "doc" ? (
           document ? (
             <DocEditor key={document.id} document={document} />
