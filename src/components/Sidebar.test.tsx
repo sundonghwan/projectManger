@@ -41,6 +41,7 @@ function setup(overrides: Partial<SidebarProps> = {}) {
     onToggle: vi.fn(),
     onAddBusiness: vi.fn(),
     onAddChild: vi.fn(),
+    onArchive: vi.fn(),
     ...overrides,
   };
   return { props, ...render(<Sidebar {...props} />) };
@@ -52,6 +53,13 @@ describe("Sidebar", () => {
     expect(screen.getByText("SI사업 A")).toBeInTheDocument();
     expect(screen.getByText("대시보드")).toBeInTheDocument();
     expect(screen.getByText("프로젝트 1")).toBeInTheDocument();
+  });
+
+  it("사업 행의 보관 버튼은 onArchive 호출, 대시보드 행엔 없음", async () => {
+    const { props } = setup();
+    await userEvent.click(screen.getByRole("button", { name: "SI사업 A 보관" }));
+    expect(props.onArchive).toHaveBeenCalledWith(bizRow);
+    expect(screen.queryByRole("button", { name: "대시보드 보관" })).not.toBeInTheDocument();
   });
 
   it("빈 목록이면 안내 문구를 보여준다", () => {

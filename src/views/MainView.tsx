@@ -158,28 +158,31 @@ export function MainView({
           <span style={{ fontSize: 13, color: "var(--text2)" }}>선택된 항목 없음</span>
         )}
         <span style={{ flex: 1 }} />
-        <button
-          onClick={onToggleTheme}
-          style={exportBtn}
-          aria-label="테마 전환"
-          title={theme === "light" ? "다크 모드" : "라이트 모드"}
-        >
-          {theme === "light" ? "🌙" : "☀"}
-        </button>
-        {business && (
-          <button onClick={() => setAutomationOpen(true)} style={exportBtn} aria-label="자동화" title="템플릿·반복 태스크">
-            ⚙
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            onClick={onToggleTheme}
+            style={iconBtn}
+            aria-label="테마 전환"
+            title={theme === "light" ? "다크 모드" : "라이트 모드"}
+          >
+            {theme === "light" ? "🌙" : "☀"}
           </button>
-        )}
-        <button onClick={() => void openTrash()} style={exportBtn} aria-label="휴지통" title="휴지통">
-          🗑
-        </button>
-        <button onClick={onExport} style={exportBtn} title="전체 데이터를 JSON으로 백업">
-          내보내기
-        </button>
-        <button onClick={onImport} style={exportBtn} title="backup.json에서 가져오기">
-          가져오기
-        </button>
+          {business && (
+            <button onClick={() => setAutomationOpen(true)} style={iconBtn} aria-label="자동화" title="템플릿·반복 태스크">
+              ⚙
+            </button>
+          )}
+          <button onClick={() => void openTrash()} style={iconBtn} aria-label="휴지통" title="휴지통">
+            🗑
+          </button>
+          <span style={{ width: 1, height: 18, background: "var(--border)", margin: "0 2px" }} />
+          <button onClick={onExport} style={exportBtn} title="전체 데이터를 JSON으로 백업">
+            내보내기
+          </button>
+          <button onClick={onImport} style={exportBtn} title="backup.json에서 가져오기">
+            가져오기
+          </button>
+        </div>
       </div>
       {backupMsg && (
         <div style={{ padding: "6px 14px", fontSize: 12, color: "var(--text2)", borderBottom: "1px solid var(--border)" }}>
@@ -337,6 +340,19 @@ const exportBtn: React.CSSProperties = {
   padding: "5px 12px",
   fontSize: 12,
   fontWeight: 600,
+  cursor: "pointer",
+};
+const iconBtn: React.CSSProperties = {
+  width: 30,
+  height: 28,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  border: "1px solid var(--border)",
+  background: "var(--bg)",
+  color: "var(--text2)",
+  borderRadius: "var(--radius-md)",
+  fontSize: 13,
   cursor: "pointer",
 };
 const errorBar: React.CSSProperties = {

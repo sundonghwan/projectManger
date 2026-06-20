@@ -165,6 +165,38 @@ export default function App() {
     [projects, loadProjects, loadDocuments],
   );
 
+  const onArchive = useCallback(
+    async (row: TreeRow) => {
+      const ok = window.confirm(`'${row.label}'을(를) 보관할까요? (휴지통에서 복구 가능)`);
+      if (!ok) return;
+      try {
+        if (row.type === "business") {
+          await api.business.archive(row.entityId);
+          await loadBusinesses();
+        } else if (row.type === "project") {
+          const p = projects.find((x) => x.id === row.entityId);
+          await api.project.archive(row.entityId);
+          if (p) await loadProjects(p.businessId);
+        } else if (row.type === "document") {
+          const d = documents.find((x) => x.id === row.entityId);
+          await api.document.archive(row.entityId);
+          if (d) await loadDocuments(d.businessId);
+        } else if (row.type === "deliverable") {
+          const dv = deliverables.find((x) => x.id === row.entityId);
+          await api.deliverable.archive(row.entityId);
+          if (dv) await loadDeliverables(dv.businessId);
+        }
+        if (selectedId === row.id) {
+          setSelectedId(null);
+          setView("dashboard");
+        }
+      } catch (e) {
+        setError(String(e));
+      }
+    },
+    [projects, documents, deliverables, selectedId, loadBusinesses, loadProjects, loadDocuments, loadDeliverables],
+  );
+
   const onRename = useCallback(
     async (row: TreeRow, name: string) => {
       try {
@@ -268,6 +300,7 @@ export default function App() {
         onAddBusiness={onAddBusiness}
         onAddChild={onAddChild}
         onRename={onRename}
+        onArchive={onArchive}
       />
       <MainView
         business={selectedBusiness}

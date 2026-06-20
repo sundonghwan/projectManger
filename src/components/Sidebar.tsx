@@ -19,9 +19,12 @@ export interface SidebarProps {
   onAddChild: (row: TreeRow) => void;
   /** 더블클릭 인라인 이름변경 (사업/프로젝트/문서) */
   onRename?: (row: TreeRow, name: string) => void;
+  /** 보관(소프트 삭제) — 사업/프로젝트/문서/산출물 */
+  onArchive?: (row: TreeRow) => void;
 }
 
 const RENAMEABLE = new Set<TreeRow["type"]>(["business", "project", "document"]);
+const ARCHIVABLE = new Set<TreeRow["type"]>(["business", "project", "document", "deliverable"]);
 
 const ICON: Partial<Record<TreeRow["type"], string>> = {
   dashboard: "📊",
@@ -43,6 +46,7 @@ export function Sidebar(props: SidebarProps) {
     onAddBusiness,
     onAddChild,
     onRename,
+    onArchive,
     header,
     typeFilter,
     onToggleType,
@@ -173,6 +177,19 @@ export function Sidebar(props: SidebarProps) {
                   +
                 </button>
               )}
+              {onArchive && ARCHIVABLE.has(row.type) && (
+                <button
+                  aria-label={`${row.label} 보관`}
+                  title="보관(휴지통으로)"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onArchive(row);
+                  }}
+                  style={archiveStyle}
+                >
+                  🗑
+                </button>
+              )}
             </div>
           );
         })}
@@ -301,5 +318,16 @@ const addChildStyle: CSSProperties = {
   cursor: "pointer",
   color: "var(--text2)",
   fontSize: 13,
+  flexShrink: 0,
+};
+const archiveStyle: CSSProperties = {
+  width: 20,
+  height: 20,
+  border: "none",
+  background: "transparent",
+  borderRadius: "var(--radius-sm)",
+  cursor: "pointer",
+  color: "var(--text2)",
+  fontSize: 11,
   flexShrink: 0,
 };
