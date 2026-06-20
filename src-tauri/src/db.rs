@@ -3,7 +3,10 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// 순서대로 적용할 마이그레이션. PRAGMA user_version 으로 적용 개수를 추적한다.
-const MIGRATIONS: &[&str] = &[include_str!("../migrations/0001_init.sql")];
+const MIGRATIONS: &[&str] = &[
+    include_str!("../migrations/0001_init.sql"),
+    include_str!("../migrations/0002_templates_recurring.sql"),
+];
 
 /// 아직 적용되지 않은 마이그레이션을 순서대로 실행. 두 번 호출해도 안전(멱등).
 pub fn migrate(conn: &Connection) -> Result<()> {

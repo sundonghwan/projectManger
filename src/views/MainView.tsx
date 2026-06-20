@@ -14,6 +14,7 @@ import { TaskEditor } from "./TaskEditor";
 import { DeliverablesView } from "./DeliverablesView";
 import { ServerView } from "./ServerView";
 import { TimelineView } from "./TimelineView";
+import { AutomationModal } from "./AutomationModal";
 
 export type ViewKind =
   | "dashboard"
@@ -83,6 +84,7 @@ export function MainView({
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const [trashOpen, setTrashOpen] = useState(false);
   const [trashItems, setTrashItems] = useState<TrashItem[]>([]);
+  const [automationOpen, setAutomationOpen] = useState(false);
   const editingTask = tasks.find((t) => t.id === editingTaskId) ?? null;
   const shownError = error ?? taskError;
 
@@ -164,6 +166,11 @@ export function MainView({
         >
           {theme === "light" ? "🌙" : "☀"}
         </button>
+        {business && (
+          <button onClick={() => setAutomationOpen(true)} style={exportBtn} aria-label="자동화" title="템플릿·반복 태스크">
+            ⚙
+          </button>
+        )}
         <button onClick={() => void openTrash()} style={exportBtn} aria-label="휴지통" title="휴지통">
           🗑
         </button>
@@ -273,6 +280,15 @@ export function MainView({
           onRestore={(item) => void restoreItem(item)}
           onPurge={(item) => void purgeItem(item)}
           onClose={() => setTrashOpen(false)}
+        />
+      )}
+
+      {automationOpen && business && (
+        <AutomationModal
+          businessId={business.id}
+          projectId={project?.id ?? null}
+          onChanged={onDataChanged}
+          onClose={() => setAutomationOpen(false)}
         />
       )}
     </section>

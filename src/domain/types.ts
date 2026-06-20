@@ -78,6 +78,25 @@ export interface Label {
   color?: string | null;
 }
 
+export interface Template {
+  id: number;
+  name: string;
+  kind: "project" | "document";
+  payload: string;
+}
+
+export interface RecurringTask {
+  id: number;
+  businessId: number;
+  projectId?: number | null;
+  title: string;
+  priority: Priority;
+  intervalDays: number;
+  nextRun: DateString;
+  /** 0/1 */
+  active: number;
+}
+
 export interface CommandSnippet {
   id: number;
   serverConnectionId?: number | null;

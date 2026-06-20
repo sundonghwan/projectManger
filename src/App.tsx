@@ -70,6 +70,12 @@ export default function App() {
     void loadBusinesses();
   }, [loadBusinesses]);
 
+  // 앱 시작 시 도래한 반복 태스크 자동 생성
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    void api.recurring.generate(today).catch(() => {});
+  }, []);
+
   const visibleBusinesses = useMemo(
     () => (typeFilter.size === 0 ? businesses : businesses.filter((b) => typeFilter.has(b.type))),
     [businesses, typeFilter],

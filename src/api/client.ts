@@ -16,12 +16,14 @@ import type {
   Priority,
   AuthType,
   Project,
+  RecurringTask,
   SearchHit,
   SearchKind,
   ServerConnection,
   Task,
   TaskLabel,
   TaskStatus,
+  Template,
   TrashItem,
 } from "../domain/types";
 
@@ -175,6 +177,31 @@ export const api = {
     resize: (id: number, rows: number, cols: number) =>
       invoke<void>("ssh_resize", { id, rows, cols }),
     disconnect: (id: number) => invoke<void>("ssh_disconnect", { id }),
+  },
+  template: {
+    list: () => invoke<Template[]>("template_list"),
+    create: (name: string, kind: "project" | "document", payload: string) =>
+      invoke<Template>("template_create", { input: { name, kind, payload } }),
+    delete: (id: number) => invoke<void>("template_delete", { id }),
+    applyProject: (templateId: number, businessId: number) =>
+      invoke<number>("template_apply_project", { templateId, businessId }),
+    applyDocument: (templateId: number, businessId: number, projectId?: number | null) =>
+      invoke<number>("template_apply_document", { templateId, businessId, projectId: projectId ?? null }),
+  },
+  recurring: {
+    list: (businessId: number) => invoke<RecurringTask[]>("recurring_list", { businessId }),
+    create: (input: {
+      businessId: number;
+      projectId?: number | null;
+      title: string;
+      priority: number;
+      intervalDays: number;
+      nextRun: string;
+    }) => invoke<RecurringTask>("recurring_create", { input }),
+    setActive: (id: number, active: boolean) =>
+      invoke<void>("recurring_set_active", { id, active }),
+    delete: (id: number) => invoke<void>("recurring_delete", { id }),
+    generate: (today: string) => invoke<number>("recurring_generate", { today }),
   },
   search: (query: string) => invoke<SearchHit[]>("search", { query }),
   trash: {

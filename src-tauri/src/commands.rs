@@ -1,7 +1,7 @@
 use crate::error::Result;
 use crate::models::{
     Block, Business, CommandSnippet, Deliverable, DeliverableVersion, Document, Label, Project,
-    SearchHit, ServerConnection, Task, TaskLabel, TrashItem,
+    RecurringTask, SearchHit, ServerConnection, Task, TaskLabel, Template, TrashItem,
 };
 use crate::secrets;
 use crate::repo;
@@ -529,6 +529,103 @@ pub fn ssh_resize(
 #[tauri::command]
 pub fn ssh_disconnect(term: State<crate::terminal::TerminalManager>, id: i64) -> Result<()> {
     crate::terminal::disconnect(&term, id)
+}
+
+// ---- 템플릿 ----
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TemplateCreate {
+    pub name: String,
+    pub kind: String,
+    pub payload: String,
+}
+
+#[tauri::command]
+pub fn template_list(state: State<AppState>) -> Result<Vec<Template>> {
+    let conn = state.db.lock().unwrap();
+    repo::template::list(&conn)
+}
+
+#[tauri::command]
+pub fn template_create(state: State<AppState>, input: TemplateCreate) -> Result<Template> {
+    let conn = state.db.lock().unwrap();
+    repo::template::create(&conn, &input.name, &input.kind, &input.payload)
+}
+
+#[tauri::command]
+pub fn template_delete(state: State<AppState>, id: i64) -> Result<()> {
+    let conn = state.db.lock().unwrap();
+    repo::template::delete(&conn, id)
+}
+
+#[tauri::command]
+pub fn template_apply_project(state: State<AppState>, template_id: i64, business_id: i64) -> Result<i64> {
+    let conn = state.db.lock().unwrap();
+    repo::template::apply_project(&conn, template_id, business_id)
+}
+
+#[tauri::command]
+pub fn template_apply_document(
+    state: State<AppState>,
+    template_id: i64,
+    business_id: i64,
+    project_id: Option<i64>,
+) -> Result<i64> {
+    let conn = state.db.lock().unwrap();
+    repo::template::apply_document(&conn, template_id, business_id, project_id)
+}
+
+// ---- 반복 태스크 ----
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecurringCreate {
+    pub business_id: i64,
+    pub project_id: Option<i64>,
+    pub title: String,
+    pub priority: i64,
+    pub interval_days: i64,
+    pub next_run: String,
+}
+
+#[tauri::command]
+pub fn recurring_list(state: State<AppState>, business_id: i64) -> Result<Vec<RecurringTask>> {
+    let conn = state.db.lock().unwrap();
+    repo::recurring::list_by_business(&conn, business_id)
+}
+
+#[tauri::command]
+pub fn recurring_create(state: State<AppState>, input: RecurringCreate) -> Result<RecurringTask> {
+    let conn = state.db.lock().unwrap();
+    repo::recurring::create(
+        &conn,
+        input.business_id,
+        input.project_id,
+        &input.title,
+        input.priority,
+        input.interval_days,
+        &input.next_run,
+    )
+}
+
+#[tauri::command]
+pub fn recurring_set_active(state: State<AppState>, id: i64, active: bool) -> Result<()> {
+    let conn = state.db.lock().unwrap();
+    repo::recurring::set_active(&conn, id, active)
+}
+
+#[tauri::command]
+pub fn recurring_delete(state: State<AppState>, id: i64) -> Result<()> {
+    let conn = state.db.lock().unwrap();
+    repo::recurring::delete(&conn, id)
+}
+
+/// today(YYYY-MM-DD) 기준 도래한 반복 태스크 생성. 생성 수 반환.
+#[tauri::command]
+pub fn recurring_generate(state: State<AppState>, today: String) -> Result<usize> {
+    let conn = state.db.lock().unwrap();
+    repo::recurring::generate_due(&conn, &today)
 }
 
 #[tauri::command]

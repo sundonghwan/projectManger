@@ -57,6 +57,28 @@ pub struct ServerConnection {
     pub archived_at: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Template {
+    pub id: i64,
+    pub name: String,
+    pub kind: String,
+    pub payload: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecurringTask {
+    pub id: i64,
+    pub business_id: i64,
+    pub project_id: Option<i64>,
+    pub title: String,
+    pub priority: i64,
+    pub interval_days: i64,
+    pub next_run: String,
+    pub active: i64,
+}
+
 /// 휴지통(보관) 항목
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
