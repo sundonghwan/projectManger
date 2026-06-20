@@ -78,6 +78,14 @@ export interface Label {
   color?: string | null;
 }
 
+export interface CommandSnippet {
+  id: number;
+  serverConnectionId?: number | null;
+  name: string;
+  command: string;
+  sortOrder: number;
+}
+
 export type SearchKind = "business" | "project" | "task" | "document";
 
 export interface SearchHit {

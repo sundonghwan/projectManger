@@ -5,5 +5,6 @@ pub mod label;
 pub mod project;
 pub mod search;
 pub mod server;
+pub mod snippet;
 pub mod task;
 pub mod trash;

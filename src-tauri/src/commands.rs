@@ -1,7 +1,7 @@
 use crate::error::Result;
 use crate::models::{
-    Block, Business, Deliverable, DeliverableVersion, Document, Label, Project, SearchHit,
-    ServerConnection, Task, TaskLabel, TrashItem,
+    Block, Business, CommandSnippet, Deliverable, DeliverableVersion, Document, Label, Project,
+    SearchHit, ServerConnection, Task, TaskLabel, TrashItem,
 };
 use crate::secrets;
 use crate::repo;
@@ -464,6 +464,32 @@ pub fn server_clear_secret(state: State<AppState>, id: i64) -> Result<()> {
 pub fn server_has_secret(state: State<AppState>, id: i64) -> Result<bool> {
     let conn = state.db.lock().unwrap();
     Ok(repo::server::get(&conn, id)?.secret_ref.is_some())
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SnippetCreate {
+    pub server_id: i64,
+    pub name: String,
+    pub command: String,
+}
+
+#[tauri::command]
+pub fn snippet_list(state: State<AppState>, server_id: i64) -> Result<Vec<CommandSnippet>> {
+    let conn = state.db.lock().unwrap();
+    repo::snippet::list_by_server(&conn, server_id)
+}
+
+#[tauri::command]
+pub fn snippet_create(state: State<AppState>, input: SnippetCreate) -> Result<CommandSnippet> {
+    let conn = state.db.lock().unwrap();
+    repo::snippet::create(&conn, input.server_id, &input.name, &input.command)
+}
+
+#[tauri::command]
+pub fn snippet_delete(state: State<AppState>, id: i64) -> Result<()> {
+    let conn = state.db.lock().unwrap();
+    repo::snippet::delete(&conn, id)
 }
 
 // ---- SSH 터미널 ----

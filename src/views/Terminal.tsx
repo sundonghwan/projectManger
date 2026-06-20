@@ -1,10 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { listen } from "@tauri-apps/api/event";
 import { api } from "../api/client";
-import type { ServerConnection } from "../domain/types";
+import type { CommandSnippet, ServerConnection } from "../domain/types";
+import { SnippetBar } from "./SnippetBar";
 
 export interface TerminalProps {
   server: ServerConnection;
@@ -14,6 +15,19 @@ export interface TerminalProps {
 /** xterm.js 터미널 — Rust PTY(ssh) 세션과 양방향 스트리밍. */
 export function Terminal({ server, onClose }: TerminalProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const [snippets, setSnippets] = useState<CommandSnippet[]>([]);
+
+  const reloadSnippets = useCallback(async () => {
+    try {
+      setSnippets(await api.snippet.list(server.id));
+    } catch {
+      /* noop */
+    }
+  }, [server.id]);
+
+  useEffect(() => {
+    void reloadSnippets();
+  }, [reloadSnippets]);
 
   useEffect(() => {
     const id = server.id;
@@ -96,6 +110,12 @@ export function Terminal({ server, onClose }: TerminalProps) {
           종료
         </button>
       </div>
+      <SnippetBar
+        snippets={snippets}
+        onRun={(cmd) => void api.ssh.write(server.id, cmd + "\r")}
+        onCreate={(name, command) => void api.snippet.create(server.id, name, command).then(reloadSnippets)}
+        onDelete={(id) => void api.snippet.delete(id).then(reloadSnippets)}
+      />
       <div ref={ref} style={{ flex: 1, minHeight: 0, padding: 8 }} />
     </div>
   );

@@ -4,6 +4,7 @@ import type {
   Block,
   Business,
   BusinessType,
+  CommandSnippet,
   DateString,
   Deliverable,
   DeliverableKind,
@@ -161,6 +162,12 @@ export const api = {
     setSecret: (id: number, secret: string) => invoke<void>("server_set_secret", { id, secret }),
     clearSecret: (id: number) => invoke<void>("server_clear_secret", { id }),
     hasSecret: (id: number) => invoke<boolean>("server_has_secret", { id }),
+  },
+  snippet: {
+    list: (serverId: number) => invoke<CommandSnippet[]>("snippet_list", { serverId }),
+    create: (serverId: number, name: string, command: string) =>
+      invoke<CommandSnippet>("snippet_create", { input: { serverId, name, command } }),
+    delete: (id: number) => invoke<void>("snippet_delete", { id }),
   },
   ssh: {
     connect: (id: number) => invoke<void>("ssh_connect", { id }),

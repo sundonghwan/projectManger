@@ -31,6 +31,16 @@ pub struct Project {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct CommandSnippet {
+    pub id: i64,
+    pub server_connection_id: Option<i64>,
+    pub name: String,
+    pub command: String,
+    pub sort_order: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ServerConnection {
     pub id: i64,
     pub business_id: i64,
