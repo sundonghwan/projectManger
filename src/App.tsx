@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./api/client";
 import { buildTree, rowId, type TreeRow } from "./domain/tree";
-import type { Business, Project } from "./domain/types";
+import type { Business, Document, Project } from "./domain/types";
 import { Sidebar } from "./components/Sidebar";
 import { businessColor } from "./ui/colors";
 import { MainView, type ViewKind } from "./views/MainView";
@@ -9,6 +9,7 @@ import { MainView, type ViewKind } from "./views/MainView";
 export default function App() {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<ViewKind>("dashboard");
@@ -32,13 +33,22 @@ export default function App() {
     }
   }, []);
 
+  const loadDocuments = useCallback(async (businessId: number) => {
+    try {
+      const list = await api.document.list(businessId);
+      setDocuments((prev) => [...prev.filter((d) => d.businessId !== businessId), ...list]);
+    } catch (e) {
+      setError(String(e));
+    }
+  }, []);
+
   useEffect(() => {
     void loadBusinesses();
   }, [loadBusinesses]);
 
   const tree = useMemo(
-    () => buildTree({ businesses, projects, documents: [], deliverables: [], expanded }),
-    [businesses, projects, expanded],
+    () => buildTree({ businesses, projects, documents, deliverables: [], expanded }),
+    [businesses, projects, documents, expanded],
   );
 
   const colorFor = useCallback(
@@ -56,18 +66,22 @@ export default function App() {
         if (next.has(row.id)) next.delete(row.id);
         else {
           next.add(row.id);
-          if (row.type === "business") void loadProjects(row.entityId);
+          if (row.type === "business") {
+            void loadProjects(row.entityId);
+            void loadDocuments(row.entityId);
+          }
         }
         return next;
       });
     },
-    [loadProjects],
+    [loadProjects, loadDocuments],
   );
 
   const onSelect = useCallback((row: TreeRow) => {
     setSelectedId(row.id);
     if (row.type === "dashboard" || row.type === "business") setView("dashboard");
     else if (row.type === "project") setView("kanban");
+    else if (row.type === "document") setView("doc");
   }, []);
 
   const onAddBusiness = useCallback(async () => {
@@ -76,27 +90,41 @@ export default function App() {
       await loadBusinesses();
       setExpanded((prev) => new Set(prev).add(rowId("business", b.id)));
       void loadProjects(b.id);
+      void loadDocuments(b.id);
       setSelectedId(rowId("business", b.id));
       setView("dashboard");
     } catch (e) {
       setError(String(e));
     }
-  }, [loadBusinesses, loadProjects]);
+  }, [loadBusinesses, loadProjects, loadDocuments]);
 
   const onAddChild = useCallback(
     async (row: TreeRow) => {
-      if (row.type === "business") {
-        try {
+      try {
+        if (row.type === "business") {
           await api.project.create({ businessId: row.entityId, name: "새 프로젝트" });
           setExpanded((prev) => new Set(prev).add(row.id));
           await loadProjects(row.entityId);
-        } catch (e) {
-          setError(String(e));
+        } else if (row.type === "project") {
+          // 프로젝트 하위에는 문서 생성
+          const proj = projects.find((p) => p.id === row.entityId);
+          if (proj) {
+            const d = await api.document.create({
+              businessId: proj.businessId,
+              projectId: proj.id,
+              title: "제목 없음",
+            });
+            setExpanded((prev) => new Set(prev).add(row.id));
+            await loadDocuments(proj.businessId);
+            setSelectedId(rowId("document", d.id));
+            setView("doc");
+          }
         }
+      } catch (e) {
+        setError(String(e));
       }
-      // 프로젝트 하위(문서·산출물) 생성은 다음 단계에서 지원
     },
-    [loadProjects],
+    [projects, loadProjects, loadDocuments],
   );
 
   const selectedBusiness = useMemo(() => {
@@ -108,14 +136,24 @@ export default function App() {
       const p = projects.find((x) => x.id === row.entityId);
       return p ? (businesses.find((b) => b.id === p.businessId) ?? null) : null;
     }
+    if (row.type === "document") {
+      const d = documents.find((x) => x.id === row.entityId);
+      return d ? (businesses.find((b) => b.id === d.businessId) ?? null) : null;
+    }
     return businesses[0] ?? null;
-  }, [tree, selectedId, businesses, projects]);
+  }, [tree, selectedId, businesses, projects, documents]);
 
   const selectedProject = useMemo(() => {
     const row = tree.find((r) => r.id === selectedId);
     if (row?.type === "project") return projects.find((x) => x.id === row.entityId) ?? null;
     return null;
   }, [tree, selectedId, projects]);
+
+  const selectedDocument = useMemo(() => {
+    const row = tree.find((r) => r.id === selectedId);
+    if (row?.type === "document") return documents.find((x) => x.id === row.entityId) ?? null;
+    return null;
+  }, [tree, selectedId, documents]);
 
   return (
     <div style={{ display: "flex", height: "100%", overflow: "hidden" }}>
@@ -131,6 +169,7 @@ export default function App() {
       <MainView
         business={selectedBusiness}
         project={selectedProject}
+        document={selectedDocument}
         view={view}
         onViewChange={setView}
         error={error}

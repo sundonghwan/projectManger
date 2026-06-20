@@ -1,4 +1,4 @@
-import type { Business, Project } from "../domain/types";
+import type { Business, Document, Project } from "../domain/types";
 import { businessColor } from "../ui/colors";
 import { useTasks } from "../hooks/useTasks";
 import { dashboardStats } from "../domain/dashboard";
@@ -6,6 +6,7 @@ import { groupByStatus } from "../domain/kanban";
 import { Dashboard } from "./Dashboard";
 import { Kanban } from "./Kanban";
 import { TaskList } from "./TaskList";
+import { DocEditor } from "./DocEditor";
 
 export type ViewKind = "dashboard" | "kanban" | "list" | "doc" | "deliverables" | "ssh";
 
@@ -30,12 +31,13 @@ const VIEW_LABEL: Record<ViewKind, string> = {
 export interface MainViewProps {
   business: Business | null;
   project: Project | null;
+  document: Document | null;
   view: ViewKind;
   onViewChange: (v: ViewKind) => void;
   error: string | null;
 }
 
-export function MainView({ business, project, view, onViewChange, error }: MainViewProps) {
+export function MainView({ business, project, document, view, onViewChange, error }: MainViewProps) {
   const { tasks, error: taskError, create, move, toggleDone } = useTasks(
     business?.id ?? null,
     project?.id ?? null,
@@ -111,6 +113,14 @@ export function MainView({ business, project, view, onViewChange, error }: MainV
           <Kanban columns={groupByStatus(tasks)} onMove={move} onAddTask={(s) => create(s)} />
         ) : view === "list" ? (
           <TaskList tasks={tasks} onToggleDone={toggleDone} />
+        ) : view === "doc" ? (
+          document ? (
+            <DocEditor key={document.id} document={document} />
+          ) : (
+            <div style={{ padding: "24px 28px", color: "var(--text2)" }}>
+              왼쪽 트리에서 문서를 선택하거나, 프로젝트의 + 로 새 문서를 만드세요.
+            </div>
+          )
         ) : (
           <div style={{ padding: "24px 28px", color: "var(--text2)" }}>
             <strong style={{ color: "var(--text)" }}>{VIEW_LABEL[view]}</strong> — 다음 단계에서 지원

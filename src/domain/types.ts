@@ -72,6 +72,24 @@ export interface Document {
   archivedAt?: Timestamp | null;
 }
 
+export type BlockType =
+  | "paragraph"
+  | "heading"
+  | "checklist"
+  | "code"
+  | "quote"
+  | "divider";
+
+export interface Block {
+  id: number;
+  documentId: number;
+  parentBlockId?: number | null;
+  type: BlockType;
+  /** 종류별 속성 JSON 문자열 (예: {"text":"...","checked":false}) */
+  content: string;
+  sortOrder: number;
+}
+
 export interface Deliverable {
   id: number;
   businessId: number;

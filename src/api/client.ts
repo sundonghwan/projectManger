@@ -1,9 +1,11 @@
 // Tauri invoke 래퍼 — 프론트는 이 클라이언트로만 백엔드와 통신.
 import { invoke } from "@tauri-apps/api/core";
 import type {
+  Block,
   Business,
   BusinessType,
   DateString,
+  Document,
   EntityStatus,
   Priority,
   Project,
@@ -75,4 +77,33 @@ export const api = {
     move: (input: TaskMoveInput) => invoke<Task>("task_move", { input }),
     archive: (id: number) => invoke<void>("task_archive", { id }),
   },
+  document: {
+    list: (businessId: number) => invoke<Document[]>("document_list", { businessId }),
+    create: (input: DocumentCreateInput) => invoke<Document>("document_create", { input }),
+    rename: (id: number, title: string) => invoke<Document>("document_rename", { id, title }),
+    archive: (id: number) => invoke<void>("document_archive", { id }),
+  },
+  block: {
+    list: (documentId: number) => invoke<Block[]>("block_list", { documentId }),
+    create: (input: BlockCreateInput) => invoke<Block>("block_create", { input }),
+    update: (input: BlockUpdateInput) => invoke<Block>("block_update", { input }),
+    delete: (id: number) => invoke<void>("block_delete", { id }),
+  },
 };
+
+export interface DocumentCreateInput {
+  businessId: number;
+  projectId?: number | null;
+  title: string;
+}
+export interface BlockCreateInput {
+  documentId: number;
+  type: string;
+  content: string;
+  sortOrder: number;
+}
+export interface BlockUpdateInput {
+  id: number;
+  type: string;
+  content: string;
+}
