@@ -89,6 +89,10 @@ export const api = {
     update: (input: BlockUpdateInput) => invoke<Block>("block_update", { input }),
     delete: (id: number) => invoke<void>("block_delete", { id }),
   },
+  backup: {
+    /** path 미지정 시 앱 데이터 폴더의 backup.json. 저장 경로 반환. */
+    exportJson: (path?: string | null) => invoke<string>("export_json", { path: path ?? null }),
+  },
 };
 
 export interface DocumentCreateInput {

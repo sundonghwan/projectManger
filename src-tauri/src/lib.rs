@@ -1,6 +1,7 @@
 mod commands;
 mod db;
 mod error;
+mod export;
 mod models;
 mod repo;
 
@@ -43,6 +44,7 @@ pub fn run() {
             commands::block_create,
             commands::block_update,
             commands::block_delete,
+            commands::export_json,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

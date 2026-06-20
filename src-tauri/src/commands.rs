@@ -258,3 +258,37 @@ pub fn block_delete(state: State<AppState>, id: i64) -> Result<()> {
     let conn = state.db.lock().unwrap();
     repo::document::delete_block(&conn, id)
 }
+
+/// 전체 데이터를 JSON으로 내보낸다. path 미지정 시 앱 데이터 폴더의 backup.json.
+/// 저장한 경로를 반환.
+#[tauri::command]
+pub fn export_json(
+    app: tauri::AppHandle,
+    state: State<AppState>,
+    path: Option<String>,
+) -> Result<String> {
+    use crate::error::AppError;
+    use tauri::Manager;
+
+    let target = match path {
+        Some(p) => std::path::PathBuf::from(p),
+        None => {
+            let dir = app
+                .path()
+                .app_data_dir()
+                .map_err(|e| AppError::Invalid(format!("앱 데이터 경로 오류: {e}")))?;
+            std::fs::create_dir_all(&dir).ok();
+            dir.join("backup.json")
+        }
+    };
+
+    let data = {
+        let conn = state.db.lock().unwrap();
+        crate::export::export_data(&conn)?
+    };
+    let pretty =
+        serde_json::to_string_pretty(&data).map_err(|e| AppError::Invalid(e.to_string()))?;
+    std::fs::write(&target, pretty.as_bytes())
+        .map_err(|e| AppError::Invalid(format!("파일 쓰기 실패: {e}")))?;
+    Ok(target.to_string_lossy().to_string())
+}

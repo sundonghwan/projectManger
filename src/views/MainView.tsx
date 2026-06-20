@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { api } from "../api/client";
 import type { Business, Document, Project } from "../domain/types";
 import { businessColor } from "../ui/colors";
 import { useTasks } from "../hooks/useTasks";
@@ -42,7 +44,17 @@ export function MainView({ business, project, document, view, onViewChange, erro
     business?.id ?? null,
     project?.id ?? null,
   );
+  const [backupMsg, setBackupMsg] = useState<string | null>(null);
   const shownError = error ?? taskError;
+
+  const onExport = async () => {
+    try {
+      const savedPath = await api.backup.exportJson();
+      setBackupMsg(`내보냄: ${savedPath}`);
+    } catch (e) {
+      setBackupMsg(`내보내기 실패: ${String(e)}`);
+    }
+  };
 
   return (
     <section
@@ -79,7 +91,16 @@ export function MainView({ business, project, document, view, onViewChange, erro
         ) : (
           <span style={{ fontSize: 13, color: "var(--text2)" }}>선택된 항목 없음</span>
         )}
+        <span style={{ flex: 1 }} />
+        <button onClick={onExport} style={exportBtn} title="전체 데이터를 JSON으로 백업">
+          내보내기
+        </button>
       </div>
+      {backupMsg && (
+        <div style={{ padding: "6px 14px", fontSize: 12, color: "var(--text2)", borderBottom: "1px solid var(--border)" }}>
+          {backupMsg}
+        </div>
+      )}
 
       {business && (
         <div style={tabbar}>
@@ -164,6 +185,16 @@ const tabStyle: React.CSSProperties = {
   background: "transparent",
   cursor: "pointer",
   marginBottom: -1,
+};
+const exportBtn: React.CSSProperties = {
+  border: "1px solid var(--border)",
+  background: "var(--bg)",
+  color: "var(--text2)",
+  borderRadius: "var(--radius-md)",
+  padding: "5px 12px",
+  fontSize: 12,
+  fontWeight: 600,
+  cursor: "pointer",
 };
 const errorBar: React.CSSProperties = {
   margin: "12px 16px",
