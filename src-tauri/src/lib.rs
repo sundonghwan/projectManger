@@ -4,6 +4,8 @@ mod error;
 mod export;
 mod models;
 mod repo;
+mod secrets;
+mod terminal;
 
 use std::sync::Mutex;
 use tauri::Manager;
@@ -20,6 +22,7 @@ pub fn run() {
             app.manage(commands::AppState {
                 db: Mutex::new(conn),
             });
+            app.manage(terminal::TerminalManager::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -57,6 +60,17 @@ pub fn run() {
             commands::deliverable_add_version,
             commands::deliverable_versions,
             commands::deliverable_archive,
+            commands::server_list,
+            commands::server_create,
+            commands::server_update,
+            commands::server_archive,
+            commands::server_set_secret,
+            commands::server_clear_secret,
+            commands::server_has_secret,
+            commands::ssh_connect,
+            commands::ssh_write,
+            commands::ssh_resize,
+            commands::ssh_disconnect,
             commands::search,
             commands::trash_list,
             commands::trash_restore,

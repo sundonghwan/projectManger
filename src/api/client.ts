@@ -13,9 +13,11 @@ import type {
   EntityStatus,
   Label,
   Priority,
+  AuthType,
   Project,
   SearchHit,
   SearchKind,
+  ServerConnection,
   Task,
   TaskLabel,
   TaskStatus,
@@ -131,6 +133,39 @@ export const api = {
     versions: (deliverableId: number) =>
       invoke<DeliverableVersion[]>("deliverable_versions", { deliverableId }),
     archive: (id: number) => invoke<void>("deliverable_archive", { id }),
+  },
+  server: {
+    list: (businessId: number) => invoke<ServerConnection[]>("server_list", { businessId }),
+    create: (input: {
+      businessId: number;
+      projectId?: number | null;
+      name: string;
+      host: string;
+      port: number;
+      username: string;
+      authType: AuthType;
+      keyPath?: string | null;
+    }) => invoke<ServerConnection>("server_create", { input }),
+    update: (input: {
+      id: number;
+      name: string;
+      host: string;
+      port: number;
+      username: string;
+      authType: AuthType;
+      keyPath?: string | null;
+    }) => invoke<ServerConnection>("server_update", { input }),
+    archive: (id: number) => invoke<void>("server_archive", { id }),
+    setSecret: (id: number, secret: string) => invoke<void>("server_set_secret", { id, secret }),
+    clearSecret: (id: number) => invoke<void>("server_clear_secret", { id }),
+    hasSecret: (id: number) => invoke<boolean>("server_has_secret", { id }),
+  },
+  ssh: {
+    connect: (id: number) => invoke<void>("ssh_connect", { id }),
+    write: (id: number, data: string) => invoke<void>("ssh_write", { id, data }),
+    resize: (id: number, rows: number, cols: number) =>
+      invoke<void>("ssh_resize", { id, rows, cols }),
+    disconnect: (id: number) => invoke<void>("ssh_disconnect", { id }),
   },
   search: (query: string) => invoke<SearchHit[]>("search", { query }),
   trash: {

@@ -1,8 +1,9 @@
 use crate::error::Result;
 use crate::models::{
-    Block, Business, Deliverable, DeliverableVersion, Document, Label, Project, SearchHit, Task,
-    TaskLabel, TrashItem,
+    Block, Business, Deliverable, DeliverableVersion, Document, Label, Project, SearchHit,
+    ServerConnection, Task, TaskLabel, TrashItem,
 };
+use crate::secrets;
 use crate::repo;
 use rusqlite::Connection;
 use serde::Deserialize;
@@ -369,6 +370,139 @@ pub fn deliverable_versions(state: State<AppState>, deliverable_id: i64) -> Resu
 pub fn deliverable_archive(state: State<AppState>, id: i64) -> Result<()> {
     let conn = state.db.lock().unwrap();
     repo::deliverable::archive(&conn, id)
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerCreate {
+    pub business_id: i64,
+    pub project_id: Option<i64>,
+    pub name: String,
+    pub host: String,
+    pub port: i64,
+    pub username: String,
+    pub auth_type: String,
+    pub key_path: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerUpdate {
+    pub id: i64,
+    pub name: String,
+    pub host: String,
+    pub port: i64,
+    pub username: String,
+    pub auth_type: String,
+    pub key_path: Option<String>,
+}
+
+#[tauri::command]
+pub fn server_list(state: State<AppState>, business_id: i64) -> Result<Vec<ServerConnection>> {
+    let conn = state.db.lock().unwrap();
+    repo::server::list_by_business(&conn, business_id)
+}
+
+#[tauri::command]
+pub fn server_create(state: State<AppState>, input: ServerCreate) -> Result<ServerConnection> {
+    let conn = state.db.lock().unwrap();
+    repo::server::create(
+        &conn,
+        input.business_id,
+        input.project_id,
+        &input.name,
+        &input.host,
+        input.port,
+        &input.username,
+        &input.auth_type,
+        input.key_path.as_deref(),
+    )
+}
+
+#[tauri::command]
+pub fn server_update(state: State<AppState>, input: ServerUpdate) -> Result<ServerConnection> {
+    let conn = state.db.lock().unwrap();
+    repo::server::update(
+        &conn,
+        input.id,
+        &input.name,
+        &input.host,
+        input.port,
+        &input.username,
+        &input.auth_type,
+        input.key_path.as_deref(),
+    )
+}
+
+#[tauri::command]
+pub fn server_archive(state: State<AppState>, id: i64) -> Result<()> {
+    let conn = state.db.lock().unwrap();
+    // 보관 시 키체인 시크릿도 제거
+    let _ = secrets::delete(&secrets::ref_for_server(id));
+    repo::server::archive(&conn, id)
+}
+
+/// 서버 비밀값(비밀번호/패스프레이즈)을 OS 키체인에 저장. DB엔 참조 키만 기록.
+#[tauri::command]
+pub fn server_set_secret(state: State<AppState>, id: i64, secret: String) -> Result<()> {
+    let secret_ref = secrets::ref_for_server(id);
+    secrets::set(&secret_ref, &secret)?;
+    let conn = state.db.lock().unwrap();
+    repo::server::set_secret_ref(&conn, id, Some(&secret_ref))
+}
+
+/// 키체인에 저장된 비밀값 제거 + 참조 해제.
+#[tauri::command]
+pub fn server_clear_secret(state: State<AppState>, id: i64) -> Result<()> {
+    secrets::delete(&secrets::ref_for_server(id))?;
+    let conn = state.db.lock().unwrap();
+    repo::server::set_secret_ref(&conn, id, None)
+}
+
+/// 비밀값 저장 여부(참조 키 존재).
+#[tauri::command]
+pub fn server_has_secret(state: State<AppState>, id: i64) -> Result<bool> {
+    let conn = state.db.lock().unwrap();
+    Ok(repo::server::get(&conn, id)?.secret_ref.is_some())
+}
+
+// ---- SSH 터미널 ----
+
+#[tauri::command]
+pub fn ssh_connect(
+    app: tauri::AppHandle,
+    state: State<AppState>,
+    term: State<crate::terminal::TerminalManager>,
+    id: i64,
+) -> Result<()> {
+    let server = {
+        let conn = state.db.lock().unwrap();
+        repo::server::get(&conn, id)?
+    };
+    crate::terminal::connect(&app, &term, &server)?;
+    let conn = state.db.lock().unwrap();
+    let _ = repo::server::touch_last_used(&conn, id);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn ssh_write(term: State<crate::terminal::TerminalManager>, id: i64, data: String) -> Result<()> {
+    crate::terminal::write(&term, id, &data)
+}
+
+#[tauri::command]
+pub fn ssh_resize(
+    term: State<crate::terminal::TerminalManager>,
+    id: i64,
+    rows: u16,
+    cols: u16,
+) -> Result<()> {
+    crate::terminal::resize(&term, id, rows, cols)
+}
+
+#[tauri::command]
+pub fn ssh_disconnect(term: State<crate::terminal::TerminalManager>, id: i64) -> Result<()> {
+    crate::terminal::disconnect(&term, id)
 }
 
 #[tauri::command]

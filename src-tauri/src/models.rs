@@ -29,6 +29,24 @@ pub struct Project {
     pub archived_at: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerConnection {
+    pub id: i64,
+    pub business_id: i64,
+    pub project_id: Option<i64>,
+    pub name: String,
+    pub host: String,
+    pub port: i64,
+    pub username: String,
+    pub auth_type: String,
+    pub key_path: Option<String>,
+    /// OS 키체인 참조 키 — 실제 비밀값은 DB에 없음
+    pub secret_ref: Option<String>,
+    pub last_used_at: Option<String>,
+    pub archived_at: Option<String>,
+}
+
 /// 휴지통(보관) 항목
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

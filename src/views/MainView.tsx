@@ -12,6 +12,7 @@ import { TaskList } from "./TaskList";
 import { DocEditor } from "./DocEditor";
 import { TaskEditor } from "./TaskEditor";
 import { DeliverablesView } from "./DeliverablesView";
+import { ServerView } from "./ServerView";
 
 export type ViewKind = "dashboard" | "kanban" | "list" | "doc" | "deliverables" | "ssh";
 
@@ -214,6 +215,8 @@ export function MainView({
             projectId={project?.id ?? null}
             onChanged={onDataChanged}
           />
+        ) : view === "ssh" ? (
+          <ServerView key={business.id} businessId={business.id} projectId={project?.id ?? null} />
         ) : (
           <div style={{ padding: "24px 28px", color: "var(--text2)" }}>
             <strong style={{ color: "var(--text)" }}>{VIEW_LABEL[view]}</strong> — 다음 단계에서 지원
