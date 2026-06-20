@@ -122,9 +122,9 @@ export default function App() {
   }, []);
 
   const onAddBusiness = useCallback(
-    async (type: BusinessType) => {
+    async (type: BusinessType, name: string) => {
       try {
-        const b = await api.business.create({ name: "새 사업", type });
+        const b = await api.business.create({ name, type });
         await loadBusinesses();
         setExpanded((prev) => new Set(prev).add(rowId("business", b.id)));
         void loadProjects(b.id);
@@ -140,7 +140,7 @@ export default function App() {
   );
 
   const onAddChild = useCallback(
-    async (row: TreeRow, kind: AddKind) => {
+    async (row: TreeRow, kind: AddKind, name: string) => {
       // 추가 위치의 사업/프로젝트 해석
       let businessId: number;
       let projectId: number | null;
@@ -156,12 +156,12 @@ export default function App() {
       try {
         setExpanded((prev) => new Set(prev).add(row.id));
         if (kind === "project") {
-          const p = await api.project.create({ businessId, name: "새 프로젝트" });
+          const p = await api.project.create({ businessId, name });
           await loadProjects(businessId);
           setSelectedId(rowId("project", p.id));
           setView("kanban");
         } else if (kind === "document") {
-          const d = await api.document.create({ businessId, projectId, title: "제목 없음" });
+          const d = await api.document.create({ businessId, projectId, title: name });
           await loadDocuments(businessId);
           setSelectedId(rowId("document", d.id));
           setView("doc");
@@ -169,7 +169,7 @@ export default function App() {
           const dv = await api.deliverable.create({
             businessId,
             projectId,
-            title: "새 산출물",
+            title: name,
             kind: "file",
           });
           await loadDeliverables(businessId);
