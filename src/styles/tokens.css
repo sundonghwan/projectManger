@@ -1,0 +1,101 @@
+/* 디자인 토큰 — docs/06-디자인시스템 기준. 라이트/다크 한 쌍. */
+:root {
+  /* 중립 표면 */
+  --bg: #ffffff;
+  --sidebar: #f7f7f5;
+  --card: #ffffff;
+  --hover: #efefed;
+  --sel: #e8e7ff;
+  --input: #f2f2f0;
+  --border: #e6e6e3;
+  --border-strong: #d4d4d0;
+
+  /* 텍스트 */
+  --text: #1f1f1d;
+  --text2: #6b6b66;
+  --text3: #9a9a93;
+  --on-accent: #ffffff;
+
+  /* 포인트 */
+  --accent: #5b5bd6;
+  --accent-hover: #4a4ac4;
+
+  /* 사업 유형 */
+  --type-si: #3b82f6;
+  --type-internal: #22c55e;
+  --type-ops: #f97316;
+  --type-etc: #94a3b8;
+
+  /* 상태 (태스크/산출물/서버 공용) */
+  --st-idle: #94a3b8;
+  --st-progress: #3b82f6;
+  --st-review: #f59e0b;
+  --st-done: #22c55e;
+  --st-danger: #ef4444;
+
+  /* 우선순위 */
+  --pr-urgent: #ef4444;
+  --pr-high: #f97316;
+  --pr-normal: #94a3b8;
+  --pr-low: #cbd5e1;
+
+  /* 간격 (4px 그리드) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* 모서리 */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+
+  /* 그림자 */
+  --shadow-popover: 0 4px 16px rgba(0, 0, 0, 0.12);
+  --shadow-modal: 0 12px 40px rgba(0, 0, 0, 0.18);
+
+  /* 레이아웃 */
+  --sidebar-width: 280px;
+  --row-height: 30px;
+  --tree-indent: 16px;
+
+  --font-sans: -apple-system, "Segoe UI", "Pretendard", Roboto, "Apple SD Gothic Neo",
+    "Malgun Gothic", sans-serif;
+  --font-mono: "SFMono-Regular", "JetBrains Mono", Consolas, "D2Coding", monospace;
+}
+
+:root[data-theme="dark"] {
+  --bg: #1a1a18;
+  --sidebar: #161614;
+  --card: #232320;
+  --hover: #2a2a27;
+  --sel: #2e2e4a;
+  --input: #232320;
+  --border: #2e2e2b;
+  --border-strong: #3a3a36;
+  --text: #ededeb;
+  --text2: #a3a39c;
+  --text3: #6f6f68;
+  --accent: #7b7bf0;
+  --accent-hover: #8e8ef5;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}

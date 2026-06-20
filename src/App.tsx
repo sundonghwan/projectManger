@@ -1,51 +1,140 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { api } from "./api/client";
+import { buildTree, rowId, type TreeRow } from "./domain/tree";
+import type { Business, Project } from "./domain/types";
+import { Sidebar } from "./components/Sidebar";
+import { businessColor } from "./ui/colors";
+import { MainView, type ViewKind } from "./views/MainView";
 
-function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+export default function App() {
+  const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [view, setView] = useState<ViewKind>("dashboard");
+  const [error, setError] = useState<string | null>(null);
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
+  const loadBusinesses = useCallback(async () => {
+    try {
+      setBusinesses(await api.business.list());
+      setError(null);
+    } catch (e) {
+      setError(String(e));
+    }
+  }, []);
+
+  const loadProjects = useCallback(async (businessId: number) => {
+    try {
+      const list = await api.project.list(businessId);
+      setProjects((prev) => [...prev.filter((p) => p.businessId !== businessId), ...list]);
+    } catch (e) {
+      setError(String(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadBusinesses();
+  }, [loadBusinesses]);
+
+  const tree = useMemo(
+    () => buildTree({ businesses, projects, documents: [], deliverables: [], expanded }),
+    [businesses, projects, expanded],
+  );
+
+  const colorFor = useCallback(
+    (entityId: number) => {
+      const b = businesses.find((x) => x.id === entityId);
+      return b ? businessColor(b.type, b.color) : "#94a3b8";
+    },
+    [businesses],
+  );
+
+  const onToggle = useCallback(
+    (row: TreeRow) => {
+      setExpanded((prev) => {
+        const next = new Set(prev);
+        if (next.has(row.id)) next.delete(row.id);
+        else {
+          next.add(row.id);
+          if (row.type === "business") void loadProjects(row.entityId);
+        }
+        return next;
+      });
+    },
+    [loadProjects],
+  );
+
+  const onSelect = useCallback((row: TreeRow) => {
+    setSelectedId(row.id);
+    if (row.type === "dashboard" || row.type === "business") setView("dashboard");
+    else if (row.type === "project") setView("kanban");
+  }, []);
+
+  const onAddBusiness = useCallback(async () => {
+    try {
+      const b = await api.business.create({ name: "새 사업", type: "etc" });
+      await loadBusinesses();
+      setExpanded((prev) => new Set(prev).add(rowId("business", b.id)));
+      void loadProjects(b.id);
+      setSelectedId(rowId("business", b.id));
+      setView("dashboard");
+    } catch (e) {
+      setError(String(e));
+    }
+  }, [loadBusinesses, loadProjects]);
+
+  const onAddChild = useCallback(
+    async (row: TreeRow) => {
+      if (row.type === "business") {
+        try {
+          await api.project.create({ businessId: row.entityId, name: "새 프로젝트" });
+          setExpanded((prev) => new Set(prev).add(row.id));
+          await loadProjects(row.entityId);
+        } catch (e) {
+          setError(String(e));
+        }
+      }
+      // 프로젝트 하위(문서·산출물) 생성은 다음 단계에서 지원
+    },
+    [loadProjects],
+  );
+
+  const selectedBusiness = useMemo(() => {
+    const row = tree.find((r) => r.id === selectedId);
+    if (!row) return businesses[0] ?? null;
+    if (row.type === "business" || row.type === "dashboard")
+      return businesses.find((b) => b.id === row.entityId) ?? null;
+    if (row.type === "project") {
+      const p = projects.find((x) => x.id === row.entityId);
+      return p ? (businesses.find((b) => b.id === p.businessId) ?? null) : null;
+    }
+    return businesses[0] ?? null;
+  }, [tree, selectedId, businesses, projects]);
+
+  const selectedProject = useMemo(() => {
+    const row = tree.find((r) => r.id === selectedId);
+    if (row?.type === "project") return projects.find((x) => x.id === row.entityId) ?? null;
+    return null;
+  }, [tree, selectedId, projects]);
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
-
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
+    <div style={{ display: "flex", height: "100%", overflow: "hidden" }}>
+      <Sidebar
+        rows={tree}
+        selectedId={selectedId}
+        colorFor={colorFor}
+        onSelect={onSelect}
+        onToggle={onToggle}
+        onAddBusiness={onAddBusiness}
+        onAddChild={onAddChild}
+      />
+      <MainView
+        business={selectedBusiness}
+        project={selectedProject}
+        view={view}
+        onViewChange={setView}
+        error={error}
+      />
+    </div>
   );
 }
-
-export default App;
