@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import type { TreeRow } from "../domain/tree";
 
 export interface SidebarProps {
@@ -10,7 +10,11 @@ export interface SidebarProps {
   onToggle: (row: TreeRow) => void;
   onAddBusiness: () => void;
   onAddChild: (row: TreeRow) => void;
+  /** 더블클릭 인라인 이름변경 (사업/프로젝트/문서) */
+  onRename?: (row: TreeRow, name: string) => void;
 }
+
+const RENAMEABLE = new Set<TreeRow["type"]>(["business", "project", "document"]);
 
 const ICON: Partial<Record<TreeRow["type"], string>> = {
   dashboard: "📊",
@@ -23,7 +27,19 @@ function projectIcon(expanded: boolean): string {
 }
 
 export function Sidebar(props: SidebarProps) {
-  const { rows, selectedId, colorFor, onSelect, onToggle, onAddBusiness, onAddChild } = props;
+  const { rows, selectedId, colorFor, onSelect, onToggle, onAddBusiness, onAddChild, onRename } = props;
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+
+  const startEdit = (row: TreeRow) => {
+    setEditingId(row.id);
+    setDraft(row.label);
+  };
+  const commit = (row: TreeRow) => {
+    const name = draft.trim();
+    if (name && name !== row.label) onRename?.(row, name);
+    setEditingId(null);
+  };
 
   return (
     <aside
@@ -96,9 +112,33 @@ export function Sidebar(props: SidebarProps) {
                 </span>
               )}
 
-              <span style={{ ...labelStyle, fontWeight: row.type === "business" ? 600 : 400 }}>
-                {row.label}
-              </span>
+              {editingId === row.id ? (
+                <input
+                  autoFocus
+                  aria-label="이름 변경"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  onBlur={() => commit(row)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commit(row);
+                    else if (e.key === "Escape") setEditingId(null);
+                  }}
+                  style={renameInput}
+                />
+              ) : (
+                <span
+                  style={{ ...labelStyle, fontWeight: row.type === "business" ? 600 : 400 }}
+                  onDoubleClick={(e) => {
+                    if (onRename && RENAMEABLE.has(row.type)) {
+                      e.stopPropagation();
+                      startEdit(row);
+                    }
+                  }}
+                >
+                  {row.label}
+                </span>
+              )}
 
               {canAddChild && (
                 <button
@@ -178,6 +218,17 @@ const labelStyle: CSSProperties = {
   whiteSpace: "nowrap",
   fontSize: 13.5,
   letterSpacing: "-0.2px",
+};
+const renameInput: CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  border: "1px solid var(--accent)",
+  borderRadius: 4,
+  background: "var(--bg)",
+  color: "var(--text)",
+  fontSize: 13.5,
+  padding: "1px 4px",
+  fontFamily: "inherit",
 };
 const addChildStyle: CSSProperties = {
   width: 20,

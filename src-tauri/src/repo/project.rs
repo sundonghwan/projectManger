@@ -82,6 +82,20 @@ pub fn update(
     get(conn, id)
 }
 
+pub fn rename(conn: &Connection, id: i64, name: &str) -> Result<Project> {
+    if name.trim().is_empty() {
+        return Err(AppError::Invalid("프로젝트명은 비어 있을 수 없습니다".into()));
+    }
+    let n = conn.execute(
+        "UPDATE project SET name=?2, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?1",
+        params![id, name],
+    )?;
+    if n == 0 {
+        return Err(AppError::NotFound);
+    }
+    get(conn, id)
+}
+
 pub fn archive(conn: &Connection, id: i64) -> Result<()> {
     let n = conn.execute(
         "UPDATE project SET archived_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?1",
@@ -153,6 +167,14 @@ mod tests {
         assert_eq!(u.name, "변경");
         assert_eq!(u.status, "done");
         assert_eq!(u.due_date.as_deref(), Some("2026-07-30"));
+    }
+
+    #[test]
+    fn rename_changes_name() {
+        let (c, biz) = setup();
+        let p = create(&c, biz, "원래").unwrap();
+        assert_eq!(rename(&c, p.id, "새").unwrap().name, "새");
+        assert!(rename(&c, p.id, " ").is_err());
     }
 
     #[test]

@@ -127,6 +127,28 @@ export default function App() {
     [projects, loadProjects, loadDocuments],
   );
 
+  const onRename = useCallback(
+    async (row: TreeRow, name: string) => {
+      try {
+        if (row.type === "business") {
+          await api.business.rename(row.entityId, name);
+          await loadBusinesses();
+        } else if (row.type === "project") {
+          const p = projects.find((x) => x.id === row.entityId);
+          await api.project.rename(row.entityId, name);
+          if (p) await loadProjects(p.businessId);
+        } else if (row.type === "document") {
+          const d = documents.find((x) => x.id === row.entityId);
+          await api.document.rename(row.entityId, name);
+          if (d) await loadDocuments(d.businessId);
+        }
+      } catch (e) {
+        setError(String(e));
+      }
+    },
+    [projects, documents, loadBusinesses, loadProjects, loadDocuments],
+  );
+
   const selectedBusiness = useMemo(() => {
     const row = tree.find((r) => r.id === selectedId);
     if (!row) return businesses[0] ?? null;
@@ -165,6 +187,7 @@ export default function App() {
         onToggle={onToggle}
         onAddBusiness={onAddBusiness}
         onAddChild={onAddChild}
+        onRename={onRename}
       />
       <MainView
         business={selectedBusiness}

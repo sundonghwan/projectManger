@@ -59,6 +59,12 @@ pub fn business_update(state: State<AppState>, input: BusinessUpdate) -> Result<
 }
 
 #[tauri::command]
+pub fn business_rename(state: State<AppState>, id: i64, name: String) -> Result<Business> {
+    let conn = state.db.lock().unwrap();
+    repo::business::rename(&conn, id, &name)
+}
+
+#[tauri::command]
 pub fn business_archive(state: State<AppState>, id: i64) -> Result<()> {
     let conn = state.db.lock().unwrap();
     repo::business::archive(&conn, id)
@@ -104,6 +110,12 @@ pub fn project_update(state: State<AppState>, input: ProjectUpdate) -> Result<Pr
         input.description.as_deref(),
         input.due_date.as_deref(),
     )
+}
+
+#[tauri::command]
+pub fn project_rename(state: State<AppState>, id: i64, name: String) -> Result<Project> {
+    let conn = state.db.lock().unwrap();
+    repo::project::rename(&conn, id, &name)
 }
 
 #[tauri::command]

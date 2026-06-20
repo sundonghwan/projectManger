@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api } from "../api/client";
+import { api, type TaskUpdateInput } from "../api/client";
 import type { Label, Task, TaskStatus } from "../domain/types";
 import { groupLabelsByTask } from "../domain/labels";
 
@@ -74,6 +74,30 @@ export function useTasks(businessId: number | null, projectId: number | null) {
     [reload],
   );
 
+  const update = useCallback(
+    async (input: TaskUpdateInput) => {
+      try {
+        await api.task.update(input);
+        await reload();
+      } catch (e) {
+        setError(String(e));
+      }
+    },
+    [reload],
+  );
+
+  const archive = useCallback(
+    async (id: number) => {
+      try {
+        await api.task.archive(id);
+        await reload();
+      } catch (e) {
+        setError(String(e));
+      }
+    },
+    [reload],
+  );
+
   const assignLabel = useCallback(
     async (taskId: number, name: string, color: string) => {
       try {
@@ -99,5 +123,17 @@ export function useTasks(businessId: number | null, projectId: number | null) {
     [reload],
   );
 
-  return { tasks, labelsByTask, error, reload, create, move, toggleDone, assignLabel, removeLabel };
+  return {
+    tasks,
+    labelsByTask,
+    error,
+    reload,
+    create,
+    move,
+    toggleDone,
+    update,
+    archive,
+    assignLabel,
+    removeLabel,
+  };
 }

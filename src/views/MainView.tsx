@@ -9,6 +9,7 @@ import { Dashboard } from "./Dashboard";
 import { Kanban } from "./Kanban";
 import { TaskList } from "./TaskList";
 import { DocEditor } from "./DocEditor";
+import { TaskEditor } from "./TaskEditor";
 
 export type ViewKind = "dashboard" | "kanban" | "list" | "doc" | "deliverables" | "ssh";
 
@@ -40,11 +41,21 @@ export interface MainViewProps {
 }
 
 export function MainView({ business, project, document, view, onViewChange, error }: MainViewProps) {
-  const { tasks, labelsByTask, error: taskError, create, move, toggleDone } = useTasks(
-    business?.id ?? null,
-    project?.id ?? null,
-  );
+  const {
+    tasks,
+    labelsByTask,
+    error: taskError,
+    create,
+    move,
+    toggleDone,
+    update,
+    archive,
+    assignLabel,
+    removeLabel,
+  } = useTasks(business?.id ?? null, project?.id ?? null);
   const [backupMsg, setBackupMsg] = useState<string | null>(null);
+  const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+  const editingTask = tasks.find((t) => t.id === editingTaskId) ?? null;
   const shownError = error ?? taskError;
 
   const onExport = async () => {
@@ -136,9 +147,15 @@ export function MainView({ business, project, document, view, onViewChange, erro
             onMove={move}
             onAddTask={(s) => create(s)}
             labelsByTask={labelsByTask}
+            onCardClick={setEditingTaskId}
           />
         ) : view === "list" ? (
-          <TaskList tasks={tasks} onToggleDone={toggleDone} labelsByTask={labelsByTask} />
+          <TaskList
+            tasks={tasks}
+            onToggleDone={toggleDone}
+            labelsByTask={labelsByTask}
+            onRowClick={setEditingTaskId}
+          />
         ) : view === "doc" ? (
           document ? (
             <DocEditor key={document.id} document={document} />
@@ -153,6 +170,24 @@ export function MainView({ business, project, document, view, onViewChange, erro
           </div>
         )}
       </div>
+
+      {editingTask && (
+        <TaskEditor
+          task={editingTask}
+          labels={labelsByTask[editingTask.id] ?? []}
+          onSave={(patch) => {
+            void update({ id: editingTask.id, ...patch });
+            setEditingTaskId(null);
+          }}
+          onAddLabel={(name, color) => void assignLabel(editingTask.id, name, color)}
+          onRemoveLabel={(l) => void removeLabel(editingTask.id, l.id)}
+          onArchive={() => {
+            void archive(editingTask.id);
+            setEditingTaskId(null);
+          }}
+          onClose={() => setEditingTaskId(null)}
+        />
+      )}
     </section>
   );
 }

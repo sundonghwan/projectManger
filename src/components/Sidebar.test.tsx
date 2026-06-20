@@ -101,4 +101,14 @@ describe("Sidebar", () => {
     const projItem = screen.getByText("프로젝트 1").closest('[role="treeitem"]')!;
     expect(projItem).toHaveAttribute("aria-selected", "true");
   });
+
+  it("라벨 더블클릭 후 Enter로 이름변경 → onRename 호출", async () => {
+    const onRename = vi.fn();
+    setup({ onRename });
+    await userEvent.dblClick(screen.getByText("프로젝트 1"));
+    const input = screen.getByLabelText("이름 변경");
+    await userEvent.clear(input);
+    await userEvent.type(input, "새 프로젝트명{Enter}");
+    expect(onRename).toHaveBeenCalledWith(projRow, "새 프로젝트명");
+  });
 });

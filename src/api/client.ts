@@ -63,12 +63,14 @@ export const api = {
     list: () => invoke<Business[]>("business_list"),
     create: (input: BusinessCreateInput) => invoke<Business>("business_create", { input }),
     update: (input: BusinessUpdateInput) => invoke<Business>("business_update", { input }),
+    rename: (id: number, name: string) => invoke<Business>("business_rename", { id, name }),
     archive: (id: number) => invoke<void>("business_archive", { id }),
   },
   project: {
     list: (businessId: number) => invoke<Project[]>("project_list", { businessId }),
     create: (input: ProjectCreateInput) => invoke<Project>("project_create", { input }),
     update: (input: ProjectUpdateInput) => invoke<Project>("project_update", { input }),
+    rename: (id: number, name: string) => invoke<Project>("project_rename", { id, name }),
     archive: (id: number) => invoke<void>("project_archive", { id }),
   },
   task: {

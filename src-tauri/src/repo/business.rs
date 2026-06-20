@@ -73,6 +73,21 @@ pub fn update(
     get(conn, id)
 }
 
+/// 이름만 변경.
+pub fn rename(conn: &Connection, id: i64, name: &str) -> Result<Business> {
+    if name.trim().is_empty() {
+        return Err(AppError::Invalid("사업명은 비어 있을 수 없습니다".into()));
+    }
+    let n = conn.execute(
+        "UPDATE business SET name=?2, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?1",
+        params![id, name],
+    )?;
+    if n == 0 {
+        return Err(AppError::NotFound);
+    }
+    get(conn, id)
+}
+
 /// 소프트 삭제(보관).
 pub fn archive(conn: &Connection, id: i64) -> Result<()> {
     let n = conn.execute(
@@ -142,6 +157,16 @@ mod tests {
         assert!(list(&c).unwrap().is_empty());
         // get 으로는 여전히 조회됨(보관 상태)
         assert!(get(&c, b.id).unwrap().archived_at.is_some());
+    }
+
+    #[test]
+    fn rename_changes_only_name() {
+        let c = conn();
+        let b = create(&c, "원래", "si", None).unwrap();
+        let r = rename(&c, b.id, "새이름").unwrap();
+        assert_eq!(r.name, "새이름");
+        assert_eq!(r.r#type, "si");
+        assert!(rename(&c, b.id, "  ").is_err());
     }
 
     #[test]
