@@ -1,19 +1,27 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/client";
-import type { Task, TaskStatus } from "../domain/types";
+import type { Label, Task, TaskStatus } from "../domain/types";
+import { groupLabelsByTask } from "../domain/labels";
 
-/** 선택된 사업/프로젝트의 태스크 로딩 + 생성/이동/완료토글. */
+/** 선택된 사업/프로젝트의 태스크 로딩 + 생성/이동/완료토글 + 라벨. */
 export function useTasks(businessId: number | null, projectId: number | null) {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [labelsByTask, setLabelsByTask] = useState<Record<number, Label[]>>({});
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     if (businessId == null) {
       setTasks([]);
+      setLabelsByTask({});
       return;
     }
     try {
-      setTasks(await api.task.list(businessId, projectId));
+      const [list, labelMap] = await Promise.all([
+        api.task.list(businessId, projectId),
+        api.label.map(businessId),
+      ]);
+      setTasks(list);
+      setLabelsByTask(groupLabelsByTask(labelMap));
       setError(null);
     } catch (e) {
       setError(String(e));
@@ -66,5 +74,30 @@ export function useTasks(businessId: number | null, projectId: number | null) {
     [reload],
   );
 
-  return { tasks, error, reload, create, move, toggleDone };
+  const assignLabel = useCallback(
+    async (taskId: number, name: string, color: string) => {
+      try {
+        const label = await api.label.create(name, color);
+        await api.label.assign(taskId, label.id);
+        await reload();
+      } catch (e) {
+        setError(String(e));
+      }
+    },
+    [reload],
+  );
+
+  const removeLabel = useCallback(
+    async (taskId: number, labelId: number) => {
+      try {
+        await api.label.unassign(taskId, labelId);
+        await reload();
+      } catch (e) {
+        setError(String(e));
+      }
+    },
+    [reload],
+  );
+
+  return { tasks, labelsByTask, error, reload, create, move, toggleDone, assignLabel, removeLabel };
 }

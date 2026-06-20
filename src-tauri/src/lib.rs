@@ -44,6 +44,11 @@ pub fn run() {
             commands::block_create,
             commands::block_update,
             commands::block_delete,
+            commands::label_list,
+            commands::label_create,
+            commands::label_assign,
+            commands::label_unassign,
+            commands::task_label_map,
             commands::export_json,
         ])
         .run(tauri::generate_context!())

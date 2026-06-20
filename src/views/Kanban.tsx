@@ -1,16 +1,19 @@
 import type { CSSProperties, DragEvent } from "react";
 import type { KanbanColumn } from "../domain/kanban";
-import type { TaskStatus } from "../domain/types";
+import type { Label, TaskStatus } from "../domain/types";
 import { computeSortOrder } from "../domain/sortOrder";
 import { TASK_STATUS_COLOR, TASK_STATUS_LABEL, priorityColor, priorityLabel } from "../ui/colors";
+import { LabelChips } from "./LabelChips";
 
 export interface KanbanProps {
   columns: KanbanColumn[];
   onMove: (taskId: number, status: TaskStatus, sortOrder: number) => void;
   onAddTask: (status: TaskStatus) => void;
+  labelsByTask?: Record<number, Label[]>;
+  onCardClick?: (taskId: number) => void;
 }
 
-export function Kanban({ columns, onMove, onAddTask }: KanbanProps) {
+export function Kanban({ columns, onMove, onAddTask, labelsByTask = {}, onCardClick }: KanbanProps) {
   const handleDrop = (col: KanbanColumn) => (e: DragEvent) => {
     e.preventDefault();
     const id = Number(e.dataTransfer.getData("text/plain"));
@@ -56,13 +59,15 @@ export function Kanban({ columns, onMove, onAddTask }: KanbanProps) {
                 key={t.id}
                 draggable
                 onDragStart={(e) => e.dataTransfer.setData("text/plain", String(t.id))}
+                onClick={() => onCardClick?.(t.id)}
                 data-testid={`card-${t.id}`}
                 style={cardStyle}
               >
                 <div style={{ fontSize: 13.5, fontWeight: 500, marginBottom: 9, lineHeight: 1.35 }}>
                   {t.title}
                 </div>
-                <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 5 }}>
+                <LabelChips labels={labelsByTask[t.id]} />
+                <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 5, marginTop: 6 }}>
                   {t.priority > 0 && (
                     <span
                       style={{

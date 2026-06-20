@@ -1,4 +1,5 @@
 pub mod business;
 pub mod document;
+pub mod label;
 pub mod project;
 pub mod task;

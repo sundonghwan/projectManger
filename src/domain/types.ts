@@ -72,6 +72,20 @@ export interface Document {
   archivedAt?: Timestamp | null;
 }
 
+export interface Label {
+  id: number;
+  name: string;
+  color?: string | null;
+}
+
+/** 태스크-라벨 조인 행 */
+export interface TaskLabel {
+  taskId: number;
+  labelId: number;
+  name: string;
+  color?: string | null;
+}
+
 export type BlockType =
   | "paragraph"
   | "heading"

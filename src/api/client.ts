@@ -7,9 +7,11 @@ import type {
   DateString,
   Document,
   EntityStatus,
+  Label,
   Priority,
   Project,
   Task,
+  TaskLabel,
   TaskStatus,
 } from "../domain/types";
 
@@ -88,6 +90,16 @@ export const api = {
     create: (input: BlockCreateInput) => invoke<Block>("block_create", { input }),
     update: (input: BlockUpdateInput) => invoke<Block>("block_update", { input }),
     delete: (id: number) => invoke<void>("block_delete", { id }),
+  },
+  label: {
+    list: () => invoke<Label[]>("label_list"),
+    create: (name: string, color?: string | null) =>
+      invoke<Label>("label_create", { input: { name, color: color ?? null } }),
+    assign: (taskId: number, labelId: number) =>
+      invoke<void>("label_assign", { input: { taskId, labelId } }),
+    unassign: (taskId: number, labelId: number) =>
+      invoke<void>("label_unassign", { input: { taskId, labelId } }),
+    map: (businessId: number) => invoke<TaskLabel[]>("task_label_map", { businessId }),
   },
   backup: {
     /** path 미지정 시 앱 데이터 폴더의 backup.json. 저장 경로 반환. */

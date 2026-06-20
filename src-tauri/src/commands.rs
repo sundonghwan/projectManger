@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::models::{Block, Business, Document, Project, Task};
+use crate::models::{Block, Business, Document, Label, Project, Task, TaskLabel};
 use crate::repo;
 use rusqlite::Connection;
 use serde::Deserialize;
@@ -257,6 +257,50 @@ pub fn block_update(state: State<AppState>, input: BlockUpdate) -> Result<Block>
 pub fn block_delete(state: State<AppState>, id: i64) -> Result<()> {
     let conn = state.db.lock().unwrap();
     repo::document::delete_block(&conn, id)
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LabelCreate {
+    pub name: String,
+    pub color: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LabelAssign {
+    pub task_id: i64,
+    pub label_id: i64,
+}
+
+#[tauri::command]
+pub fn label_list(state: State<AppState>) -> Result<Vec<Label>> {
+    let conn = state.db.lock().unwrap();
+    repo::label::list(&conn)
+}
+
+#[tauri::command]
+pub fn label_create(state: State<AppState>, input: LabelCreate) -> Result<Label> {
+    let conn = state.db.lock().unwrap();
+    repo::label::create(&conn, &input.name, input.color.as_deref())
+}
+
+#[tauri::command]
+pub fn label_assign(state: State<AppState>, input: LabelAssign) -> Result<()> {
+    let conn = state.db.lock().unwrap();
+    repo::label::assign(&conn, input.task_id, input.label_id)
+}
+
+#[tauri::command]
+pub fn label_unassign(state: State<AppState>, input: LabelAssign) -> Result<()> {
+    let conn = state.db.lock().unwrap();
+    repo::label::unassign(&conn, input.task_id, input.label_id)
+}
+
+#[tauri::command]
+pub fn task_label_map(state: State<AppState>, business_id: i64) -> Result<Vec<TaskLabel>> {
+    let conn = state.db.lock().unwrap();
+    repo::label::map_for_business(&conn, business_id)
 }
 
 /// 전체 데이터를 JSON으로 내보낸다. path 미지정 시 앱 데이터 폴더의 backup.json.

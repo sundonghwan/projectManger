@@ -1,15 +1,18 @@
 import type { CSSProperties } from "react";
-import type { Task } from "../domain/types";
+import type { Label, Task } from "../domain/types";
 import { TASK_STATUS_COLOR, TASK_STATUS_LABEL, priorityColor, priorityLabel } from "../ui/colors";
+import { LabelChips } from "./LabelChips";
 
 export interface TaskListProps {
   tasks: Task[];
   onToggleDone: (task: Task) => void;
+  labelsByTask?: Record<number, Label[]>;
+  onRowClick?: (taskId: number) => void;
 }
 
-const COLS = "34px 1fr 96px 84px 90px";
+const COLS = "34px 1fr 96px 84px 90px 150px";
 
-export function TaskList({ tasks, onToggleDone }: TaskListProps) {
+export function TaskList({ tasks, onToggleDone, labelsByTask = {}, onRowClick }: TaskListProps) {
   return (
     <div>
       <div style={{ ...rowGrid, ...headerStyle }}>
@@ -18,6 +21,7 @@ export function TaskList({ tasks, onToggleDone }: TaskListProps) {
         <span>상태</span>
         <span>우선순위</span>
         <span>마감</span>
+        <span>라벨</span>
       </div>
       {tasks.length === 0 && (
         <div style={{ padding: "16px 20px", color: "var(--text3)", fontSize: 13 }}>
@@ -27,7 +31,12 @@ export function TaskList({ tasks, onToggleDone }: TaskListProps) {
       {tasks.map((t) => {
         const done = t.status === "done";
         return (
-          <div key={t.id} style={{ ...rowGrid, ...bodyRow }} data-testid={`row-${t.id}`}>
+          <div
+            key={t.id}
+            style={{ ...rowGrid, ...bodyRow, cursor: onRowClick ? "pointer" : "default" }}
+            data-testid={`row-${t.id}`}
+            onClick={() => onRowClick?.(t.id)}
+          >
             <span>
               <button
                 role="checkbox"
@@ -84,6 +93,9 @@ export function TaskList({ tasks, onToggleDone }: TaskListProps) {
               )}
             </span>
             <span style={{ fontSize: 12, color: "var(--text2)" }}>{t.dueDate ?? ""}</span>
+            <span style={{ display: "flex", overflow: "hidden" }}>
+              <LabelChips labels={labelsByTask[t.id]} />
+            </span>
           </div>
         );
       })}

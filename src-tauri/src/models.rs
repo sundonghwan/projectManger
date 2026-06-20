@@ -31,6 +31,24 @@ pub struct Project {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct Label {
+    pub id: i64,
+    pub name: String,
+    pub color: Option<String>,
+}
+
+/// 태스크-라벨 조인 행 (사업 단위 일괄 조회용)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskLabel {
+    pub task_id: i64,
+    pub label_id: i64,
+    pub name: String,
+    pub color: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Document {
     pub id: i64,
     pub business_id: i64,

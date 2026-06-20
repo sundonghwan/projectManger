@@ -40,7 +40,7 @@ export interface MainViewProps {
 }
 
 export function MainView({ business, project, document, view, onViewChange, error }: MainViewProps) {
-  const { tasks, error: taskError, create, move, toggleDone } = useTasks(
+  const { tasks, labelsByTask, error: taskError, create, move, toggleDone } = useTasks(
     business?.id ?? null,
     project?.id ?? null,
   );
@@ -131,9 +131,14 @@ export function MainView({ business, project, document, view, onViewChange, erro
         ) : view === "dashboard" ? (
           <Dashboard business={business} stats={dashboardStats(tasks)} />
         ) : view === "kanban" ? (
-          <Kanban columns={groupByStatus(tasks)} onMove={move} onAddTask={(s) => create(s)} />
+          <Kanban
+            columns={groupByStatus(tasks)}
+            onMove={move}
+            onAddTask={(s) => create(s)}
+            labelsByTask={labelsByTask}
+          />
         ) : view === "list" ? (
-          <TaskList tasks={tasks} onToggleDone={toggleDone} />
+          <TaskList tasks={tasks} onToggleDone={toggleDone} labelsByTask={labelsByTask} />
         ) : view === "doc" ? (
           document ? (
             <DocEditor key={document.id} document={document} />
