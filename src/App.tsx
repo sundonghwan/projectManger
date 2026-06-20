@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./api/client";
 import { buildTree, rowId, type TreeRow } from "./domain/tree";
 import type { Business, BusinessType, Deliverable, Document, Project } from "./domain/types";
-import { Sidebar } from "./components/Sidebar";
+import { Sidebar, type AddKind } from "./components/Sidebar";
 import { GlobalSearch } from "./components/GlobalSearch";
 import type { SearchHit } from "./domain/types";
 import { businessColor } from "./ui/colors";
@@ -121,48 +121,66 @@ export default function App() {
     else if (row.type === "deliverable") setView("deliverables");
   }, []);
 
-  const onAddBusiness = useCallback(async () => {
-    try {
-      const b = await api.business.create({ name: "새 사업", type: "etc" });
-      await loadBusinesses();
-      setExpanded((prev) => new Set(prev).add(rowId("business", b.id)));
-      void loadProjects(b.id);
-      void loadDocuments(b.id);
-      void loadDeliverables(b.id);
-      setSelectedId(rowId("business", b.id));
-      setView("dashboard");
-    } catch (e) {
-      setError(String(e));
-    }
-  }, [loadBusinesses, loadProjects, loadDocuments, loadDeliverables]);
+  const onAddBusiness = useCallback(
+    async (type: BusinessType) => {
+      try {
+        const b = await api.business.create({ name: "새 사업", type });
+        await loadBusinesses();
+        setExpanded((prev) => new Set(prev).add(rowId("business", b.id)));
+        void loadProjects(b.id);
+        void loadDocuments(b.id);
+        void loadDeliverables(b.id);
+        setSelectedId(rowId("business", b.id));
+        setView("dashboard");
+      } catch (e) {
+        setError(String(e));
+      }
+    },
+    [loadBusinesses, loadProjects, loadDocuments, loadDeliverables],
+  );
 
   const onAddChild = useCallback(
-    async (row: TreeRow) => {
+    async (row: TreeRow, kind: AddKind) => {
+      // 추가 위치의 사업/프로젝트 해석
+      let businessId: number;
+      let projectId: number | null;
+      if (row.type === "business") {
+        businessId = row.entityId;
+        projectId = null;
+      } else {
+        const proj = projects.find((p) => p.id === row.entityId);
+        if (!proj) return;
+        businessId = proj.businessId;
+        projectId = proj.id;
+      }
       try {
-        if (row.type === "business") {
-          await api.project.create({ businessId: row.entityId, name: "새 프로젝트" });
-          setExpanded((prev) => new Set(prev).add(row.id));
-          await loadProjects(row.entityId);
-        } else if (row.type === "project") {
-          // 프로젝트 하위에는 문서 생성
-          const proj = projects.find((p) => p.id === row.entityId);
-          if (proj) {
-            const d = await api.document.create({
-              businessId: proj.businessId,
-              projectId: proj.id,
-              title: "제목 없음",
-            });
-            setExpanded((prev) => new Set(prev).add(row.id));
-            await loadDocuments(proj.businessId);
-            setSelectedId(rowId("document", d.id));
-            setView("doc");
-          }
+        setExpanded((prev) => new Set(prev).add(row.id));
+        if (kind === "project") {
+          const p = await api.project.create({ businessId, name: "새 프로젝트" });
+          await loadProjects(businessId);
+          setSelectedId(rowId("project", p.id));
+          setView("kanban");
+        } else if (kind === "document") {
+          const d = await api.document.create({ businessId, projectId, title: "제목 없음" });
+          await loadDocuments(businessId);
+          setSelectedId(rowId("document", d.id));
+          setView("doc");
+        } else {
+          const dv = await api.deliverable.create({
+            businessId,
+            projectId,
+            title: "새 산출물",
+            kind: "file",
+          });
+          await loadDeliverables(businessId);
+          setSelectedId(rowId("deliverable", dv.id));
+          setView("deliverables");
         }
       } catch (e) {
         setError(String(e));
       }
     },
-    [projects, loadProjects, loadDocuments],
+    [projects, loadProjects, loadDocuments, loadDeliverables],
   );
 
   const onArchive = useCallback(

@@ -89,19 +89,33 @@ describe("Sidebar", () => {
     expect(props.onSelect).not.toHaveBeenCalled();
   });
 
-  it("사업 추가 버튼은 onAddBusiness 호출", async () => {
+  it("사업 추가 → 유형 메뉴에서 선택 시 onAddBusiness(type)", async () => {
     const { props } = setup();
     await userEvent.click(screen.getByRole("button", { name: "사업 추가" }));
-    expect(props.onAddBusiness).toHaveBeenCalled();
+    // 유형 선택 메뉴 노출
+    await userEvent.click(screen.getByRole("menuitem", { name: /내부개발/ }));
+    expect(props.onAddBusiness).toHaveBeenCalledWith("internal");
   });
 
-  it("하위 추가 버튼은 onAddChild 호출 (사업/프로젝트에만 노출)", async () => {
+  it("사업 [+] → 종류 메뉴에서 선택 시 onAddChild(row, kind)", async () => {
     const { props } = setup();
     const addButtons = screen.getAllByRole("button", { name: "하위 추가" });
     // 사업 1 + 프로젝트 1 = 2개 (대시보드에는 없음)
     expect(addButtons).toHaveLength(2);
-    await userEvent.click(addButtons[0]);
-    expect(props.onAddChild).toHaveBeenCalledWith(bizRow);
+    await userEvent.click(addButtons[0]); // 사업 노드
+    // 사업 메뉴: 프로젝트/문서/산출물
+    expect(screen.getByRole("menuitem", { name: /프로젝트/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("menuitem", { name: /산출물/ }));
+    expect(props.onAddChild).toHaveBeenCalledWith(bizRow, "deliverable");
+  });
+
+  it("프로젝트 [+] 메뉴에는 프로젝트 옵션이 없다", async () => {
+    const { props } = setup();
+    const addButtons = screen.getAllByRole("button", { name: "하위 추가" });
+    await userEvent.click(addButtons[1]); // 프로젝트 노드
+    expect(screen.queryByRole("menuitem", { name: /프로젝트/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("menuitem", { name: /문서/ }));
+    expect(props.onAddChild).toHaveBeenCalledWith(projRow, "document");
   });
 
   it("선택된 행은 aria-selected=true", () => {

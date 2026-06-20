@@ -2,6 +2,10 @@ import { useState, type CSSProperties, type ReactNode } from "react";
 import type { TreeRow } from "../domain/tree";
 import type { BusinessType } from "../domain/types";
 import { TYPE_COLOR, TYPE_LABEL } from "../ui/colors";
+import { AddMenu, type AddMenuOption } from "./AddMenu";
+
+/** 노드에 추가할 수 있는 하위 항목 종류 */
+export type AddKind = "project" | "document" | "deliverable";
 
 export interface SidebarProps {
   rows: TreeRow[];
@@ -15,8 +19,10 @@ export interface SidebarProps {
   colorFor: (businessEntityId: number) => string;
   onSelect: (row: TreeRow) => void;
   onToggle: (row: TreeRow) => void;
-  onAddBusiness: () => void;
-  onAddChild: (row: TreeRow) => void;
+  /** 사용자가 고른 유형으로 새 사업 생성 */
+  onAddBusiness: (type: BusinessType) => void;
+  /** 사용자가 고른 종류의 하위 항목 생성 */
+  onAddChild: (row: TreeRow, kind: AddKind) => void;
   /** 더블클릭 인라인 이름변경 (사업/프로젝트/문서) */
   onRename?: (row: TreeRow, name: string) => void;
   /** 보관(소프트 삭제) — 사업/프로젝트/문서/산출물 */
@@ -53,6 +59,43 @@ export function Sidebar(props: SidebarProps) {
   } = props;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  // 추가 메뉴: 사업 유형 선택 또는 노드 하위 종류 선택
+  const [menu, setMenu] = useState<
+    | { x: number; y: number; ctx: { kind: "business" } | { kind: "child"; row: TreeRow } }
+    | null
+  >(null);
+
+  const openMenu = (e: React.MouseEvent, ctx: { kind: "business" } | { kind: "child"; row: TreeRow }) => {
+    e.stopPropagation();
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setMenu({ x: r.left, y: r.bottom + 4, ctx });
+  };
+
+  const menuOptions: AddMenuOption[] = !menu
+    ? []
+    : menu.ctx.kind === "business"
+      ? [
+          { key: "si", label: TYPE_LABEL.si, icon: "●" },
+          { key: "internal", label: TYPE_LABEL.internal, icon: "●" },
+          { key: "ops", label: TYPE_LABEL.ops, icon: "●" },
+          { key: "etc", label: TYPE_LABEL.etc, icon: "●" },
+        ]
+      : menu.ctx.row.type === "business"
+        ? [
+            { key: "project", label: "프로젝트", icon: "📁" },
+            { key: "document", label: "문서", icon: "📄" },
+            { key: "deliverable", label: "산출물", icon: "📦" },
+          ]
+        : [
+            { key: "document", label: "문서", icon: "📄" },
+            { key: "deliverable", label: "산출물", icon: "📦" },
+          ];
+
+  const onMenuSelect = (key: string) => {
+    if (!menu) return;
+    if (menu.ctx.kind === "business") onAddBusiness(key as BusinessType);
+    else onAddChild(menu.ctx.row, key as AddKind);
+  };
 
   const startEdit = (row: TreeRow) => {
     setEditingId(row.id);
@@ -79,7 +122,7 @@ export function Sidebar(props: SidebarProps) {
       {header}
 
       <div style={{ padding: "4px 8px 6px" }}>
-        <button onClick={onAddBusiness} style={addBusinessStyle} aria-label="사업 추가">
+        <button onClick={(e) => openMenu(e, { kind: "business" })} style={addBusinessStyle} aria-label="사업 추가">
           <span style={{ width: 16, textAlign: "center", fontWeight: 600 }}>+</span>
           <span>사업 추가</span>
         </button>
@@ -168,10 +211,7 @@ export function Sidebar(props: SidebarProps) {
               {canAddChild && (
                 <button
                   aria-label="하위 추가"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onAddChild(row);
-                  }}
+                  onClick={(e) => openMenu(e, { kind: "child", row })}
                   style={addChildStyle}
                 >
                   +
@@ -228,6 +268,16 @@ export function Sidebar(props: SidebarProps) {
             })}
           </div>
         </div>
+      )}
+
+      {menu && (
+        <AddMenu
+          x={menu.x}
+          y={menu.y}
+          options={menuOptions}
+          onSelect={onMenuSelect}
+          onClose={() => setMenu(null)}
+        />
       )}
     </aside>
   );
