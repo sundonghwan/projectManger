@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::models::Business;
+use crate::models::{Business, Project};
 use crate::repo;
 use rusqlite::Connection;
 use serde::Deserialize;
@@ -62,4 +62,52 @@ pub fn business_update(state: State<AppState>, input: BusinessUpdate) -> Result<
 pub fn business_archive(state: State<AppState>, id: i64) -> Result<()> {
     let conn = state.db.lock().unwrap();
     repo::business::archive(&conn, id)
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectCreate {
+    pub business_id: i64,
+    pub name: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectUpdate {
+    pub id: i64,
+    pub name: String,
+    pub status: String,
+    pub description: Option<String>,
+    pub due_date: Option<String>,
+}
+
+#[tauri::command]
+pub fn project_list(state: State<AppState>, business_id: i64) -> Result<Vec<Project>> {
+    let conn = state.db.lock().unwrap();
+    repo::project::list_by_business(&conn, business_id)
+}
+
+#[tauri::command]
+pub fn project_create(state: State<AppState>, input: ProjectCreate) -> Result<Project> {
+    let conn = state.db.lock().unwrap();
+    repo::project::create(&conn, input.business_id, &input.name)
+}
+
+#[tauri::command]
+pub fn project_update(state: State<AppState>, input: ProjectUpdate) -> Result<Project> {
+    let conn = state.db.lock().unwrap();
+    repo::project::update(
+        &conn,
+        input.id,
+        &input.name,
+        &input.status,
+        input.description.as_deref(),
+        input.due_date.as_deref(),
+    )
+}
+
+#[tauri::command]
+pub fn project_archive(state: State<AppState>, id: i64) -> Result<()> {
+    let conn = state.db.lock().unwrap();
+    repo::project::archive(&conn, id)
 }

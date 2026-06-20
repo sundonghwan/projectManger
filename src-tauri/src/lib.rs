@@ -26,6 +26,10 @@ pub fn run() {
             commands::business_create,
             commands::business_update,
             commands::business_archive,
+            commands::project_list,
+            commands::project_create,
+            commands::project_update,
+            commands::project_archive,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
