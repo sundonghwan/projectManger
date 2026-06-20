@@ -35,6 +35,14 @@ pub fn run() {
             commands::task_update,
             commands::task_move,
             commands::task_archive,
+            commands::document_list,
+            commands::document_create,
+            commands::document_rename,
+            commands::document_archive,
+            commands::block_list,
+            commands::block_create,
+            commands::block_update,
+            commands::block_delete,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

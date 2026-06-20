@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::models::{Business, Project, Task};
+use crate::models::{Block, Business, Document, Project, Task};
 use crate::repo;
 use rusqlite::Connection;
 use serde::Deserialize;
@@ -182,4 +182,79 @@ pub fn task_move(state: State<AppState>, input: TaskMove) -> Result<Task> {
 pub fn task_archive(state: State<AppState>, id: i64) -> Result<()> {
     let conn = state.db.lock().unwrap();
     repo::task::archive(&conn, id)
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentCreate {
+    pub business_id: i64,
+    pub project_id: Option<i64>,
+    pub title: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BlockCreate {
+    pub document_id: i64,
+    #[serde(rename = "type")]
+    pub type_: String,
+    pub content: String,
+    pub sort_order: f64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BlockUpdate {
+    pub id: i64,
+    #[serde(rename = "type")]
+    pub type_: String,
+    pub content: String,
+}
+
+#[tauri::command]
+pub fn document_list(state: State<AppState>, business_id: i64) -> Result<Vec<Document>> {
+    let conn = state.db.lock().unwrap();
+    repo::document::list_by_business(&conn, business_id)
+}
+
+#[tauri::command]
+pub fn document_create(state: State<AppState>, input: DocumentCreate) -> Result<Document> {
+    let conn = state.db.lock().unwrap();
+    repo::document::create(&conn, input.business_id, input.project_id, &input.title)
+}
+
+#[tauri::command]
+pub fn document_rename(state: State<AppState>, id: i64, title: String) -> Result<Document> {
+    let conn = state.db.lock().unwrap();
+    repo::document::rename(&conn, id, &title)
+}
+
+#[tauri::command]
+pub fn document_archive(state: State<AppState>, id: i64) -> Result<()> {
+    let conn = state.db.lock().unwrap();
+    repo::document::archive(&conn, id)
+}
+
+#[tauri::command]
+pub fn block_list(state: State<AppState>, document_id: i64) -> Result<Vec<Block>> {
+    let conn = state.db.lock().unwrap();
+    repo::document::list_blocks(&conn, document_id)
+}
+
+#[tauri::command]
+pub fn block_create(state: State<AppState>, input: BlockCreate) -> Result<Block> {
+    let conn = state.db.lock().unwrap();
+    repo::document::create_block(&conn, input.document_id, &input.type_, &input.content, input.sort_order)
+}
+
+#[tauri::command]
+pub fn block_update(state: State<AppState>, input: BlockUpdate) -> Result<Block> {
+    let conn = state.db.lock().unwrap();
+    repo::document::update_block(&conn, input.id, &input.type_, &input.content)
+}
+
+#[tauri::command]
+pub fn block_delete(state: State<AppState>, id: i64) -> Result<()> {
+    let conn = state.db.lock().unwrap();
+    repo::document::delete_block(&conn, id)
 }
