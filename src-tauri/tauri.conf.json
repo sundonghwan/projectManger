@@ -25,7 +25,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis"],
     "category": "Productivity",
     "shortDescription": "사업 단위 프로젝트 관리",
     "longDescription": "사업 단위로 할 일·문서·산출물·개발 서버(SSH)를 한 곳에서 관리하는 내부용 데스크톱 앱.",
