@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./api/client";
 import { buildTree, rowId, type TreeRow } from "./domain/tree";
-import type { Business, Document, Project } from "./domain/types";
+import type { Business, BusinessType, Document, Project } from "./domain/types";
 import { Sidebar } from "./components/Sidebar";
 import { GlobalSearch } from "./components/GlobalSearch";
 import type { SearchHit } from "./domain/types";
@@ -18,6 +18,16 @@ export default function App() {
   const [view, setView] = useState<ViewKind>("dashboard");
   const [error, setError] = useState<string | null>(null);
   const { theme, toggle: toggleTheme } = useTheme();
+  const [typeFilter, setTypeFilter] = useState<Set<BusinessType>>(new Set());
+
+  const onToggleType = useCallback((t: BusinessType) => {
+    setTypeFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(t)) next.delete(t);
+      else next.add(t);
+      return next;
+    });
+  }, []);
 
   const loadBusinesses = useCallback(async () => {
     try {
@@ -50,9 +60,14 @@ export default function App() {
     void loadBusinesses();
   }, [loadBusinesses]);
 
+  const visibleBusinesses = useMemo(
+    () => (typeFilter.size === 0 ? businesses : businesses.filter((b) => typeFilter.has(b.type))),
+    [businesses, typeFilter],
+  );
+
   const tree = useMemo(
-    () => buildTree({ businesses, projects, documents, deliverables: [], expanded }),
-    [businesses, projects, documents, expanded],
+    () => buildTree({ businesses: visibleBusinesses, projects, documents, deliverables: [], expanded }),
+    [visibleBusinesses, projects, documents, expanded],
   );
 
   const colorFor = useCallback(
@@ -153,6 +168,14 @@ export default function App() {
     [projects, documents, loadBusinesses, loadProjects, loadDocuments],
   );
 
+  const onDataChanged = useCallback(async () => {
+    await loadBusinesses();
+    for (const b of businesses) {
+      await loadProjects(b.id);
+      await loadDocuments(b.id);
+    }
+  }, [businesses, loadBusinesses, loadProjects, loadDocuments]);
+
   const navigateTo = useCallback(
     async (hit: SearchHit) => {
       const bizRow = rowId("business", hit.businessId);
@@ -217,6 +240,8 @@ export default function App() {
         rows={tree}
         selectedId={selectedId}
         header={<GlobalSearch onSearch={(q) => api.search(q)} onPick={navigateTo} />}
+        typeFilter={typeFilter}
+        onToggleType={onToggleType}
         colorFor={colorFor}
         onSelect={onSelect}
         onToggle={onToggle}
@@ -233,6 +258,7 @@ export default function App() {
         error={error}
         theme={theme}
         onToggleTheme={toggleTheme}
+        onDataChanged={onDataChanged}
       />
     </div>
   );

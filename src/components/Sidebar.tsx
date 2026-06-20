@@ -1,11 +1,16 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
 import type { TreeRow } from "../domain/tree";
+import type { BusinessType } from "../domain/types";
+import { TYPE_COLOR, TYPE_LABEL } from "../ui/colors";
 
 export interface SidebarProps {
   rows: TreeRow[];
   selectedId: string | null;
   /** 트리 위에 렌더할 헤더 슬롯 (예: 전역 검색) */
   header?: ReactNode;
+  /** 유형 필터: 선택된 유형 집합(비어 있으면 전체) */
+  typeFilter?: Set<BusinessType>;
+  onToggleType?: (type: BusinessType) => void;
   /** 사업 id → 표시 색상 (유형 컬러 또는 커스텀) */
   colorFor: (businessEntityId: number) => string;
   onSelect: (row: TreeRow) => void;
@@ -29,8 +34,19 @@ function projectIcon(expanded: boolean): string {
 }
 
 export function Sidebar(props: SidebarProps) {
-  const { rows, selectedId, colorFor, onSelect, onToggle, onAddBusiness, onAddChild, onRename, header } =
-    props;
+  const {
+    rows,
+    selectedId,
+    colorFor,
+    onSelect,
+    onToggle,
+    onAddBusiness,
+    onAddChild,
+    onRename,
+    header,
+    typeFilter,
+    onToggleType,
+  } = props;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
 
@@ -161,9 +177,50 @@ export function Sidebar(props: SidebarProps) {
           );
         })}
       </div>
+
+      {onToggleType && (
+        <div style={filterSection}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text2)", marginBottom: 8 }}>
+            유형 필터
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {(Object.keys(TYPE_LABEL) as BusinessType[]).map((t) => {
+              const active = typeFilter?.has(t) ?? false;
+              return (
+                <button
+                  key={t}
+                  onClick={() => onToggleType(t)}
+                  aria-pressed={active}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                    fontSize: 12,
+                    padding: "3px 9px",
+                    borderRadius: 20,
+                    border: `1px solid ${active ? TYPE_COLOR[t] : "var(--border)"}`,
+                    background: active ? TYPE_COLOR[t] + "22" : "transparent",
+                    color: active ? TYPE_COLOR[t] : "var(--text2)",
+                    cursor: "pointer",
+                  }}
+                >
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: TYPE_COLOR[t] }} />
+                  {TYPE_LABEL[t]}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </aside>
   );
 }
+
+const filterSection: CSSProperties = {
+  flex: "none",
+  borderTop: "1px solid var(--border)",
+  padding: "10px 14px 12px",
+};
 
 const addBusinessStyle: CSSProperties = {
   height: 30,

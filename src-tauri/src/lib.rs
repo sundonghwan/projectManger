@@ -52,6 +52,9 @@ pub fn run() {
             commands::label_unassign,
             commands::task_label_map,
             commands::search,
+            commands::trash_list,
+            commands::trash_restore,
+            commands::trash_purge,
             commands::export_json,
         ])
         .run(tauri::generate_context!())

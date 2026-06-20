@@ -11,9 +11,11 @@ import type {
   Priority,
   Project,
   SearchHit,
+  SearchKind,
   Task,
   TaskLabel,
   TaskStatus,
+  TrashItem,
 } from "../domain/types";
 
 export interface BusinessCreateInput {
@@ -109,6 +111,11 @@ export const api = {
     exportJson: (path?: string | null) => invoke<string>("export_json", { path: path ?? null }),
   },
   search: (query: string) => invoke<SearchHit[]>("search", { query }),
+  trash: {
+    list: () => invoke<TrashItem[]>("trash_list"),
+    restore: (kind: SearchKind, id: number) => invoke<void>("trash_restore", { kind, id }),
+    purge: (kind: SearchKind, id: number) => invoke<void>("trash_purge", { kind, id }),
+  },
 };
 
 export interface DocumentCreateInput {

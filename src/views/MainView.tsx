@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api } from "../api/client";
-import type { Business, Document, Project } from "../domain/types";
+import type { Business, Document, Project, TrashItem } from "../domain/types";
+import { TrashPanel } from "./TrashPanel";
 import { businessColor } from "../ui/colors";
 import { useTasks } from "../hooks/useTasks";
 import { dashboardStats } from "../domain/dashboard";
@@ -40,6 +41,7 @@ export interface MainViewProps {
   error: string | null;
   theme: "light" | "dark";
   onToggleTheme: () => void;
+  onDataChanged: () => void;
 }
 
 export function MainView({
@@ -51,6 +53,7 @@ export function MainView({
   error,
   theme,
   onToggleTheme,
+  onDataChanged,
 }: MainViewProps) {
   const {
     tasks,
@@ -66,6 +69,8 @@ export function MainView({
   } = useTasks(business?.id ?? null, project?.id ?? null);
   const [backupMsg, setBackupMsg] = useState<string | null>(null);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+  const [trashOpen, setTrashOpen] = useState(false);
+  const [trashItems, setTrashItems] = useState<TrashItem[]>([]);
   const editingTask = tasks.find((t) => t.id === editingTaskId) ?? null;
   const shownError = error ?? taskError;
 
@@ -76,6 +81,21 @@ export function MainView({
     } catch (e) {
       setBackupMsg(`내보내기 실패: ${String(e)}`);
     }
+  };
+
+  const openTrash = async () => {
+    setTrashItems(await api.trash.list());
+    setTrashOpen(true);
+  };
+  const restoreItem = async (item: TrashItem) => {
+    await api.trash.restore(item.kind, item.id);
+    setTrashItems(await api.trash.list());
+    onDataChanged();
+  };
+  const purgeItem = async (item: TrashItem) => {
+    await api.trash.purge(item.kind, item.id);
+    setTrashItems(await api.trash.list());
+    onDataChanged();
   };
 
   return (
@@ -121,6 +141,9 @@ export function MainView({
           title={theme === "light" ? "다크 모드" : "라이트 모드"}
         >
           {theme === "light" ? "🌙" : "☀"}
+        </button>
+        <button onClick={() => void openTrash()} style={exportBtn} aria-label="휴지통" title="휴지통">
+          🗑
         </button>
         <button onClick={onExport} style={exportBtn} title="전체 데이터를 JSON으로 백업">
           내보내기
@@ -205,6 +228,15 @@ export function MainView({
             setEditingTaskId(null);
           }}
           onClose={() => setEditingTaskId(null)}
+        />
+      )}
+
+      {trashOpen && (
+        <TrashPanel
+          items={trashItems}
+          onRestore={(item) => void restoreItem(item)}
+          onPurge={(item) => void purgeItem(item)}
+          onClose={() => setTrashOpen(false)}
         />
       )}
     </section>

@@ -88,6 +88,13 @@ export interface SearchHit {
   projectId?: number | null;
 }
 
+export interface TrashItem {
+  kind: SearchKind;
+  id: number;
+  title: string;
+  archivedAt?: string | null;
+}
+
 /** 태스크-라벨 조인 행 */
 export interface TaskLabel {
   taskId: number;

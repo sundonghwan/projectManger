@@ -29,6 +29,16 @@ pub struct Project {
     pub archived_at: Option<String>,
 }
 
+/// 휴지통(보관) 항목
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrashItem {
+    pub kind: String, // business | project | task | document
+    pub id: i64,
+    pub title: String,
+    pub archived_at: Option<String>,
+}
+
 /// 전역 검색 결과 항목
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

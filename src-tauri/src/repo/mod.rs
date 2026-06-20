@@ -4,3 +4,4 @@ pub mod label;
 pub mod project;
 pub mod search;
 pub mod task;
+pub mod trash;

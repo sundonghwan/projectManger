@@ -102,6 +102,13 @@ describe("Sidebar", () => {
     expect(projItem).toHaveAttribute("aria-selected", "true");
   });
 
+  it("유형 필터 칩 클릭 시 onToggleType 호출", async () => {
+    const onToggleType = vi.fn();
+    setup({ onToggleType, typeFilter: new Set() });
+    await userEvent.click(screen.getByRole("button", { name: /내부개발/ }));
+    expect(onToggleType).toHaveBeenCalledWith("internal");
+  });
+
   it("라벨 더블클릭 후 Enter로 이름변경 → onRename 호출", async () => {
     const onRename = vi.fn();
     setup({ onRename });

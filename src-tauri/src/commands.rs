@@ -1,5 +1,7 @@
 use crate::error::Result;
-use crate::models::{Block, Business, Document, Label, Project, SearchHit, Task, TaskLabel};
+use crate::models::{
+    Block, Business, Document, Label, Project, SearchHit, Task, TaskLabel, TrashItem,
+};
 use crate::repo;
 use rusqlite::Connection;
 use serde::Deserialize;
@@ -319,6 +321,24 @@ pub fn task_label_map(state: State<AppState>, business_id: i64) -> Result<Vec<Ta
 pub fn search(state: State<AppState>, query: String) -> Result<Vec<SearchHit>> {
     let conn = state.db.lock().unwrap();
     repo::search::search(&conn, &query)
+}
+
+#[tauri::command]
+pub fn trash_list(state: State<AppState>) -> Result<Vec<TrashItem>> {
+    let conn = state.db.lock().unwrap();
+    repo::trash::list_archived(&conn)
+}
+
+#[tauri::command]
+pub fn trash_restore(state: State<AppState>, kind: String, id: i64) -> Result<()> {
+    let conn = state.db.lock().unwrap();
+    repo::trash::restore(&conn, &kind, id)
+}
+
+#[tauri::command]
+pub fn trash_purge(state: State<AppState>, kind: String, id: i64) -> Result<()> {
+    let conn = state.db.lock().unwrap();
+    repo::trash::purge(&conn, &kind, id)
 }
 
 /// 전체 데이터를 JSON으로 내보낸다. path 미지정 시 앱 데이터 폴더의 backup.json.
