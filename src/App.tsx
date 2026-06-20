@@ -3,6 +3,8 @@ import { api } from "./api/client";
 import { buildTree, rowId, type TreeRow } from "./domain/tree";
 import type { Business, Document, Project } from "./domain/types";
 import { Sidebar } from "./components/Sidebar";
+import { GlobalSearch } from "./components/GlobalSearch";
+import type { SearchHit } from "./domain/types";
 import { businessColor } from "./ui/colors";
 import { MainView, type ViewKind } from "./views/MainView";
 import { useTheme } from "./hooks/useTheme";
@@ -151,6 +153,36 @@ export default function App() {
     [projects, documents, loadBusinesses, loadProjects, loadDocuments],
   );
 
+  const navigateTo = useCallback(
+    async (hit: SearchHit) => {
+      const bizRow = rowId("business", hit.businessId);
+      setExpanded((prev) => new Set(prev).add(bizRow));
+      await Promise.all([loadProjects(hit.businessId), loadDocuments(hit.businessId)]);
+      if (hit.kind === "business") {
+        setSelectedId(bizRow);
+        setView("dashboard");
+      } else if (hit.kind === "project") {
+        setExpanded((prev) => new Set(prev).add(rowId("project", hit.id)));
+        setSelectedId(rowId("project", hit.id));
+        setView("kanban");
+      } else if (hit.kind === "document") {
+        if (hit.projectId) setExpanded((prev) => new Set(prev).add(rowId("project", hit.projectId!)));
+        setSelectedId(rowId("document", hit.id));
+        setView("doc");
+      } else {
+        // task → 보드로 이동
+        if (hit.projectId) {
+          setExpanded((prev) => new Set(prev).add(rowId("project", hit.projectId!)));
+          setSelectedId(rowId("project", hit.projectId));
+        } else {
+          setSelectedId(bizRow);
+        }
+        setView("kanban");
+      }
+    },
+    [loadProjects, loadDocuments],
+  );
+
   const selectedBusiness = useMemo(() => {
     const row = tree.find((r) => r.id === selectedId);
     if (!row) return businesses[0] ?? null;
@@ -184,6 +216,7 @@ export default function App() {
       <Sidebar
         rows={tree}
         selectedId={selectedId}
+        header={<GlobalSearch onSearch={(q) => api.search(q)} onPick={navigateTo} />}
         colorFor={colorFor}
         onSelect={onSelect}
         onToggle={onToggle}

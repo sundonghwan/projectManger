@@ -1,9 +1,11 @@
-import { useState, type CSSProperties } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import type { TreeRow } from "../domain/tree";
 
 export interface SidebarProps {
   rows: TreeRow[];
   selectedId: string | null;
+  /** 트리 위에 렌더할 헤더 슬롯 (예: 전역 검색) */
+  header?: ReactNode;
   /** 사업 id → 표시 색상 (유형 컬러 또는 커스텀) */
   colorFor: (businessEntityId: number) => string;
   onSelect: (row: TreeRow) => void;
@@ -27,7 +29,8 @@ function projectIcon(expanded: boolean): string {
 }
 
 export function Sidebar(props: SidebarProps) {
-  const { rows, selectedId, colorFor, onSelect, onToggle, onAddBusiness, onAddChild, onRename } = props;
+  const { rows, selectedId, colorFor, onSelect, onToggle, onAddBusiness, onAddChild, onRename, header } =
+    props;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
 
@@ -53,7 +56,9 @@ export function Sidebar(props: SidebarProps) {
         flexDirection: "column",
       }}
     >
-      <div style={{ padding: "10px 8px 6px" }}>
+      {header}
+
+      <div style={{ padding: "4px 8px 6px" }}>
         <button onClick={onAddBusiness} style={addBusinessStyle} aria-label="사업 추가">
           <span style={{ width: 16, textAlign: "center", fontWeight: 600 }}>+</span>
           <span>사업 추가</span>

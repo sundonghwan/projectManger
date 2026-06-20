@@ -51,6 +51,7 @@ pub fn run() {
             commands::label_assign,
             commands::label_unassign,
             commands::task_label_map,
+            commands::search,
             commands::export_json,
         ])
         .run(tauri::generate_context!())

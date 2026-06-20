@@ -78,6 +78,16 @@ export interface Label {
   color?: string | null;
 }
 
+export type SearchKind = "business" | "project" | "task" | "document";
+
+export interface SearchHit {
+  kind: SearchKind;
+  id: number;
+  title: string;
+  businessId: number;
+  projectId?: number | null;
+}
+
 /** 태스크-라벨 조인 행 */
 export interface TaskLabel {
   taskId: number;

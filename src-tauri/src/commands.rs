@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::models::{Block, Business, Document, Label, Project, Task, TaskLabel};
+use crate::models::{Block, Business, Document, Label, Project, SearchHit, Task, TaskLabel};
 use crate::repo;
 use rusqlite::Connection;
 use serde::Deserialize;
@@ -313,6 +313,12 @@ pub fn label_unassign(state: State<AppState>, input: LabelAssign) -> Result<()> 
 pub fn task_label_map(state: State<AppState>, business_id: i64) -> Result<Vec<TaskLabel>> {
     let conn = state.db.lock().unwrap();
     repo::label::map_for_business(&conn, business_id)
+}
+
+#[tauri::command]
+pub fn search(state: State<AppState>, query: String) -> Result<Vec<SearchHit>> {
+    let conn = state.db.lock().unwrap();
+    repo::search::search(&conn, &query)
 }
 
 /// 전체 데이터를 JSON으로 내보낸다. path 미지정 시 앱 데이터 폴더의 backup.json.
