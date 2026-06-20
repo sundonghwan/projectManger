@@ -1,0 +1,36 @@
+# ===== 비공개 기획/설계 문서 (로컬 전용 — 공개 리포에 푸시하지 않음) =====
+docs/
+*.dc.html
+
+# ===== Node / Frontend =====
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.local
+coverage/
+.vitest/
+
+# ===== Rust / Tauri =====
+src-tauri/target/
+src-tauri/gen/
+
+# ===== 로컬 데이터 / 백업 (앱이 생성하는 SQLite·산출물) =====
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
+/backups/
+
+# ===== 에디터 / OS =====
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+
+# ===== 환경 변수 =====
+.env
+.env.*
+!.env.example
