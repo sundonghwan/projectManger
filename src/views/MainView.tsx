@@ -1,5 +1,11 @@
 import type { Business, Project } from "../domain/types";
-import { businessColor, TYPE_LABEL } from "../ui/colors";
+import { businessColor } from "../ui/colors";
+import { useTasks } from "../hooks/useTasks";
+import { dashboardStats } from "../domain/dashboard";
+import { groupByStatus } from "../domain/kanban";
+import { Dashboard } from "./Dashboard";
+import { Kanban } from "./Kanban";
+import { TaskList } from "./TaskList";
 
 export type ViewKind = "dashboard" | "kanban" | "list" | "doc" | "deliverables" | "ssh";
 
@@ -30,6 +36,12 @@ export interface MainViewProps {
 }
 
 export function MainView({ business, project, view, onViewChange, error }: MainViewProps) {
+  const { tasks, error: taskError, create, move, toggleDone } = useTasks(
+    business?.id ?? null,
+    project?.id ?? null,
+  );
+  const shownError = error ?? taskError;
+
   return (
     <section
       style={{
@@ -41,7 +53,6 @@ export function MainView({ business, project, view, onViewChange, error }: MainV
         background: "var(--bg)",
       }}
     >
-      {/* 탑바 — 빵부스러기 */}
       <div style={topbar}>
         {business ? (
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -68,7 +79,6 @@ export function MainView({ business, project, view, onViewChange, error }: MainV
         )}
       </div>
 
-      {/* 뷰 탭 */}
       {business && (
         <div style={tabbar}>
           {TABS.map((t) => {
@@ -92,16 +102,18 @@ export function MainView({ business, project, view, onViewChange, error }: MainV
       )}
 
       <div style={{ flex: 1, overflow: "auto", minHeight: 0 }}>
-        {error && <div style={errorBar}>⚠ {error}</div>}
+        {shownError && <div style={errorBar}>⚠ {shownError}</div>}
         {!business ? (
           <Empty />
+        ) : view === "dashboard" ? (
+          <Dashboard business={business} stats={dashboardStats(tasks)} />
+        ) : view === "kanban" ? (
+          <Kanban columns={groupByStatus(tasks)} onMove={move} onAddTask={(s) => create(s)} />
+        ) : view === "list" ? (
+          <TaskList tasks={tasks} onToggleDone={toggleDone} />
         ) : (
           <div style={{ padding: "24px 28px", color: "var(--text2)" }}>
-            <strong style={{ color: "var(--text)" }}>{VIEW_LABEL[view]}</strong> 뷰 — 준비 중
-            <div style={{ marginTop: 8, fontSize: 13 }}>
-              {business.name}
-              {project ? ` › ${project.name}` : ""} ({TYPE_LABEL[business.type]})
-            </div>
+            <strong style={{ color: "var(--text)" }}>{VIEW_LABEL[view]}</strong> — 다음 단계에서 지원
           </div>
         )}
       </div>
@@ -112,7 +124,9 @@ export function MainView({ business, project, view, onViewChange, error }: MainV
 function Empty() {
   return (
     <div style={{ padding: "60px 28px", textAlign: "center", color: "var(--text3)" }}>
-      <div style={{ fontSize: 15, marginBottom: 8 }}>왼쪽에서 사업을 선택하거나 새로 만들어 시작하세요.</div>
+      <div style={{ fontSize: 15, marginBottom: 8 }}>
+        왼쪽에서 사업을 선택하거나 새로 만들어 시작하세요.
+      </div>
     </div>
   );
 }
