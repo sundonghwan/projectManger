@@ -127,10 +127,21 @@ export interface Deliverable {
   projectId?: number | null;
   title: string;
   kind: DeliverableKind;
+  documentId?: number | null;
+  filePath?: string | null;
   status: DeliverableStatus;
   currentVersion: number;
   sortOrder: number;
   archivedAt?: Timestamp | null;
+}
+
+export interface DeliverableVersion {
+  id: number;
+  deliverableId: number;
+  version: number;
+  filePath?: string | null;
+  note?: string | null;
+  createdAt: Timestamp;
 }
 
 export interface ServerConnection {

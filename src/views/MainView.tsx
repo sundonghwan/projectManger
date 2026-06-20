@@ -11,6 +11,7 @@ import { Kanban } from "./Kanban";
 import { TaskList } from "./TaskList";
 import { DocEditor } from "./DocEditor";
 import { TaskEditor } from "./TaskEditor";
+import { DeliverablesView } from "./DeliverablesView";
 
 export type ViewKind = "dashboard" | "kanban" | "list" | "doc" | "deliverables" | "ssh";
 
@@ -206,6 +207,13 @@ export function MainView({
               왼쪽 트리에서 문서를 선택하거나, 프로젝트의 + 로 새 문서를 만드세요.
             </div>
           )
+        ) : view === "deliverables" ? (
+          <DeliverablesView
+            key={business.id}
+            businessId={business.id}
+            projectId={project?.id ?? null}
+            onChanged={onDataChanged}
+          />
         ) : (
           <div style={{ padding: "24px 28px", color: "var(--text2)" }}>
             <strong style={{ color: "var(--text)" }}>{VIEW_LABEL[view]}</strong> — 다음 단계에서 지원

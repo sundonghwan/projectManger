@@ -1,6 +1,7 @@
 use crate::error::Result;
 use crate::models::{
-    Block, Business, Document, Label, Project, SearchHit, Task, TaskLabel, TrashItem,
+    Block, Business, Deliverable, DeliverableVersion, Document, Label, Project, SearchHit, Task,
+    TaskLabel, TrashItem,
 };
 use crate::repo;
 use rusqlite::Connection;
@@ -315,6 +316,59 @@ pub fn label_unassign(state: State<AppState>, input: LabelAssign) -> Result<()> 
 pub fn task_label_map(state: State<AppState>, business_id: i64) -> Result<Vec<TaskLabel>> {
     let conn = state.db.lock().unwrap();
     repo::label::map_for_business(&conn, business_id)
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeliverableCreate {
+    pub business_id: i64,
+    pub project_id: Option<i64>,
+    pub title: String,
+    pub kind: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeliverableVersionAdd {
+    pub id: i64,
+    pub note: Option<String>,
+    pub file_path: Option<String>,
+}
+
+#[tauri::command]
+pub fn deliverable_list(state: State<AppState>, business_id: i64) -> Result<Vec<Deliverable>> {
+    let conn = state.db.lock().unwrap();
+    repo::deliverable::list_by_business(&conn, business_id)
+}
+
+#[tauri::command]
+pub fn deliverable_create(state: State<AppState>, input: DeliverableCreate) -> Result<Deliverable> {
+    let conn = state.db.lock().unwrap();
+    repo::deliverable::create(&conn, input.business_id, input.project_id, &input.title, &input.kind)
+}
+
+#[tauri::command]
+pub fn deliverable_set_status(state: State<AppState>, id: i64, status: String) -> Result<Deliverable> {
+    let conn = state.db.lock().unwrap();
+    repo::deliverable::update_status(&conn, id, &status)
+}
+
+#[tauri::command]
+pub fn deliverable_add_version(state: State<AppState>, input: DeliverableVersionAdd) -> Result<Deliverable> {
+    let conn = state.db.lock().unwrap();
+    repo::deliverable::add_version(&conn, input.id, input.note.as_deref(), input.file_path.as_deref())
+}
+
+#[tauri::command]
+pub fn deliverable_versions(state: State<AppState>, deliverable_id: i64) -> Result<Vec<DeliverableVersion>> {
+    let conn = state.db.lock().unwrap();
+    repo::deliverable::list_versions(&conn, deliverable_id)
+}
+
+#[tauri::command]
+pub fn deliverable_archive(state: State<AppState>, id: i64) -> Result<()> {
+    let conn = state.db.lock().unwrap();
+    repo::deliverable::archive(&conn, id)
 }
 
 #[tauri::command]

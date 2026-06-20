@@ -93,6 +93,33 @@ pub struct Block {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct Deliverable {
+    pub id: i64,
+    pub business_id: i64,
+    pub project_id: Option<i64>,
+    pub title: String,
+    pub kind: String,
+    pub document_id: Option<i64>,
+    pub file_path: Option<String>,
+    pub status: String,
+    pub current_version: i64,
+    pub sort_order: f64,
+    pub archived_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeliverableVersion {
+    pub id: i64,
+    pub deliverable_id: i64,
+    pub version: i64,
+    pub file_path: Option<String>,
+    pub note: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Task {
     pub id: i64,
     pub business_id: i64,

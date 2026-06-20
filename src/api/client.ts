@@ -5,6 +5,10 @@ import type {
   Business,
   BusinessType,
   DateString,
+  Deliverable,
+  DeliverableKind,
+  DeliverableStatus,
+  DeliverableVersion,
   Document,
   EntityStatus,
   Label,
@@ -109,6 +113,24 @@ export const api = {
   backup: {
     /** path 미지정 시 앱 데이터 폴더의 backup.json. 저장 경로 반환. */
     exportJson: (path?: string | null) => invoke<string>("export_json", { path: path ?? null }),
+  },
+  deliverable: {
+    list: (businessId: number) => invoke<Deliverable[]>("deliverable_list", { businessId }),
+    create: (input: {
+      businessId: number;
+      projectId?: number | null;
+      title: string;
+      kind: DeliverableKind;
+    }) => invoke<Deliverable>("deliverable_create", { input }),
+    setStatus: (id: number, status: DeliverableStatus) =>
+      invoke<Deliverable>("deliverable_set_status", { id, status }),
+    addVersion: (id: number, note?: string | null, filePath?: string | null) =>
+      invoke<Deliverable>("deliverable_add_version", {
+        input: { id, note: note ?? null, filePath: filePath ?? null },
+      }),
+    versions: (deliverableId: number) =>
+      invoke<DeliverableVersion[]>("deliverable_versions", { deliverableId }),
+    archive: (id: number) => invoke<void>("deliverable_archive", { id }),
   },
   search: (query: string) => invoke<SearchHit[]>("search", { query }),
   trash: {

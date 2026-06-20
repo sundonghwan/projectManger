@@ -35,6 +35,12 @@ export const DELIVERABLE_STATUS_COLOR: Record<DeliverableStatus, string> = {
   done: "#22c55e",
 };
 
+export const DELIVERABLE_STATUS_LABEL: Record<DeliverableStatus, string> = {
+  draft: "작성중",
+  review: "검토",
+  done: "완료",
+};
+
 const PRIORITY_COLOR: Record<Priority, string> = {
   0: "transparent",
   1: "#cbd5e1",

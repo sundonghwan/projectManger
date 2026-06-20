@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./api/client";
 import { buildTree, rowId, type TreeRow } from "./domain/tree";
-import type { Business, BusinessType, Document, Project } from "./domain/types";
+import type { Business, BusinessType, Deliverable, Document, Project } from "./domain/types";
 import { Sidebar } from "./components/Sidebar";
 import { GlobalSearch } from "./components/GlobalSearch";
 import type { SearchHit } from "./domain/types";
@@ -13,6 +13,7 @@ export default function App() {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<ViewKind>("dashboard");
@@ -56,6 +57,15 @@ export default function App() {
     }
   }, []);
 
+  const loadDeliverables = useCallback(async (businessId: number) => {
+    try {
+      const list = await api.deliverable.list(businessId);
+      setDeliverables((prev) => [...prev.filter((d) => d.businessId !== businessId), ...list]);
+    } catch (e) {
+      setError(String(e));
+    }
+  }, []);
+
   useEffect(() => {
     void loadBusinesses();
   }, [loadBusinesses]);
@@ -66,8 +76,8 @@ export default function App() {
   );
 
   const tree = useMemo(
-    () => buildTree({ businesses: visibleBusinesses, projects, documents, deliverables: [], expanded }),
-    [visibleBusinesses, projects, documents, expanded],
+    () => buildTree({ businesses: visibleBusinesses, projects, documents, deliverables, expanded }),
+    [visibleBusinesses, projects, documents, deliverables, expanded],
   );
 
   const colorFor = useCallback(
@@ -88,12 +98,13 @@ export default function App() {
           if (row.type === "business") {
             void loadProjects(row.entityId);
             void loadDocuments(row.entityId);
+            void loadDeliverables(row.entityId);
           }
         }
         return next;
       });
     },
-    [loadProjects, loadDocuments],
+    [loadProjects, loadDocuments, loadDeliverables],
   );
 
   const onSelect = useCallback((row: TreeRow) => {
@@ -101,6 +112,7 @@ export default function App() {
     if (row.type === "dashboard" || row.type === "business") setView("dashboard");
     else if (row.type === "project") setView("kanban");
     else if (row.type === "document") setView("doc");
+    else if (row.type === "deliverable") setView("deliverables");
   }, []);
 
   const onAddBusiness = useCallback(async () => {
@@ -110,12 +122,13 @@ export default function App() {
       setExpanded((prev) => new Set(prev).add(rowId("business", b.id)));
       void loadProjects(b.id);
       void loadDocuments(b.id);
+      void loadDeliverables(b.id);
       setSelectedId(rowId("business", b.id));
       setView("dashboard");
     } catch (e) {
       setError(String(e));
     }
-  }, [loadBusinesses, loadProjects, loadDocuments]);
+  }, [loadBusinesses, loadProjects, loadDocuments, loadDeliverables]);
 
   const onAddChild = useCallback(
     async (row: TreeRow) => {
@@ -173,8 +186,9 @@ export default function App() {
     for (const b of businesses) {
       await loadProjects(b.id);
       await loadDocuments(b.id);
+      await loadDeliverables(b.id);
     }
-  }, [businesses, loadBusinesses, loadProjects, loadDocuments]);
+  }, [businesses, loadBusinesses, loadProjects, loadDocuments, loadDeliverables]);
 
   const navigateTo = useCallback(
     async (hit: SearchHit) => {
