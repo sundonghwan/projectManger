@@ -5,6 +5,7 @@ import type { Business, Document, Project } from "./domain/types";
 import { Sidebar } from "./components/Sidebar";
 import { businessColor } from "./ui/colors";
 import { MainView, type ViewKind } from "./views/MainView";
+import { useTheme } from "./hooks/useTheme";
 
 export default function App() {
   const [businesses, setBusinesses] = useState<Business[]>([]);
@@ -14,6 +15,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<ViewKind>("dashboard");
   const [error, setError] = useState<string | null>(null);
+  const { theme, toggle: toggleTheme } = useTheme();
 
   const loadBusinesses = useCallback(async () => {
     try {
@@ -196,6 +198,8 @@ export default function App() {
         view={view}
         onViewChange={setView}
         error={error}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
     </div>
   );

@@ -38,9 +38,20 @@ export interface MainViewProps {
   view: ViewKind;
   onViewChange: (v: ViewKind) => void;
   error: string | null;
+  theme: "light" | "dark";
+  onToggleTheme: () => void;
 }
 
-export function MainView({ business, project, document, view, onViewChange, error }: MainViewProps) {
+export function MainView({
+  business,
+  project,
+  document,
+  view,
+  onViewChange,
+  error,
+  theme,
+  onToggleTheme,
+}: MainViewProps) {
   const {
     tasks,
     labelsByTask,
@@ -103,6 +114,14 @@ export function MainView({ business, project, document, view, onViewChange, erro
           <span style={{ fontSize: 13, color: "var(--text2)" }}>선택된 항목 없음</span>
         )}
         <span style={{ flex: 1 }} />
+        <button
+          onClick={onToggleTheme}
+          style={exportBtn}
+          aria-label="테마 전환"
+          title={theme === "light" ? "다크 모드" : "라이트 모드"}
+        >
+          {theme === "light" ? "🌙" : "☀"}
+        </button>
         <button onClick={onExport} style={exportBtn} title="전체 데이터를 JSON으로 백업">
           내보내기
         </button>
