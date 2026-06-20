@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::models::{Business, Project};
+use crate::models::{Business, Project, Task};
 use crate::repo;
 use rusqlite::Connection;
 use serde::Deserialize;
@@ -110,4 +110,76 @@ pub fn project_update(state: State<AppState>, input: ProjectUpdate) -> Result<Pr
 pub fn project_archive(state: State<AppState>, id: i64) -> Result<()> {
     let conn = state.db.lock().unwrap();
     repo::project::archive(&conn, id)
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskCreate {
+    pub business_id: i64,
+    pub project_id: Option<i64>,
+    pub title: String,
+    #[serde(default = "default_priority")]
+    pub priority: i64,
+}
+fn default_priority() -> i64 {
+    2
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskUpdate {
+    pub id: i64,
+    pub title: String,
+    pub priority: i64,
+    pub due_date: Option<String>,
+    pub description: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskMove {
+    pub id: i64,
+    pub status: String,
+    pub sort_order: f64,
+}
+
+#[tauri::command]
+pub fn task_list(
+    state: State<AppState>,
+    business_id: i64,
+    project_id: Option<i64>,
+) -> Result<Vec<Task>> {
+    let conn = state.db.lock().unwrap();
+    repo::task::list(&conn, business_id, project_id)
+}
+
+#[tauri::command]
+pub fn task_create(state: State<AppState>, input: TaskCreate) -> Result<Task> {
+    let conn = state.db.lock().unwrap();
+    repo::task::create(&conn, input.business_id, input.project_id, &input.title, input.priority)
+}
+
+#[tauri::command]
+pub fn task_update(state: State<AppState>, input: TaskUpdate) -> Result<Task> {
+    let conn = state.db.lock().unwrap();
+    repo::task::update(
+        &conn,
+        input.id,
+        &input.title,
+        input.priority,
+        input.due_date.as_deref(),
+        input.description.as_deref(),
+    )
+}
+
+#[tauri::command]
+pub fn task_move(state: State<AppState>, input: TaskMove) -> Result<Task> {
+    let conn = state.db.lock().unwrap();
+    repo::task::move_task(&conn, input.id, &input.status, input.sort_order)
+}
+
+#[tauri::command]
+pub fn task_archive(state: State<AppState>, id: i64) -> Result<()> {
+    let conn = state.db.lock().unwrap();
+    repo::task::archive(&conn, id)
 }
