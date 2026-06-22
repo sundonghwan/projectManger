@@ -83,10 +83,12 @@ pub struct RecurringTask {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TrashItem {
-    pub kind: String, // business | project | task | document
+    pub kind: String, // business | project | task | document | deliverable
     pub id: i64,
     pub title: String,
     pub archived_at: Option<String>,
+    /** 산출물 보관 항목의 파일 크기(바이트). 그 외 None. */
+    pub file_size: Option<i64>,
 }
 
 /// 전역 검색 결과 항목

@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { marked } from "marked";
+import DOMPurify from "dompurify";
 import type { Document } from "../domain/types";
 import { api } from "../api/client";
 import { Icon } from "../ui/icons/Icon";
 
 marked.setOptions({ gfm: true, breaks: true });
+
+type SaveState = "saved" | "saving";
 
 export interface DocEditorProps {
   document: Document;
@@ -15,6 +18,7 @@ export function DocEditor({ document }: DocEditorProps) {
   const [body, setBody] = useState(document.body ?? "");
   const [mode, setMode] = useState<"edit" | "preview">("edit");
   const [error, setError] = useState<string | null>(null);
+  const [saveState, setSaveState] = useState<SaveState>("saved");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latest = useRef(body);
   const touched = useRef(false);
@@ -36,12 +40,19 @@ export function DocEditor({ document }: DocEditorProps) {
     };
   }, [document.id]);
 
+  const save = (text: string) => {
+    api.document
+      .setBody(document.id, text)
+      .then(() => setSaveState("saved"))
+      .catch((e) => setError(String(e)));
+  };
+
   const flush = () => {
     if (timer.current) {
       clearTimeout(timer.current);
       timer.current = null;
+      save(latest.current);
     }
-    api.document.setBody(document.id, latest.current).catch((e) => setError(String(e)));
   };
 
   // 언마운트(문서 전환/목록 복귀) 시 미저장분 저장
@@ -56,14 +67,18 @@ export function DocEditor({ document }: DocEditorProps) {
     touched.current = true;
     setBody(text);
     latest.current = text;
+    setSaveState("saving");
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
-      api.document.setBody(document.id, text).catch((e) => setError(String(e)));
       timer.current = null;
+      save(text);
     }, 600);
   };
 
-  const html = useMemo(() => marked.parse(body, { async: false }) as string, [body]);
+  const html = useMemo(
+    () => DOMPurify.sanitize(marked.parse(body, { async: false }) as string),
+    [body],
+  );
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
@@ -71,6 +86,9 @@ export function DocEditor({ document }: DocEditorProps) {
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, letterSpacing: "-0.4px", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {document.title}
         </h1>
+        <span style={{ fontSize: 11, color: "var(--text3)", whiteSpace: "nowrap" }}>
+          {saveState === "saving" ? "저장 중…" : "저장됨"}
+        </span>
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           <button onClick={() => setMode("edit")} style={tabBtn(mode === "edit")}>편집</button>
           <button onClick={() => setMode("preview")} style={tabBtn(mode === "preview")}>미리보기</button>
@@ -94,6 +112,8 @@ export function DocEditor({ document }: DocEditorProps) {
             placeholder={"마크다운으로 작성하세요.\n\n# 제목\n- 목록\n- [ ] 할 일\n**굵게**, `코드`, > 인용"}
             style={textArea}
           />
+        ) : body.trim() === "" ? (
+          <div style={{ ...previewBox, color: "var(--text3)", fontSize: 14 }}>미리볼 내용이 없습니다.</div>
         ) : (
           <div className="md-preview" style={previewBox} dangerouslySetInnerHTML={{ __html: html }} />
         )}

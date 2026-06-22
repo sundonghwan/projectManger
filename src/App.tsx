@@ -197,6 +197,10 @@ export default function App() {
         setSelectedId(rowId("document", hit.businessId));
         setPendingDocId(hit.id);
         setView("doc");
+      } else if (hit.kind === "deliverable") {
+        // 산출물도 단일 진입 노드(목록)로 이동.
+        setSelectedId(rowId("deliverable", hit.businessId));
+        setView("deliverables");
       } else {
         // task → 보드로 이동
         if (hit.projectId) {

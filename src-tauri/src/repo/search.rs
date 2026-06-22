@@ -61,13 +61,30 @@ pub fn search(conn: &Connection, query: &str) -> Result<Vec<SearchHit>> {
         out.push(row?);
     }
 
+    // 문서는 제목 + 본문(마크다운) 모두 검색.
     let mut stmt = conn.prepare(
         "SELECT id, business_id, project_id, title FROM document \
-         WHERE archived_at IS NULL AND title LIKE ?1 ORDER BY title LIMIT 20",
+         WHERE archived_at IS NULL AND (title LIKE ?1 OR body LIKE ?1) ORDER BY title LIMIT 20",
     )?;
     for row in stmt.query_map(params![like], |r| {
         Ok(SearchHit {
             kind: "document".into(),
+            id: r.get(0)?,
+            business_id: r.get(1)?,
+            project_id: r.get(2)?,
+            title: r.get(3)?,
+        })
+    })? {
+        out.push(row?);
+    }
+
+    let mut stmt = conn.prepare(
+        "SELECT id, business_id, project_id, title FROM deliverable \
+         WHERE archived_at IS NULL AND title LIKE ?1 ORDER BY title LIMIT 20",
+    )?;
+    for row in stmt.query_map(params![like], |r| {
+        Ok(SearchHit {
+            kind: "deliverable".into(),
             id: r.get(0)?,
             business_id: r.get(1)?,
             project_id: r.get(2)?,
@@ -108,6 +125,27 @@ mod tests {
         assert!(kinds.contains(&"task"));
         assert!(kinds.contains(&"document"));
         assert_eq!(hits.len(), 4);
+    }
+
+    #[test]
+    fn finds_document_by_body() {
+        let c = db::open_in_memory().unwrap();
+        let b = business::create(&c, "사업", "si", None).unwrap();
+        let d = document::create(&c, b.id, None, "회의록").unwrap();
+        document::set_body(&c, d.id, "# 안건\n예산 3억 검토").unwrap();
+        let hits = search(&c, "예산").unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].kind, "document");
+        assert_eq!(hits[0].title, "회의록");
+    }
+
+    #[test]
+    fn finds_deliverable_by_title() {
+        let c = db::open_in_memory().unwrap();
+        let b = business::create(&c, "사업", "si", None).unwrap();
+        crate::repo::deliverable::create_file(&c, b.id, None, "설계서.pdf", "설계서.pdf", 10).unwrap();
+        let hits = search(&c, "설계").unwrap();
+        assert!(hits.iter().any(|h| h.kind == "deliverable" && h.title == "설계서.pdf"));
     }
 
     #[test]

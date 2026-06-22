@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useRef, useState, type CSSProperties } from "react";
 import type { Deliverable, DeliverableStatus } from "../domain/types";
 import { DELIVERABLE_STATUS_COLOR, DELIVERABLE_STATUS_LABEL } from "../ui/colors";
 import { formatBytes } from "../domain/format";
@@ -7,6 +7,7 @@ import { Icon } from "../ui/icons/Icon";
 export interface DeliverableListProps {
   deliverables: Deliverable[];
   error: string | null;
+  uploading?: boolean;
   onUpload: () => void;
   onSetStatus: (id: number, status: DeliverableStatus) => void;
   onRename: (id: number, title: string) => void;
@@ -17,15 +18,19 @@ export interface DeliverableListProps {
 const STATUSES: DeliverableStatus[] = ["draft", "review", "done"];
 
 export function DeliverableList(props: DeliverableListProps) {
-  const { deliverables, error, onUpload, onSetStatus, onRename, onOpen, onArchive } = props;
+  const { deliverables, error, uploading, onUpload, onSetStatus, onRename, onOpen, onArchive } = props;
   const [editingId, setEditingId] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
+  const renameDone = useRef(false); // Enter→blur 중복 커밋 방지
 
   const startEdit = (d: Deliverable) => {
+    renameDone.current = false;
     setEditingId(d.id);
     setDraft(d.title);
   };
   const commit = (d: Deliverable) => {
+    if (renameDone.current) return;
+    renameDone.current = true;
     const name = draft.trim();
     if (name && name !== d.title) onRename(d.id, name);
     setEditingId(null);
@@ -35,8 +40,8 @@ export function DeliverableList(props: DeliverableListProps) {
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       <div style={{ display: "flex", alignItems: "center", padding: "12px 20px" }}>
         <span style={{ fontSize: 15, fontWeight: 600, flex: 1 }}>산출물</span>
-        <button onClick={onUpload} style={uploadBtn}>
-          <Icon name="arrow-up" size={14} /> 파일 업로드
+        <button onClick={onUpload} disabled={uploading} style={{ ...uploadBtn, opacity: uploading ? 0.6 : 1 }}>
+          <Icon name="arrow-up" size={14} /> {uploading ? "업로드 중…" : "파일 업로드"}
         </button>
       </div>
 

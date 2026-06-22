@@ -57,6 +57,7 @@ export function DocumentsView({ businessId, projectId, onChanged, initialOpenDoc
       onOpen={(id) => setOpenId(id)}
       onRename={(id, title) => void d.rename(id, title)}
       onArchive={(id) => {
+        if (!window.confirm("이 문서를 삭제할까요? (휴지통에서 복구 가능)")) return;
         if (openId === id) setOpenId(null);
         void d.archive(id);
       }}

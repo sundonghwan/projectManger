@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import type { SearchKind, TrashItem } from "../domain/types";
+import { formatBytes } from "../domain/format";
 import { Icon } from "../ui/icons/Icon";
 
 export interface TrashPanelProps {
@@ -39,6 +40,11 @@ export function TrashPanel({ items, onRestore, onPurge, onClose }: TrashPanelPro
               <span style={{ flex: 1, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {item.title}
               </span>
+              {item.kind === "deliverable" && item.fileSize != null && (
+                <span style={{ fontSize: 11, color: "var(--text3)", fontFamily: "var(--font-mono)" }}>
+                  {formatBytes(item.fileSize)}
+                </span>
+              )}
               <button onClick={() => onRestore(item)} style={restoreBtn}>복구</button>
               <button onClick={() => onPurge(item)} style={purgeBtn} aria-label={`${item.title} 영구삭제`}>
                 삭제

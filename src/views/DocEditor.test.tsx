@@ -42,6 +42,21 @@ describe("DocEditor (markdown)", () => {
     expect(screen.getByRole("heading", { level: 1, name: "안녕" })).toBeInTheDocument();
   });
 
+  it("미리보기에서 위험한 HTML을 제거(sanitize)한다", async () => {
+    vi.mocked(api.document.get).mockResolvedValueOnce({
+      body: '텍스트 <img src=x onerror="alert(1)"> 끝\n\n[클릭](javascript:alert(2))',
+    } as never);
+    render(<DocEditor document={{ ...doc, body: "" }} />);
+    const ta = screen.getByLabelText("문서 본문") as HTMLTextAreaElement;
+    await waitFor(() => expect(ta.value).toContain("onerror"));
+    await userEvent.click(screen.getByRole("button", { name: "미리보기" }));
+    const preview = document.querySelector(".md-preview") as HTMLElement;
+    // onerror 핸들러 제거 + 링크에서 javascript: 스킴 제거
+    expect(preview.innerHTML).not.toContain("onerror");
+    const link = preview.querySelector("a");
+    expect(link?.getAttribute("href") ?? "").not.toContain("javascript:");
+  });
+
   it("입력 후 blur 시 setBody로 저장", async () => {
     render(<DocEditor document={doc} />);
     const ta = screen.getByLabelText("문서 본문") as HTMLTextAreaElement;

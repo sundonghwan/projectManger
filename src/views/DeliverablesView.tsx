@@ -23,11 +23,14 @@ export function DeliverablesView({ businessId, projectId, onChanged }: Deliverab
     <DeliverableList
       deliverables={d.deliverables}
       error={d.error}
+      uploading={d.uploading}
       onUpload={() => void onUpload()}
       onSetStatus={(id, s) => void d.setStatus(id, s)}
       onRename={(id, title) => void d.rename(id, title)}
       onOpen={(deliv) => void d.open(deliv)}
-      onArchive={(id) => void d.archive(id)}
+      onArchive={(id) => {
+        if (window.confirm("이 산출물을 삭제할까요? (휴지통에서 복구 가능)")) void d.archive(id);
+      }}
     />
   );
 }

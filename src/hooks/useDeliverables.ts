@@ -10,6 +10,7 @@ export function useDeliverables(
 ) {
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const reload = useCallback(async () => {
     if (businessId == null) {
@@ -31,15 +32,18 @@ export function useDeliverables(
   const upload = useCallback(
     async (paths: string[]) => {
       if (businessId == null || paths.length === 0) return;
+      setUploading(true);
       try {
         const created = await api.deliverable.upload(businessId, projectId, paths);
         await reload();
         onChanged?.();
         if (created.length < paths.length) {
-          setError(`${paths.length}개 중 ${created.length}개만 업로드됨`);
+          setError(`${paths.length}개 중 ${created.length}개만 업로드되었습니다. (폴더·빈 파일·접근 불가 등 제외)`);
         }
       } catch (e) {
         setError(String(e));
+      } finally {
+        setUploading(false);
       }
     },
     [businessId, projectId, reload, onChanged],
@@ -77,8 +81,8 @@ export function useDeliverables(
     }
     try {
       await api.deliverable.open(d.filePath);
-    } catch (e) {
-      setError(String(e));
+    } catch {
+      setError("파일을 열 수 없습니다. 파일이 이동되었거나 삭제되었을 수 있습니다.");
     }
   }, []);
 
@@ -95,5 +99,5 @@ export function useDeliverables(
     [reload, onChanged],
   );
 
-  return { deliverables, error, reload, upload, rename, setStatus, open, archive };
+  return { deliverables, error, uploading, reload, upload, rename, setStatus, open, archive };
 }

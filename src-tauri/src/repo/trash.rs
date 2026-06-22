@@ -17,15 +17,15 @@ fn table_for(kind: &str) -> Result<&'static str> {
 /// 보관된(archived_at IS NOT NULL) 항목을 모두 조회. business/project/document 는 name/title, task 는 title.
 pub fn list_archived(conn: &Connection) -> Result<Vec<TrashItem>> {
     let sql = "
-        SELECT 'business' AS kind, id, name AS title, archived_at FROM business WHERE archived_at IS NOT NULL
+        SELECT 'business' AS kind, id, name AS title, archived_at, NULL AS file_size FROM business WHERE archived_at IS NOT NULL
         UNION ALL
-        SELECT 'project', id, name, archived_at FROM project WHERE archived_at IS NOT NULL
+        SELECT 'project', id, name, archived_at, NULL FROM project WHERE archived_at IS NOT NULL
         UNION ALL
-        SELECT 'task', id, title, archived_at FROM task WHERE archived_at IS NOT NULL
+        SELECT 'task', id, title, archived_at, NULL FROM task WHERE archived_at IS NOT NULL
         UNION ALL
-        SELECT 'document', id, title, archived_at FROM document WHERE archived_at IS NOT NULL
+        SELECT 'document', id, title, archived_at, NULL FROM document WHERE archived_at IS NOT NULL
         UNION ALL
-        SELECT 'deliverable', id, title, archived_at FROM deliverable WHERE archived_at IS NOT NULL
+        SELECT 'deliverable', id, title, archived_at, file_size FROM deliverable WHERE archived_at IS NOT NULL
         ORDER BY archived_at DESC";
     let mut stmt = conn.prepare(sql)?;
     let rows = stmt.query_map([], |r| {
@@ -34,6 +34,7 @@ pub fn list_archived(conn: &Connection) -> Result<Vec<TrashItem>> {
             id: r.get(1)?,
             title: r.get(2)?,
             archived_at: r.get(3)?,
+            file_size: r.get(4)?,
         })
     })?;
     let mut out = Vec::new();

@@ -80,6 +80,10 @@ pub fn create(
 }
 
 pub fn rename(conn: &Connection, id: i64, title: &str) -> Result<Document> {
+    let title = title.trim();
+    if title.is_empty() {
+        return Err(AppError::Invalid("문서 제목은 비어 있을 수 없습니다".into()));
+    }
     let n = conn.execute(
         "UPDATE document SET title=?2, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?1",
         params![id, title],

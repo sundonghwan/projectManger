@@ -16,6 +16,7 @@ export function DocumentList(props: DocumentListProps) {
   const { documents, error, onCreate, onOpen, onRename, onArchive } = props;
   const [editingId, setEditingId] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
+  const renameDone = useRef(false); // Enter→blur 중복 커밋 방지
   // 새 문서 인라인 이름 입력
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
@@ -36,10 +37,13 @@ export function DocumentList(props: DocumentListProps) {
   };
 
   const startEdit = (d: Document) => {
+    renameDone.current = false;
     setEditingId(d.id);
     setDraft(d.title);
   };
   const commit = (d: Document) => {
+    if (renameDone.current) return;
+    renameDone.current = true;
     const name = draft.trim();
     if (name && name !== d.title) onRename(d.id, name);
     setEditingId(null);

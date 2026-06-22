@@ -128,6 +128,8 @@ export interface TrashItem {
   id: number;
   title: string;
   archivedAt?: string | null;
+  /** 산출물 보관 항목의 파일 크기(바이트). */
+  fileSize?: number | null;
 }
 
 /** 태스크-라벨 조인 행 */
