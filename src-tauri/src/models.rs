@@ -151,10 +151,13 @@ pub struct Deliverable {
     pub kind: String,
     pub document_id: Option<i64>,
     pub file_path: Option<String>,
+    pub file_size: Option<i64>,
+    pub original_name: Option<String>,
     pub status: String,
     pub current_version: i64,
     pub sort_order: f64,
     pub archived_at: Option<String>,
+    pub created_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

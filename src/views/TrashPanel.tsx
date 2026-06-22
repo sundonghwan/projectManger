@@ -14,6 +14,7 @@ const KIND_LABEL: Record<SearchKind, string> = {
   project: "프로젝트",
   task: "태스크",
   document: "문서",
+  deliverable: "산출물",
 };
 
 export function TrashPanel({ items, onRestore, onPurge, onClose }: TrashPanelProps) {

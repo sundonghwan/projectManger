@@ -372,6 +372,66 @@ pub fn deliverable_archive(state: State<AppState>, id: i64) -> Result<()> {
     repo::deliverable::archive(&conn, id)
 }
 
+/// 파일 업로드(다중). 프론트가 다이얼로그로 고른 경로들을 받아 앱 데이터 폴더로 복사하고
+/// 각각 산출물 행을 생성한다. 개별 파일 실패는 건너뛰고 성공분만 반환한다.
+#[tauri::command]
+pub fn deliverable_upload(
+    app: tauri::AppHandle,
+    state: State<AppState>,
+    business_id: i64,
+    project_id: Option<i64>,
+    paths: Vec<String>,
+) -> Result<Vec<Deliverable>> {
+    use tauri::Manager;
+    let data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|_| crate::error::AppError::Invalid("앱 데이터 폴더를 찾을 수 없음".into()))?;
+    let conn = state.db.lock().unwrap();
+    let mut created = Vec::new();
+    for path in paths {
+        let src = std::path::Path::new(&path);
+        let filename = match src.file_name().and_then(|f| f.to_str()) {
+            Some(f) if !f.is_empty() => f.to_string(),
+            _ => continue,
+        };
+        let size = match std::fs::metadata(src) {
+            Ok(m) if m.is_file() => m.len() as i64,
+            _ => continue,
+        };
+        // 1) 행 먼저 생성해 id 확보
+        let d = match repo::deliverable::create_file(&conn, business_id, project_id, &filename, &filename, size) {
+            Ok(d) => d,
+            Err(_) => continue,
+        };
+        // 2) <appData>/deliverables/<id>/<filename> 로 복사
+        let dest_dir = data_dir.join("deliverables").join(d.id.to_string());
+        if std::fs::create_dir_all(&dest_dir).is_err() {
+            let _ = repo::deliverable::delete(&conn, d.id);
+            continue;
+        }
+        let dest = dest_dir.join(&filename);
+        if std::fs::copy(src, &dest).is_err() {
+            let _ = repo::deliverable::delete(&conn, d.id);
+            let _ = std::fs::remove_dir(&dest_dir);
+            continue;
+        }
+        // 3) 복사본 경로 기록
+        let dest_str = dest.to_string_lossy().to_string();
+        if repo::deliverable::set_file_path(&conn, d.id, &dest_str).is_err() {
+            continue;
+        }
+        created.push(repo::deliverable::get(&conn, d.id)?);
+    }
+    Ok(created)
+}
+
+#[tauri::command]
+pub fn deliverable_rename(state: State<AppState>, id: i64, title: String) -> Result<Deliverable> {
+    let conn = state.db.lock().unwrap();
+    repo::deliverable::rename(&conn, id, &title)
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerCreate {
@@ -663,7 +723,22 @@ pub fn trash_restore(state: State<AppState>, kind: String, id: i64) -> Result<()
 #[tauri::command]
 pub fn trash_purge(state: State<AppState>, kind: String, id: i64) -> Result<()> {
     let conn = state.db.lock().unwrap();
-    repo::trash::purge(&conn, &kind, id)
+    // 산출물은 영구삭제 시 복사 보관된 물리 파일도 함께 제거한다.
+    let file_path = if kind == "deliverable" {
+        repo::deliverable::file_path_of(&conn, id).ok().flatten()
+    } else {
+        None
+    };
+    repo::trash::purge(&conn, &kind, id)?;
+    if let Some(path) = file_path {
+        let p = std::path::Path::new(&path);
+        let _ = std::fs::remove_file(p);
+        // <appData>/deliverables/<id>/ 폴더도 비었으면 정리
+        if let Some(parent) = p.parent() {
+            let _ = std::fs::remove_dir(parent);
+        }
+    }
+    Ok(())
 }
 
 /// 전체 데이터를 JSON으로 내보낸다. path 미지정 시 앱 데이터 폴더의 backup.json.

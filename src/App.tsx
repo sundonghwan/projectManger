@@ -82,8 +82,8 @@ export default function App() {
   );
 
   const tree = useMemo(
-    () => buildTree({ businesses: visibleBusinesses, projects, documents, deliverables, expanded }),
-    [visibleBusinesses, projects, documents, deliverables, expanded],
+    () => buildTree({ businesses: visibleBusinesses, projects, documents, expanded }),
+    [visibleBusinesses, projects, documents, expanded],
   );
 
   const colorFor = useCallback(
@@ -166,14 +166,7 @@ export default function App() {
           setSelectedId(rowId("document", d.id));
           setView("doc");
         } else {
-          const dv = await api.deliverable.create({
-            businessId,
-            projectId,
-            title: name,
-            kind: "file",
-          });
-          await loadDeliverables(businessId);
-          setSelectedId(rowId("deliverable", dv.id));
+          // 산출물은 '산출물' 탭의 '파일 업로드'로만 생성한다.
           setView("deliverables");
         }
       } catch (e) {
@@ -279,7 +272,7 @@ export default function App() {
   const selectedBusiness = useMemo(() => {
     const row = tree.find((r) => r.id === selectedId);
     if (!row) return businesses[0] ?? null;
-    if (row.type === "business" || row.type === "dashboard")
+    if (row.type === "business" || row.type === "dashboard" || row.type === "deliverable")
       return businesses.find((b) => b.id === row.entityId) ?? null;
     if (row.type === "project") {
       const p = projects.find((x) => x.id === row.entityId);

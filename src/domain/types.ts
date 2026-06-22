@@ -111,7 +111,7 @@ export interface SftpEntry {
   size: number;
 }
 
-export type SearchKind = "business" | "project" | "task" | "document";
+export type SearchKind = "business" | "project" | "task" | "document" | "deliverable";
 
 export interface SearchHit {
   kind: SearchKind;
@@ -162,10 +162,13 @@ export interface Deliverable {
   kind: DeliverableKind;
   documentId?: number | null;
   filePath?: string | null;
+  fileSize?: number | null;
+  originalName?: string | null;
   status: DeliverableStatus;
   currentVersion: number;
   sortOrder: number;
   archivedAt?: Timestamp | null;
+  createdAt: Timestamp;
 }
 
 export interface DeliverableVersion {

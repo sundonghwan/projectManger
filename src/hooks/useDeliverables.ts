@@ -1,16 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/client";
-import type { Deliverable, DeliverableStatus, DeliverableVersion } from "../domain/types";
+import type { Deliverable, DeliverableStatus } from "../domain/types";
 
-/** 사업 산출물 로딩 + 생성/상태변경/버전추가/보관 + 선택 산출물의 버전 히스토리. */
+/** 사업 산출물(업로드 파일) 로딩 + 업로드/상태변경/이름변경/열기/보관. */
 export function useDeliverables(
   businessId: number | null,
   projectId: number | null,
   onChanged?: () => void,
 ) {
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [versions, setVersions] = useState<DeliverableVersion[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
@@ -30,38 +28,35 @@ export function useDeliverables(
     void reload();
   }, [reload]);
 
-  const loadVersions = useCallback(async (id: number) => {
-    setVersions(await api.deliverable.versions(id));
-  }, []);
-
-  const select = useCallback(
-    async (id: number) => {
-      setSelectedId(id);
+  const upload = useCallback(
+    async (paths: string[]) => {
+      if (businessId == null || paths.length === 0) return;
       try {
-        await loadVersions(id);
+        const created = await api.deliverable.upload(businessId, projectId, paths);
+        await reload();
+        onChanged?.();
+        if (created.length < paths.length) {
+          setError(`${paths.length}개 중 ${created.length}개만 업로드됨`);
+        }
       } catch (e) {
         setError(String(e));
       }
     },
-    [loadVersions],
+    [businessId, projectId, reload, onChanged],
   );
 
-  const create = useCallback(async () => {
-    if (businessId == null) return;
-    try {
-      const d = await api.deliverable.create({
-        businessId,
-        projectId,
-        title: "새 산출물",
-        kind: "file",
-      });
-      await reload();
-      onChanged?.();
-      await select(d.id);
-    } catch (e) {
-      setError(String(e));
-    }
-  }, [businessId, projectId, reload, onChanged, select]);
+  const rename = useCallback(
+    async (id: number, title: string) => {
+      try {
+        await api.deliverable.rename(id, title);
+        await reload();
+        onChanged?.();
+      } catch (e) {
+        setError(String(e));
+      }
+    },
+    [reload, onChanged],
+  );
 
   const setStatus = useCallback(
     async (id: number, status: DeliverableStatus) => {
@@ -75,32 +70,30 @@ export function useDeliverables(
     [reload],
   );
 
-  const addVersion = useCallback(
-    async (id: number) => {
-      try {
-        await api.deliverable.addVersion(id, "새 버전");
-        await reload();
-        await loadVersions(id);
-      } catch (e) {
-        setError(String(e));
-      }
-    },
-    [reload, loadVersions],
-  );
+  const open = useCallback(async (d: Deliverable) => {
+    if (!d.filePath) {
+      setError("파일 경로가 없습니다.");
+      return;
+    }
+    try {
+      await api.deliverable.open(d.filePath);
+    } catch (e) {
+      setError(String(e));
+    }
+  }, []);
 
   const archive = useCallback(
     async (id: number) => {
       try {
         await api.deliverable.archive(id);
-        if (selectedId === id) setSelectedId(null);
         await reload();
         onChanged?.();
       } catch (e) {
         setError(String(e));
       }
     },
-    [reload, onChanged, selectedId],
+    [reload, onChanged],
   );
 
-  return { deliverables, selectedId, versions, error, select, create, setStatus, addVersion, archive };
+  return { deliverables, error, reload, upload, rename, setStatus, open, archive };
 }

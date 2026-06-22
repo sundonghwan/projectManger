@@ -1,5 +1,6 @@
 // Tauri invoke 래퍼 — 프론트는 이 클라이언트로만 백엔드와 통신.
 import { invoke } from "@tauri-apps/api/core";
+import { openPath } from "@tauri-apps/plugin-opener";
 import type {
   Block,
   Business,
@@ -7,9 +8,7 @@ import type {
   CommandSnippet,
   DateString,
   Deliverable,
-  DeliverableKind,
   DeliverableStatus,
-  DeliverableVersion,
   Document,
   EntityStatus,
   Label,
@@ -124,20 +123,19 @@ export const api = {
   },
   deliverable: {
     list: (businessId: number) => invoke<Deliverable[]>("deliverable_list", { businessId }),
-    create: (input: {
-      businessId: number;
-      projectId?: number | null;
-      title: string;
-      kind: DeliverableKind;
-    }) => invoke<Deliverable>("deliverable_create", { input }),
+    /** 다중 파일 업로드 — 앱 데이터 폴더로 복사 후 생성된 산출물 목록 반환. */
+    upload: (businessId: number, projectId: number | null, paths: string[]) =>
+      invoke<Deliverable[]>("deliverable_upload", {
+        businessId,
+        projectId: projectId ?? null,
+        paths,
+      }),
+    rename: (id: number, title: string) =>
+      invoke<Deliverable>("deliverable_rename", { id, title }),
     setStatus: (id: number, status: DeliverableStatus) =>
       invoke<Deliverable>("deliverable_set_status", { id, status }),
-    addVersion: (id: number, note?: string | null, filePath?: string | null) =>
-      invoke<Deliverable>("deliverable_add_version", {
-        input: { id, note: note ?? null, filePath: filePath ?? null },
-      }),
-    versions: (deliverableId: number) =>
-      invoke<DeliverableVersion[]>("deliverable_versions", { deliverableId }),
+    /** 복사 보관된 파일을 OS 기본 앱으로 연다. */
+    open: (path: string) => openPath(path),
     archive: (id: number) => invoke<void>("deliverable_archive", { id }),
   },
   server: {

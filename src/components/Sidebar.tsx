@@ -30,7 +30,8 @@ export interface SidebarProps {
 }
 
 const RENAMEABLE = new Set<TreeRow["type"]>(["business", "project", "document"]);
-const ARCHIVABLE = new Set<TreeRow["type"]>(["business", "project", "document", "deliverable"]);
+// 산출물(deliverable)은 트리에선 단일 진입 노드이므로 보관 대상이 아니다(목록에서 개별 삭제).
+const ARCHIVABLE = new Set<TreeRow["type"]>(["business", "project", "document"]);
 
 const ICON: Partial<Record<TreeRow["type"], IconName>> = {
   dashboard: "dashboard",
@@ -71,11 +72,12 @@ export function Sidebar(props: SidebarProps) {
     setMenu({ x: r.left, y: r.bottom + 4, ctx });
   };
 
+  // 산출물은 '산출물' 탭의 '파일 업로드'로만 생성하므로 트리 추가 메뉴에서 제외.
   const allowedKinds: AddKind[] =
     menu && menu.ctx.kind === "child"
       ? menu.ctx.row.type === "business"
-        ? ["project", "document", "deliverable"]
-        : ["document", "deliverable"]
+        ? ["project", "document"]
+        : ["document"]
       : [];
 
   const startEdit = (row: TreeRow) => {

@@ -15,6 +15,7 @@ use tauri::Manager;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let dir = app.path().app_data_dir().expect("app_data_dir 를 찾을 수 없음");
             std::fs::create_dir_all(&dir).ok();
@@ -61,6 +62,8 @@ pub fn run() {
             commands::deliverable_add_version,
             commands::deliverable_versions,
             commands::deliverable_archive,
+            commands::deliverable_upload,
+            commands::deliverable_rename,
             commands::server_list,
             commands::server_create,
             commands::server_update,

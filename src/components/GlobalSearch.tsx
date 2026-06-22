@@ -12,12 +12,14 @@ const KIND_ICON: Record<SearchKind, IconName> = {
   project: "folder",
   task: "check-square",
   document: "document",
+  deliverable: "deliverable",
 };
 const KIND_LABEL: Record<SearchKind, string> = {
   business: "사업",
   project: "프로젝트",
   task: "태스크",
   document: "문서",
+  deliverable: "산출물",
 };
 
 export function GlobalSearch({ onSearch, onPick }: GlobalSearchProps) {

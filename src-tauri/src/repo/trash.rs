@@ -9,6 +9,7 @@ fn table_for(kind: &str) -> Result<&'static str> {
         "project" => Ok("project"),
         "task" => Ok("task"),
         "document" => Ok("document"),
+        "deliverable" => Ok("deliverable"),
         other => Err(AppError::Invalid(format!("알 수 없는 종류: {other}"))),
     }
 }
@@ -23,6 +24,8 @@ pub fn list_archived(conn: &Connection) -> Result<Vec<TrashItem>> {
         SELECT 'task', id, title, archived_at FROM task WHERE archived_at IS NOT NULL
         UNION ALL
         SELECT 'document', id, title, archived_at FROM document WHERE archived_at IS NOT NULL
+        UNION ALL
+        SELECT 'deliverable', id, title, archived_at FROM deliverable WHERE archived_at IS NOT NULL
         ORDER BY archived_at DESC";
     let mut stmt = conn.prepare(sql)?;
     let rows = stmt.query_map([], |r| {

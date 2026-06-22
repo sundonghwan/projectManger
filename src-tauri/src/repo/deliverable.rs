@@ -14,10 +14,13 @@ fn map_deliverable(row: &Row) -> rusqlite::Result<Deliverable> {
         kind: row.get("kind")?,
         document_id: row.get("document_id")?,
         file_path: row.get("file_path")?,
+        file_size: row.get("file_size")?,
+        original_name: row.get("original_name")?,
         status: row.get("status")?,
         current_version: row.get("current_version")?,
         sort_order: row.get("sort_order")?,
         archived_at: row.get("archived_at")?,
+        created_at: row.get("created_at")?,
     })
 }
 
@@ -93,6 +96,86 @@ pub fn create(
         params![id],
     )?;
     get(conn, id)
+}
+
+/// 파일 산출물 생성(업로드 모델). 버전 행은 남기지 않는다. file_path 는 복사 후 set_file_path 로 채운다.
+pub fn create_file(
+    conn: &Connection,
+    business_id: i64,
+    project_id: Option<i64>,
+    title: &str,
+    original_name: &str,
+    file_size: i64,
+) -> Result<Deliverable> {
+    if title.trim().is_empty() {
+        return Err(AppError::Invalid("산출물명은 비어 있을 수 없습니다".into()));
+    }
+    if let Some(pid) = project_id {
+        let ok: bool = conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM project WHERE id=?1 AND business_id=?2)",
+            params![pid, business_id],
+            |r| r.get(0),
+        )?;
+        if !ok {
+            return Err(AppError::Invalid("프로젝트가 해당 사업 소속이 아닙니다".into()));
+        }
+    }
+    let next: f64 = conn.query_row(
+        "SELECT COALESCE(MAX(sort_order),0)+1 FROM deliverable WHERE business_id=?1",
+        params![business_id],
+        |r| r.get(0),
+    )?;
+    conn.execute(
+        "INSERT INTO deliverable (business_id, project_id, title, kind, original_name, file_size, sort_order) \
+         VALUES (?1,?2,?3,'file',?4,?5,?6)",
+        params![business_id, project_id, title, original_name, file_size, next],
+    )?;
+    get(conn, conn.last_insert_rowid())
+}
+
+/// 복사 완료된 파일의 절대 경로를 기록.
+pub fn set_file_path(conn: &Connection, id: i64, file_path: &str) -> Result<()> {
+    let n = conn.execute(
+        "UPDATE deliverable SET file_path=?2, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?1",
+        params![id, file_path],
+    )?;
+    if n == 0 {
+        return Err(AppError::NotFound);
+    }
+    Ok(())
+}
+
+/// 표시명(title) 수정. 원본 파일명(original_name)은 바뀌지 않는다.
+pub fn rename(conn: &Connection, id: i64, title: &str) -> Result<Deliverable> {
+    if title.trim().is_empty() {
+        return Err(AppError::Invalid("산출물명은 비어 있을 수 없습니다".into()));
+    }
+    let n = conn.execute(
+        "UPDATE deliverable SET title=?2, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?1",
+        params![id, title.trim()],
+    )?;
+    if n == 0 {
+        return Err(AppError::NotFound);
+    }
+    get(conn, id)
+}
+
+/// 산출물 삭제(영구) 직전, 물리 파일 정리를 위해 file_path 를 조회.
+pub fn file_path_of(conn: &Connection, id: i64) -> Result<Option<String>> {
+    conn.query_row("SELECT file_path FROM deliverable WHERE id=?1", params![id], |r| r.get(0))
+        .map_err(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => AppError::NotFound,
+            other => AppError::Db(other),
+        })
+}
+
+/// 산출물 행 삭제(영구). 물리 파일 제거는 호출자(명령 계층)가 담당.
+pub fn delete(conn: &Connection, id: i64) -> Result<()> {
+    let n = conn.execute("DELETE FROM deliverable WHERE id=?1", params![id])?;
+    if n == 0 {
+        return Err(AppError::NotFound);
+    }
+    Ok(())
 }
 
 pub fn update_status(conn: &Connection, id: i64, status: &str) -> Result<Deliverable> {
@@ -202,6 +285,40 @@ mod tests {
         assert_eq!(versions.len(), 2);
         assert_eq!(versions[0].version, 2); // 최신 먼저
         assert_eq!(versions[0].note.as_deref(), Some("피드백 반영"));
+    }
+
+    #[test]
+    fn create_file_sets_fields_without_version() {
+        let (c, biz, _) = setup();
+        let d = create_file(&c, biz, None, "보고서.pdf", "보고서.pdf", 2048).unwrap();
+        assert_eq!(d.kind, "file");
+        assert_eq!(d.status, "draft");
+        assert_eq!(d.original_name.as_deref(), Some("보고서.pdf"));
+        assert_eq!(d.file_size, Some(2048));
+        assert!(d.file_path.is_none());
+        // 업로드 모델은 버전 행을 만들지 않는다
+        assert!(list_versions(&c, d.id).unwrap().is_empty());
+        // 경로 기록
+        set_file_path(&c, d.id, "/tmp/x/보고서.pdf").unwrap();
+        assert_eq!(get(&c, d.id).unwrap().file_path.as_deref(), Some("/tmp/x/보고서.pdf"));
+    }
+
+    #[test]
+    fn rename_changes_title_only() {
+        let (c, biz, _) = setup();
+        let d = create_file(&c, biz, None, "a.txt", "a.txt", 1).unwrap();
+        let r = rename(&c, d.id, "최종본").unwrap();
+        assert_eq!(r.title, "최종본");
+        assert_eq!(r.original_name.as_deref(), Some("a.txt")); // 원본명 불변
+        assert!(rename(&c, d.id, "  ").is_err());
+    }
+
+    #[test]
+    fn delete_removes_row() {
+        let (c, biz, _) = setup();
+        let d = create_file(&c, biz, None, "a.txt", "a.txt", 1).unwrap();
+        delete(&c, d.id).unwrap();
+        assert!(get(&c, d.id).is_err());
     }
 
     #[test]
