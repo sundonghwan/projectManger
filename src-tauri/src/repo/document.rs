@@ -9,6 +9,7 @@ fn map_doc(row: &Row) -> rusqlite::Result<Document> {
         project_id: row.get("project_id")?,
         title: row.get("title")?,
         icon: row.get("icon")?,
+        body: row.get("body")?,
         sort_order: row.get("sort_order")?,
         archived_at: row.get("archived_at")?,
         created_at: row.get("created_at")?,
@@ -87,6 +88,18 @@ pub fn rename(conn: &Connection, id: i64, title: &str) -> Result<Document> {
         return Err(AppError::NotFound);
     }
     get(conn, id)
+}
+
+/// 문서 본문(마크다운) 저장.
+pub fn set_body(conn: &Connection, id: i64, body: &str) -> Result<()> {
+    let n = conn.execute(
+        "UPDATE document SET body=?2, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?1",
+        params![id, body],
+    )?;
+    if n == 0 {
+        return Err(AppError::NotFound);
+    }
+    Ok(())
 }
 
 pub fn archive(conn: &Connection, id: i64) -> Result<()> {

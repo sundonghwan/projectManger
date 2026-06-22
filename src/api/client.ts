@@ -96,7 +96,10 @@ export const api = {
   document: {
     list: (businessId: number) => invoke<Document[]>("document_list", { businessId }),
     create: (input: DocumentCreateInput) => invoke<Document>("document_create", { input }),
+    get: (id: number) => invoke<Document>("document_get", { id }),
     rename: (id: number, title: string) => invoke<Document>("document_rename", { id, title }),
+    /** 본문(마크다운) 저장. */
+    setBody: (id: number, body: string) => invoke<void>("document_set_body", { id, body }),
     archive: (id: number) => invoke<void>("document_archive", { id }),
   },
   block: {

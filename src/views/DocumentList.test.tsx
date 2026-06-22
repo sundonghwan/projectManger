@@ -9,6 +9,7 @@ const doc = (id: number, over: Partial<Document> = {}): Document => ({
   businessId: 1,
   projectId: null,
   title: `문서${id}`,
+  body: "",
   sortOrder: id,
   createdAt: "2026-06-22T03:00:00Z",
   ...over,

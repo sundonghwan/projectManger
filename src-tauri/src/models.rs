@@ -126,6 +126,7 @@ pub struct Document {
     pub project_id: Option<i64>,
     pub title: String,
     pub icon: Option<String>,
+    pub body: String,
     pub sort_order: f64,
     pub archived_at: Option<String>,
     pub created_at: String,

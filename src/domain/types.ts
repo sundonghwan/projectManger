@@ -68,6 +68,7 @@ export interface Document {
   projectId?: number | null;
   title: string;
   icon?: string | null;
+  body: string;
   sortOrder: number;
   archivedAt?: Timestamp | null;
   createdAt: Timestamp;

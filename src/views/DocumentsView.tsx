@@ -38,7 +38,7 @@ export function DocumentsView({ businessId, projectId, onChanged, initialOpenDoc
             {openDoc.title}
           </span>
         </div>
-        <div style={{ flex: 1, overflow: "auto", minHeight: 0 }}>
+        <div style={{ flex: 1, minHeight: 0 }}>
           <DocEditor key={openDoc.id} document={openDoc} />
         </div>
       </div>

@@ -252,6 +252,18 @@ pub fn document_archive(state: State<AppState>, id: i64) -> Result<()> {
 }
 
 #[tauri::command]
+pub fn document_get(state: State<AppState>, id: i64) -> Result<Document> {
+    let conn = state.db.lock().unwrap();
+    repo::document::get(&conn, id)
+}
+
+#[tauri::command]
+pub fn document_set_body(state: State<AppState>, id: i64, body: String) -> Result<()> {
+    let conn = state.db.lock().unwrap();
+    repo::document::set_body(&conn, id, &body)
+}
+
+#[tauri::command]
 pub fn block_list(state: State<AppState>, document_id: i64) -> Result<Vec<Block>> {
     let conn = state.db.lock().unwrap();
     repo::document::list_blocks(&conn, document_id)
