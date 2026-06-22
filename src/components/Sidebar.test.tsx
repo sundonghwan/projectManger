@@ -98,28 +98,26 @@ describe("Sidebar", () => {
     expect(props.onAddBusiness).toHaveBeenCalledWith("internal", "신규 사업");
   });
 
-  it("사업 [+] → 종류 선택 + 이름 입력 후 onAddChild(row, kind, name)", async () => {
+  it("사업 [+] → 프로젝트 생성, 문서·산출물 옵션은 없다", async () => {
     const { props } = setup();
     const addButtons = screen.getAllByRole("button", { name: "하위 추가" });
-    // 사업 1 + 프로젝트 1 = 2개 (대시보드에는 없음)
-    expect(addButtons).toHaveLength(2);
+    // 사업에만 하위 추가 버튼(프로젝트). 대시보드·프로젝트엔 없음
+    expect(addButtons).toHaveLength(1);
     await userEvent.click(addButtons[0]); // 사업 노드
-    // 산출물은 업로드 버튼으로만 생성하므로 트리 추가 메뉴에는 없다
-    expect(screen.queryByRole("button", { name: /산출물/ })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /문서/ }));
-    await userEvent.type(screen.getByLabelText("이름"), "제안서");
+    const dialog = screen.getByRole("dialog");
+    // 문서·산출물은 각 목록에서 생성하므로 트리 추가 메뉴엔 없다
+    expect(within(dialog).queryByRole("button", { name: /문서/ })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: /산출물/ })).not.toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: /프로젝트/ }));
+    await userEvent.type(screen.getByLabelText("이름"), "신규 프로젝트");
     await userEvent.click(screen.getByRole("button", { name: "만들기" }));
-    expect(props.onAddChild).toHaveBeenCalledWith(bizRow, "document", "제안서");
+    expect(props.onAddChild).toHaveBeenCalledWith(bizRow, "project", "신규 프로젝트");
   });
 
-  it("프로젝트 [+] 폼에는 프로젝트 옵션이 없다", async () => {
-    const { props } = setup();
-    const addButtons = screen.getAllByRole("button", { name: "하위 추가" });
-    await userEvent.click(addButtons[1]); // 프로젝트 노드
-    const dialog = screen.getByRole("dialog");
-    expect(within(dialog).queryByRole("button", { name: /프로젝트/ })).not.toBeInTheDocument();
-    await userEvent.type(screen.getByLabelText("이름"), "회의록{Enter}");
-    expect(props.onAddChild).toHaveBeenCalledWith(projRow, "document", "회의록");
+  it("프로젝트 행에는 하위 추가 버튼이 없다", () => {
+    setup();
+    const projItem = screen.getByText("프로젝트 1").closest('[role="treeitem"]') as HTMLElement;
+    expect(within(projItem).queryByRole("button", { name: "하위 추가" })).toBeNull();
   });
 
   it("선택된 행은 aria-selected=true", () => {

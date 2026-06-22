@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildTree, rowId, type TreeInput } from "./tree";
-import type { Business, Project, Document } from "./types";
+import type { Business, Project } from "./types";
 
 // --- 테스트 픽스처 헬퍼 (필요한 필드만 채우고 나머지 기본값) ---
 const biz = (o: Partial<Business> & Pick<Business, "id" | "name">): Business => ({
@@ -16,16 +16,10 @@ const proj = (o: Partial<Project> & Pick<Project, "id" | "businessId" | "name">)
   archivedAt: null,
   ...o,
 });
-const doc = (o: Partial<Document> & Pick<Document, "id" | "businessId" | "title">): Document => ({
-  sortOrder: 0,
-  archivedAt: null,
-  projectId: null,
-  ...o,
-});
+
 const empty: TreeInput = {
   businesses: [],
   projects: [],
-  documents: [],
   expanded: new Set(),
 };
 
@@ -34,73 +28,35 @@ describe("buildTree", () => {
     expect(buildTree(empty)).toEqual([]);
   });
 
-  it("접힌 사업은 행 1개만 만든다 (대시보드/하위 미노출)", () => {
-    const rows = buildTree({
-      ...empty,
-      businesses: [biz({ id: 1, name: "SI사업 A" })],
-    });
+  it("접힌 사업은 행 1개만 만든다 (하위 미노출)", () => {
+    const rows = buildTree({ ...empty, businesses: [biz({ id: 1, name: "SI사업 A" })] });
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({
-      id: "business:1",
-      type: "business",
-      depth: 0,
-      label: "SI사업 A",
-      hasChildren: true,
-      expanded: false,
-    });
+    expect(rows[0]).toMatchObject({ id: "business:1", type: "business", depth: 0, hasChildren: true, expanded: false });
   });
 
-  it("펼친 사업은 대시보드·산출물 의사행(depth1)을 먼저 노출한다", () => {
+  it("펼친 사업은 대시보드·문서·산출물 진입 의사행(depth1)을 노출한다", () => {
     const rows = buildTree({
       ...empty,
       businesses: [biz({ id: 1, name: "A" })],
       expanded: new Set([rowId("business", 1)]),
     });
-    expect(rows.map((r) => r.id)).toEqual(["business:1", "dashboard:1", "deliverable:1"]);
-    expect(rows[1]).toMatchObject({ type: "dashboard", depth: 1, hasChildren: false });
-    // 산출물은 단일 진입 노드(파일은 트리에 두지 않음). entityId = 사업 id.
-    expect(rows[2]).toMatchObject({ type: "deliverable", depth: 1, label: "산출물", entityId: 1, hasChildren: false });
+    expect(rows.map((r) => r.id)).toEqual(["business:1", "dashboard:1", "document:1", "deliverable:1"]);
+    // 문서·산출물 진입 노드의 entityId 는 사업 id, hasChildren=false
+    expect(rows[2]).toMatchObject({ type: "document", depth: 1, label: "문서", entityId: 1, hasChildren: false });
+    expect(rows[3]).toMatchObject({ type: "deliverable", depth: 1, label: "산출물", entityId: 1, hasChildren: false });
   });
 
-  it("펼친 사업 아래 프로젝트는 depth1, 접혀 있으면 하위 미노출", () => {
+  it("프로젝트는 진입 노드 뒤에 depth1 leaf(확장 불가)로 노출한다", () => {
     const rows = buildTree({
       ...empty,
       businesses: [biz({ id: 1, name: "A" })],
       projects: [proj({ id: 10, businessId: 1, name: "P1" })],
-      documents: [doc({ id: 100, businessId: 1, projectId: 10, title: "문서" })],
       expanded: new Set([rowId("business", 1)]),
     });
-    const proj1 = rows.find((r) => r.id === "project:10")!;
-    expect(proj1).toMatchObject({ type: "project", depth: 1, hasChildren: true, expanded: false });
-    // 프로젝트가 접혀 있으므로 그 문서는 노출되지 않음
-    expect(rows.find((r) => r.id === "document:100")).toBeUndefined();
-  });
-
-  it("펼친 프로젝트는 문서를 depth2로 노출한다", () => {
-    const rows = buildTree({
-      ...empty,
-      businesses: [biz({ id: 1, name: "A" })],
-      projects: [proj({ id: 10, businessId: 1, name: "P1" })],
-      documents: [doc({ id: 100, businessId: 1, projectId: 10, title: "요건정의서" })],
-      expanded: new Set([rowId("business", 1), rowId("project", 10)]),
-    });
-    const d = rows.find((r) => r.id === "document:100")!;
-    expect(d).toMatchObject({ type: "document", depth: 2, label: "요건정의서" });
-    // 산출물 파일은 트리에 leaf로 노출되지 않는다(목록에서만 본다)
-    expect(rows.some((r) => r.type === "deliverable" && r.depth === 2)).toBe(false);
-  });
-
-  it("사업 직속 문서(projectId=null)는 프로젝트 뒤에 depth1로 노출", () => {
-    const rows = buildTree({
-      ...empty,
-      businesses: [biz({ id: 1, name: "A" })],
-      projects: [proj({ id: 10, businessId: 1, name: "P1" })],
-      documents: [doc({ id: 100, businessId: 1, projectId: null, title: "사업 직속 문서" })],
-      expanded: new Set([rowId("business", 1)]),
-    });
-    const direct = rows.find((r) => r.id === "document:100")!;
-    expect(direct).toMatchObject({ type: "document", depth: 1 });
-    expect(rows.indexOf(direct)).toBeGreaterThan(rows.indexOf(rows.find((r) => r.id === "project:10")!));
+    const p = rows.find((r) => r.id === "project:10")!;
+    expect(p).toMatchObject({ type: "project", depth: 1, hasChildren: false });
+    // 진입 의사행들보다 뒤에 온다
+    expect(rows.indexOf(p)).toBeGreaterThan(rows.findIndex((r) => r.id === "deliverable:1"));
   });
 
   it("archived 항목은 제외한다", () => {
@@ -127,22 +83,13 @@ describe("buildTree", () => {
     });
     expect(rows.map((r) => r.label)).toEqual(["첫째", "둘째"]);
   });
-
-  it("프로젝트가 비어 있으면 hasChildren=false", () => {
-    const rows = buildTree({
-      ...empty,
-      businesses: [biz({ id: 1, name: "A" })],
-      projects: [proj({ id: 10, businessId: 1, name: "빈 프로젝트" })],
-      expanded: new Set([rowId("business", 1)]),
-    });
-    expect(rows.find((r) => r.id === "project:10")).toMatchObject({ hasChildren: false });
-  });
 });
 
 describe("rowId", () => {
   it("타입과 id를 결합한 고유 키를 만든다", () => {
     expect(rowId("business", 1)).toBe("business:1");
     expect(rowId("project", 10)).toBe("project:10");
-    expect(rowId("dashboard", 1)).toBe("dashboard:1");
+    expect(rowId("document", 1)).toBe("document:1");
+    expect(rowId("deliverable", 1)).toBe("deliverable:1");
   });
 });

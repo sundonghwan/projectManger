@@ -17,6 +17,8 @@ export default function App() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<ViewKind>("dashboard");
+  // 검색 등에서 특정 문서를 바로 편집기로 열도록 전달하는 대상 id (열린 뒤 소비됨)
+  const [pendingDocId, setPendingDocId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { theme, toggle: toggleTheme } = useTheme();
   const [typeFilter, setTypeFilter] = useState<Set<BusinessType>>(new Set());
@@ -82,8 +84,8 @@ export default function App() {
   );
 
   const tree = useMemo(
-    () => buildTree({ businesses: visibleBusinesses, projects, documents, expanded }),
-    [visibleBusinesses, projects, documents, expanded],
+    () => buildTree({ businesses: visibleBusinesses, projects, expanded }),
+    [visibleBusinesses, projects, expanded],
   );
 
   const colorFor = useCallback(
@@ -141,39 +143,20 @@ export default function App() {
 
   const onAddChild = useCallback(
     async (row: TreeRow, kind: AddKind, name: string) => {
-      // 추가 위치의 사업/프로젝트 해석
-      let businessId: number;
-      let projectId: number | null;
-      if (row.type === "business") {
-        businessId = row.entityId;
-        projectId = null;
-      } else {
-        const proj = projects.find((p) => p.id === row.entityId);
-        if (!proj) return;
-        businessId = proj.businessId;
-        projectId = proj.id;
-      }
+      // 트리 추가 메뉴는 사업 아래 프로젝트 생성만 담당한다.
+      // (문서는 '문서' 노드의 '새 문서', 산출물은 '산출물' 노드의 '파일 업로드'로 생성)
+      if (kind !== "project" || row.type !== "business") return;
       try {
         setExpanded((prev) => new Set(prev).add(row.id));
-        if (kind === "project") {
-          const p = await api.project.create({ businessId, name });
-          await loadProjects(businessId);
-          setSelectedId(rowId("project", p.id));
-          setView("kanban");
-        } else if (kind === "document") {
-          const d = await api.document.create({ businessId, projectId, title: name });
-          await loadDocuments(businessId);
-          setSelectedId(rowId("document", d.id));
-          setView("doc");
-        } else {
-          // 산출물은 '산출물' 탭의 '파일 업로드'로만 생성한다.
-          setView("deliverables");
-        }
+        const p = await api.project.create({ businessId: row.entityId, name });
+        await loadProjects(row.entityId);
+        setSelectedId(rowId("project", p.id));
+        setView("kanban");
       } catch (e) {
         setError(String(e));
       }
     },
-    [projects, loadProjects, loadDocuments, loadDeliverables],
+    [loadProjects],
   );
 
   const onArchive = useCallback(
@@ -252,8 +235,9 @@ export default function App() {
         setSelectedId(rowId("project", hit.id));
         setView("kanban");
       } else if (hit.kind === "document") {
-        if (hit.projectId) setExpanded((prev) => new Set(prev).add(rowId("project", hit.projectId!)));
-        setSelectedId(rowId("document", hit.id));
+        // 문서는 단일 진입 노드(문서 목록) → 해당 문서를 자동으로 편집기로 연다.
+        setSelectedId(rowId("document", hit.businessId));
+        setPendingDocId(hit.id);
         setView("doc");
       } else {
         // task → 보드로 이동
@@ -272,30 +256,26 @@ export default function App() {
   const selectedBusiness = useMemo(() => {
     const row = tree.find((r) => r.id === selectedId);
     if (!row) return businesses[0] ?? null;
-    if (row.type === "business" || row.type === "dashboard" || row.type === "deliverable")
+    // 문서·산출물 진입 노드의 entityId 는 소속 사업 id (단일 진입 패턴).
+    if (
+      row.type === "business" ||
+      row.type === "dashboard" ||
+      row.type === "deliverable" ||
+      row.type === "document"
+    )
       return businesses.find((b) => b.id === row.entityId) ?? null;
     if (row.type === "project") {
       const p = projects.find((x) => x.id === row.entityId);
       return p ? (businesses.find((b) => b.id === p.businessId) ?? null) : null;
     }
-    if (row.type === "document") {
-      const d = documents.find((x) => x.id === row.entityId);
-      return d ? (businesses.find((b) => b.id === d.businessId) ?? null) : null;
-    }
     return businesses[0] ?? null;
-  }, [tree, selectedId, businesses, projects, documents]);
+  }, [tree, selectedId, businesses, projects]);
 
   const selectedProject = useMemo(() => {
     const row = tree.find((r) => r.id === selectedId);
     if (row?.type === "project") return projects.find((x) => x.id === row.entityId) ?? null;
     return null;
   }, [tree, selectedId, projects]);
-
-  const selectedDocument = useMemo(() => {
-    const row = tree.find((r) => r.id === selectedId);
-    if (row?.type === "document") return documents.find((x) => x.id === row.entityId) ?? null;
-    return null;
-  }, [tree, selectedId, documents]);
 
   return (
     <div style={{ display: "flex", height: "100%", overflow: "hidden" }}>
@@ -316,13 +296,14 @@ export default function App() {
       <MainView
         business={selectedBusiness}
         project={selectedProject}
-        document={selectedDocument}
         view={view}
         onViewChange={setView}
         error={error}
         theme={theme}
         onToggleTheme={toggleTheme}
         onDataChanged={onDataChanged}
+        openDocId={pendingDocId}
+        onDocOpened={() => setPendingDocId(null)}
       />
     </div>
   );

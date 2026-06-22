@@ -70,6 +70,7 @@ export interface Document {
   icon?: string | null;
   sortOrder: number;
   archivedAt?: Timestamp | null;
+  createdAt: Timestamp;
 }
 
 export interface Label {

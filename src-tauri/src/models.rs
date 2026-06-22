@@ -128,6 +128,7 @@ pub struct Document {
     pub icon: Option<String>,
     pub sort_order: f64,
     pub archived_at: Option<String>,
+    pub created_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

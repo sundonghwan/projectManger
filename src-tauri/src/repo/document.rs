@@ -11,6 +11,7 @@ fn map_doc(row: &Row) -> rusqlite::Result<Document> {
         icon: row.get("icon")?,
         sort_order: row.get("sort_order")?,
         archived_at: row.get("archived_at")?,
+        created_at: row.get("created_at")?,
     })
 }
 

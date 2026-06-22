@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api } from "../api/client";
-import type { Business, Document, Project, TrashItem } from "../domain/types";
+import type { Business, Project, TrashItem } from "../domain/types";
 import { TrashPanel } from "./TrashPanel";
 import { businessColor } from "../ui/colors";
 import { Icon } from "../ui/icons/Icon";
@@ -10,7 +10,7 @@ import { groupByStatus } from "../domain/kanban";
 import { Dashboard } from "./Dashboard";
 import { Kanban } from "./Kanban";
 import { TaskList } from "./TaskList";
-import { DocEditor } from "./DocEditor";
+import { DocumentsView } from "./DocumentsView";
 import { TaskEditor } from "./TaskEditor";
 import { DeliverablesView } from "./DeliverablesView";
 import { ServerView } from "./ServerView";
@@ -49,25 +49,28 @@ const VIEW_LABEL: Record<ViewKind, string> = {
 export interface MainViewProps {
   business: Business | null;
   project: Project | null;
-  document: Document | null;
   view: ViewKind;
   onViewChange: (v: ViewKind) => void;
   error: string | null;
   theme: "light" | "dark";
   onToggleTheme: () => void;
   onDataChanged: () => void;
+  /** 검색 등에서 문서 뷰 진입 시 자동으로 열 문서 id */
+  openDocId?: number | null;
+  onDocOpened?: () => void;
 }
 
 export function MainView({
   business,
   project,
-  document,
   view,
   onViewChange,
   error,
   theme,
   onToggleTheme,
   onDataChanged,
+  openDocId,
+  onDocOpened,
 }: MainViewProps) {
   const {
     tasks,
@@ -242,13 +245,14 @@ export function MainView({
         ) : view === "timeline" ? (
           <TimelineView tasks={tasks} />
         ) : view === "doc" ? (
-          document ? (
-            <DocEditor key={document.id} document={document} />
-          ) : (
-            <div style={{ padding: "24px 28px", color: "var(--text2)" }}>
-              왼쪽 트리에서 문서를 선택하거나, 프로젝트의 + 로 새 문서를 만드세요.
-            </div>
-          )
+          <DocumentsView
+            key={business.id}
+            businessId={business.id}
+            projectId={project?.id ?? null}
+            onChanged={onDataChanged}
+            initialOpenDocId={openDocId}
+            onOpened={onDocOpened}
+          />
         ) : view === "deliverables" ? (
           <DeliverablesView
             key={business.id}
