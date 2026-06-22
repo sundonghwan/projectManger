@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import type { Block, BlockType } from "../domain/types";
 import { parseContent } from "../domain/blockContent";
 import { Icon } from "../ui/icons/Icon";
@@ -8,6 +8,8 @@ export interface BlockEditorProps {
   onChangeText: (block: Block, text: string) => void;
   onToggleCheck: (block: Block) => void;
   onAddBlock: (type: BlockType) => void;
+  /** 특정 블록 다음에 새 블록 삽입(Enter 이어쓰기). 생성된 블록 반환. */
+  onAddBlockAfter: (block: Block, type?: BlockType) => Promise<Block | null>;
   onDelete: (block: Block) => void;
 }
 
@@ -20,15 +22,45 @@ const ADDABLE: { type: BlockType; label: string }[] = [
   { type: "divider", label: "구분선" },
 ];
 
-export function BlockEditor({ blocks, onChangeText, onToggleCheck, onAddBlock, onDelete }: BlockEditorProps) {
+export function BlockEditor({
+  blocks,
+  onChangeText,
+  onToggleCheck,
+  onAddBlock,
+  onAddBlockAfter,
+  onDelete,
+}: BlockEditorProps) {
+  const inputRefs = useRef<Map<number, HTMLInputElement | HTMLTextAreaElement>>(new Map());
+  const [focusId, setFocusId] = useState<number | null>(null);
+
+  const setRef = (id: number, el: HTMLInputElement | HTMLTextAreaElement | null) => {
+    if (el) inputRefs.current.set(id, el);
+    else inputRefs.current.delete(id);
+  };
+
+  // 새로 만든(또는 지정된) 블록 입력에 포커스 + 커서를 끝으로 이동.
+  useEffect(() => {
+    if (focusId == null) return;
+    const el = inputRefs.current.get(focusId);
+    if (el) {
+      el.focus();
+      const len = el.value.length;
+      el.setSelectionRange(len, len);
+      setFocusId(null);
+    }
+  }, [blocks, focusId]);
+
+  // Enter: 같은 종류(체크리스트)면 항목 이어가기, 그 외엔 문단으로 줄바꿈. Shift+Enter는 통과.
+  const handleEnter = (e: KeyboardEvent, block: Block, nextType: BlockType) => {
+    if (e.key !== "Enter" || e.shiftKey) return;
+    e.preventDefault();
+    void onAddBlockAfter(block, nextType).then((nb) => {
+      if (nb) setFocusId(nb.id);
+    });
+  };
+
   return (
     <div style={{ maxWidth: 720, margin: "0 auto", padding: "24px 24px 80px" }}>
-      {blocks.length === 0 && (
-        <div style={{ color: "var(--text3)", fontSize: 14, marginBottom: 12 }}>
-          빈 문서입니다. 아래에서 블록을 추가하세요.
-        </div>
-      )}
-
       {blocks.map((b) => {
         const data = parseContent(b.content);
         return (
@@ -48,9 +80,11 @@ export function BlockEditor({ blocks, onChangeText, onToggleCheck, onAddBlock, o
                     {data.checked ? <Icon name="check" size={12} strokeWidth={2.5} /> : null}
                   </button>
                   <input
+                    ref={(el) => setRef(b.id, el)}
                     aria-label="블록 텍스트"
                     value={data.text}
                     onChange={(e) => onChangeText(b, e.target.value)}
+                    onKeyDown={(e) => handleEnter(e, b, "checklist")}
                     placeholder="할 일"
                     style={{
                       ...textInput,
@@ -61,6 +95,7 @@ export function BlockEditor({ blocks, onChangeText, onToggleCheck, onAddBlock, o
                 </div>
               ) : b.type === "code" ? (
                 <textarea
+                  ref={(el) => setRef(b.id, el)}
                   aria-label="블록 텍스트"
                   value={data.text}
                   onChange={(e) => onChangeText(b, e.target.value)}
@@ -69,9 +104,11 @@ export function BlockEditor({ blocks, onChangeText, onToggleCheck, onAddBlock, o
                 />
               ) : (
                 <input
+                  ref={(el) => setRef(b.id, el)}
                   aria-label="블록 텍스트"
                   value={data.text}
                   onChange={(e) => onChangeText(b, e.target.value)}
+                  onKeyDown={(e) => handleEnter(e, b, "paragraph")}
                   placeholder={b.type === "heading" ? "제목" : "텍스트"}
                   style={{
                     ...textInput,
@@ -94,7 +131,7 @@ export function BlockEditor({ blocks, onChangeText, onToggleCheck, onAddBlock, o
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 16 }}>
         {ADDABLE.map((a) => (
-          <button key={a.type} onClick={() => onAddBlock(a.type)} style={addBlockBtn}>
+          <button key={a.type} onClick={() => void onAddBlock(a.type)} style={addBlockBtn}>
             <Icon name="plus" size={13} /> {a.label}
           </button>
         ))}

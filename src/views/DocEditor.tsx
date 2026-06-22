@@ -8,7 +8,7 @@ export interface DocEditorProps {
 }
 
 export function DocEditor({ document }: DocEditorProps) {
-  const { blocks, error, addBlock, changeText, toggleCheck, remove } = useBlocks(document.id);
+  const { blocks, error, addBlock, addBlockAfter, changeText, toggleCheck, remove } = useBlocks(document.id);
 
   return (
     <div style={{ padding: "32px 0 0" }}>
@@ -32,6 +32,7 @@ export function DocEditor({ document }: DocEditorProps) {
         onChangeText={changeText}
         onToggleCheck={toggleCheck}
         onAddBlock={addBlock}
+        onAddBlockAfter={addBlockAfter}
         onDelete={remove}
       />
     </div>

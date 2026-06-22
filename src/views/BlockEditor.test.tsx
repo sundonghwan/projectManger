@@ -18,6 +18,7 @@ function setup(blocks: Block[]) {
     onChangeText: vi.fn(),
     onToggleCheck: vi.fn(),
     onAddBlock: vi.fn(),
+    onAddBlockAfter: vi.fn().mockResolvedValue(null),
     onDelete: vi.fn(),
   };
   render(<BlockEditor blocks={blocks} {...handlers} />);
@@ -25,9 +26,12 @@ function setup(blocks: Block[]) {
 }
 
 describe("BlockEditor", () => {
-  it("빈 문서 안내", () => {
-    setup([]);
-    expect(screen.getByText(/빈 문서입니다/)).toBeInTheDocument();
+  it("Enter 시 onAddBlockAfter(문단)로 이어쓰기", async () => {
+    const h = setup([block(1, "paragraph", "첫 줄")]);
+    const input = screen.getByLabelText("블록 텍스트");
+    input.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(h.onAddBlockAfter).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }), "paragraph");
   });
 
   it("블록 텍스트를 입력값으로 표시", () => {

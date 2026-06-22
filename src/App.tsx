@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./api/client";
 import { buildTree, rowId, type TreeRow } from "./domain/tree";
-import type { Business, BusinessType, Deliverable, Document, Project } from "./domain/types";
+import type { Business, BusinessType, Project } from "./domain/types";
 import { Sidebar, type AddKind } from "./components/Sidebar";
 import { GlobalSearch } from "./components/GlobalSearch";
 import type { SearchHit } from "./domain/types";
@@ -12,8 +12,6 @@ import { useTheme } from "./hooks/useTheme";
 export default function App() {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<ViewKind>("dashboard");
@@ -45,24 +43,6 @@ export default function App() {
     try {
       const list = await api.project.list(businessId);
       setProjects((prev) => [...prev.filter((p) => p.businessId !== businessId), ...list]);
-    } catch (e) {
-      setError(String(e));
-    }
-  }, []);
-
-  const loadDocuments = useCallback(async (businessId: number) => {
-    try {
-      const list = await api.document.list(businessId);
-      setDocuments((prev) => [...prev.filter((d) => d.businessId !== businessId), ...list]);
-    } catch (e) {
-      setError(String(e));
-    }
-  }, []);
-
-  const loadDeliverables = useCallback(async (businessId: number) => {
-    try {
-      const list = await api.deliverable.list(businessId);
-      setDeliverables((prev) => [...prev.filter((d) => d.businessId !== businessId), ...list]);
     } catch (e) {
       setError(String(e));
     }
@@ -103,16 +83,12 @@ export default function App() {
         if (next.has(row.id)) next.delete(row.id);
         else {
           next.add(row.id);
-          if (row.type === "business") {
-            void loadProjects(row.entityId);
-            void loadDocuments(row.entityId);
-            void loadDeliverables(row.entityId);
-          }
+          if (row.type === "business") void loadProjects(row.entityId);
         }
         return next;
       });
     },
-    [loadProjects, loadDocuments, loadDeliverables],
+    [loadProjects],
   );
 
   const onSelect = useCallback((row: TreeRow) => {
@@ -130,15 +106,13 @@ export default function App() {
         await loadBusinesses();
         setExpanded((prev) => new Set(prev).add(rowId("business", b.id)));
         void loadProjects(b.id);
-        void loadDocuments(b.id);
-        void loadDeliverables(b.id);
         setSelectedId(rowId("business", b.id));
         setView("dashboard");
       } catch (e) {
         setError(String(e));
       }
     },
-    [loadBusinesses, loadProjects, loadDocuments, loadDeliverables],
+    [loadBusinesses, loadProjects],
   );
 
   const onAddChild = useCallback(
@@ -171,14 +145,6 @@ export default function App() {
           const p = projects.find((x) => x.id === row.entityId);
           await api.project.archive(row.entityId);
           if (p) await loadProjects(p.businessId);
-        } else if (row.type === "document") {
-          const d = documents.find((x) => x.id === row.entityId);
-          await api.document.archive(row.entityId);
-          if (d) await loadDocuments(d.businessId);
-        } else if (row.type === "deliverable") {
-          const dv = deliverables.find((x) => x.id === row.entityId);
-          await api.deliverable.archive(row.entityId);
-          if (dv) await loadDeliverables(dv.businessId);
         }
         if (selectedId === row.id) {
           setSelectedId(null);
@@ -188,7 +154,7 @@ export default function App() {
         setError(String(e));
       }
     },
-    [projects, documents, deliverables, selectedId, loadBusinesses, loadProjects, loadDocuments, loadDeliverables],
+    [projects, selectedId, loadBusinesses, loadProjects],
   );
 
   const onRename = useCallback(
@@ -201,32 +167,24 @@ export default function App() {
           const p = projects.find((x) => x.id === row.entityId);
           await api.project.rename(row.entityId, name);
           if (p) await loadProjects(p.businessId);
-        } else if (row.type === "document") {
-          const d = documents.find((x) => x.id === row.entityId);
-          await api.document.rename(row.entityId, name);
-          if (d) await loadDocuments(d.businessId);
         }
       } catch (e) {
         setError(String(e));
       }
     },
-    [projects, documents, loadBusinesses, loadProjects, loadDocuments],
+    [projects, loadBusinesses, loadProjects],
   );
 
   const onDataChanged = useCallback(async () => {
     await loadBusinesses();
-    for (const b of businesses) {
-      await loadProjects(b.id);
-      await loadDocuments(b.id);
-      await loadDeliverables(b.id);
-    }
-  }, [businesses, loadBusinesses, loadProjects, loadDocuments, loadDeliverables]);
+    for (const b of businesses) await loadProjects(b.id);
+  }, [businesses, loadBusinesses, loadProjects]);
 
   const navigateTo = useCallback(
     async (hit: SearchHit) => {
       const bizRow = rowId("business", hit.businessId);
       setExpanded((prev) => new Set(prev).add(bizRow));
-      await Promise.all([loadProjects(hit.businessId), loadDocuments(hit.businessId)]);
+      await loadProjects(hit.businessId);
       if (hit.kind === "business") {
         setSelectedId(bizRow);
         setView("dashboard");
@@ -250,7 +208,7 @@ export default function App() {
         setView("kanban");
       }
     },
-    [loadProjects, loadDocuments],
+    [loadProjects],
   );
 
   const selectedBusiness = useMemo(() => {
