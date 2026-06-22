@@ -41,10 +41,18 @@ describe("DocumentList", () => {
     expect(screen.getByText(/문서가 없습니다/)).toBeInTheDocument();
   });
 
-  it("새 문서 버튼 onCreate", async () => {
+  it("새 문서 → 이름 입력 후 Enter로 onCreate(title)", async () => {
     const h = setup();
     await userEvent.click(screen.getByRole("button", { name: "새 문서" }));
-    expect(h.onCreate).toHaveBeenCalled();
+    await userEvent.type(screen.getByLabelText("새 문서 이름"), "기획안{Enter}");
+    expect(h.onCreate).toHaveBeenCalledWith("기획안");
+  });
+
+  it("새 문서 이름이 비면 생성하지 않는다", async () => {
+    const h = setup();
+    await userEvent.click(screen.getByRole("button", { name: "새 문서" }));
+    await userEvent.keyboard("{Escape}");
+    expect(h.onCreate).not.toHaveBeenCalled();
   });
 
   it("편집 버튼 onOpen", async () => {

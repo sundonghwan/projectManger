@@ -49,9 +49,10 @@ export function DocumentsView({ businessId, projectId, onChanged, initialOpenDoc
     <DocumentList
       documents={d.documents}
       error={d.error}
-      onCreate={async () => {
-        const doc = await d.create();
-        if (doc) setOpenId(doc.id);
+      onCreate={(title) => {
+        void d.create(title).then((doc) => {
+          if (doc) setOpenId(doc.id);
+        });
       }}
       onOpen={(id) => setOpenId(id)}
       onRename={(id, title) => void d.rename(id, title)}

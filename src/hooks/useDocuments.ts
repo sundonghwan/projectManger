@@ -28,19 +28,24 @@ export function useDocuments(
     void reload();
   }, [reload]);
 
-  /** 새 문서 생성 후 생성된 문서를 반환(호출측에서 바로 편집기로 열 수 있게). */
-  const create = useCallback(async (): Promise<Document | null> => {
-    if (businessId == null) return null;
-    try {
-      const doc = await api.document.create({ businessId, projectId, title: "새 문서" });
-      await reload();
-      onChanged?.();
-      return doc;
-    } catch (e) {
-      setError(String(e));
-      return null;
-    }
-  }, [businessId, projectId, reload, onChanged]);
+  /** 주어진 제목으로 새 문서 생성 후 생성된 문서를 반환(호출측에서 바로 편집기로 열 수 있게). */
+  const create = useCallback(
+    async (title: string): Promise<Document | null> => {
+      if (businessId == null) return null;
+      const name = title.trim();
+      if (!name) return null;
+      try {
+        const doc = await api.document.create({ businessId, projectId, title: name });
+        await reload();
+        onChanged?.();
+        return doc;
+      } catch (e) {
+        setError(String(e));
+        return null;
+      }
+    },
+    [businessId, projectId, reload, onChanged],
+  );
 
   const rename = useCallback(
     async (id: number, title: string) => {

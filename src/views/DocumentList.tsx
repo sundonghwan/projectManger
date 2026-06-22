@@ -1,11 +1,12 @@
-import { useState, type CSSProperties } from "react";
+import { useRef, useState, type CSSProperties } from "react";
 import type { Document } from "../domain/types";
 import { Icon } from "../ui/icons/Icon";
 
 export interface DocumentListProps {
   documents: Document[];
   error: string | null;
-  onCreate: () => void;
+  /** 사용자가 입력한 제목으로 새 문서 생성. */
+  onCreate: (title: string) => void;
   onOpen: (id: number) => void;
   onRename: (id: number, title: string) => void;
   onArchive: (id: number) => void;
@@ -15,6 +16,24 @@ export function DocumentList(props: DocumentListProps) {
   const { documents, error, onCreate, onOpen, onRename, onArchive } = props;
   const [editingId, setEditingId] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
+  // 새 문서 인라인 이름 입력
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+  const finishedRef = useRef(false); // Enter/blur 중복 커밋 방지
+
+  const startCreate = () => {
+    finishedRef.current = false;
+    setNewName("");
+    setCreating(true);
+  };
+  const finishCreate = (save: boolean) => {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
+    setCreating(false);
+    const name = newName.trim();
+    if (save && name) onCreate(name);
+    setNewName("");
+  };
 
   const startEdit = (d: Document) => {
     setEditingId(d.id);
@@ -30,7 +49,7 @@ export function DocumentList(props: DocumentListProps) {
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       <div style={{ display: "flex", alignItems: "center", padding: "12px 20px" }}>
         <span style={{ fontSize: 15, fontWeight: 600, flex: 1 }}>문서</span>
-        <button onClick={onCreate} style={createBtn}>
+        <button onClick={startCreate} style={createBtn}>
           <Icon name="plus" size={14} /> 새 문서
         </button>
       </div>
@@ -48,7 +67,30 @@ export function DocumentList(props: DocumentListProps) {
         <span style={{ textAlign: "right" }}>동작</span>
       </div>
 
-      {documents.length === 0 ? (
+      {creating && (
+        <div style={{ ...rowGrid, ...bodyRow }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+            <Icon name="document" size={15} style={{ color: "var(--text2)", flexShrink: 0 }} />
+            <input
+              autoFocus
+              aria-label="새 문서 이름"
+              value={newName}
+              placeholder="문서 이름 (Enter로 생성)"
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") finishCreate(true);
+                else if (e.key === "Escape") finishCreate(false);
+              }}
+              onBlur={() => finishCreate(true)}
+              style={renameInput}
+            />
+          </span>
+          <span />
+          <span />
+        </div>
+      )}
+
+      {documents.length === 0 && !creating ? (
         <div style={{ padding: "20px", color: "var(--text3)", fontSize: 13 }}>
           문서가 없습니다. “새 문서”로 추가하세요.
         </div>
