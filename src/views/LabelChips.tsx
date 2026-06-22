@@ -1,4 +1,5 @@
 import type { Label } from "../domain/types";
+import { Icon } from "../ui/icons/Icon";
 
 export interface LabelChipsProps {
   labels?: Label[];
@@ -36,9 +37,9 @@ export function LabelChips({ labels, onRemove }: LabelChipsProps) {
                   e.stopPropagation();
                   onRemove(l);
                 }}
-                style={{ border: "none", background: "transparent", color, cursor: "pointer", padding: 0, fontSize: 12, lineHeight: 1 }}
+                style={{ display: "inline-flex", alignItems: "center", border: "none", background: "transparent", color, cursor: "pointer", padding: 0, lineHeight: 1 }}
               >
-                ×
+                <Icon name="close" size={11} strokeWidth={2} />
               </button>
             )}
           </span>

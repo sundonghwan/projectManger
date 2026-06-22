@@ -1,5 +1,6 @@
 import { useState, type CSSProperties } from "react";
 import type { CommandSnippet } from "../domain/types";
+import { Icon } from "../ui/icons/Icon";
 
 export interface SnippetBarProps {
   snippets: CommandSnippet[];
@@ -30,7 +31,7 @@ export function SnippetBar({ snippets, onRun, onCreate, onDelete }: SnippetBarPr
             {s.name}
           </button>
           <button onClick={() => onDelete(s.id)} aria-label={`${s.name} 삭제`} style={delBtn}>
-            ×
+            <Icon name="close" size={12} />
           </button>
         </span>
       ))}
@@ -41,7 +42,7 @@ export function SnippetBar({ snippets, onRun, onCreate, onDelete }: SnippetBarPr
           <button onClick={submit} style={runBtn}>저장</button>
         </span>
       ) : (
-        <button onClick={() => setAdding(true)} style={addBtn} aria-label="스니펫 추가">+ 스니펫</button>
+        <button onClick={() => setAdding(true)} style={addBtn} aria-label="스니펫 추가"><Icon name="plus" size={12} /> 스니펫</button>
       )}
     </div>
   );
@@ -58,6 +59,6 @@ const bar: CSSProperties = {
 };
 const chip: CSSProperties = { display: "inline-flex", alignItems: "center", border: "1px solid #33332a", borderRadius: 5 };
 const runBtn: CSSProperties = { background: "transparent", border: "none", color: "#a9c7a0", fontSize: 11, padding: "3px 8px", cursor: "pointer", fontFamily: "var(--font-mono)" };
-const delBtn: CSSProperties = { background: "transparent", border: "none", color: "#8a8a80", fontSize: 12, padding: "0 6px 0 0", cursor: "pointer" };
-const addBtn: CSSProperties = { background: "transparent", border: "1px dashed #33332a", borderRadius: 5, color: "#8a8a80", fontSize: 11, padding: "3px 9px", cursor: "pointer" };
+const delBtn: CSSProperties = { display: "inline-flex", alignItems: "center", background: "transparent", border: "none", color: "#8a8a80", padding: "0 6px 0 2px", cursor: "pointer" };
+const addBtn: CSSProperties = { display: "inline-flex", alignItems: "center", gap: 4, background: "transparent", border: "1px dashed #33332a", borderRadius: 5, color: "#8a8a80", fontSize: 11, padding: "3px 9px", cursor: "pointer" };
 const input: CSSProperties = { background: "#0d0d0c", border: "1px solid #33332a", borderRadius: 4, color: "#d8d8cf", fontSize: 11, padding: "3px 6px", width: 90, fontFamily: "var(--font-mono)" };

@@ -1,16 +1,17 @@
 import { useRef, useState, type CSSProperties } from "react";
 import type { SearchHit, SearchKind } from "../domain/types";
+import { Icon, type IconName } from "../ui/icons/Icon";
 
 export interface GlobalSearchProps {
   onSearch: (query: string) => Promise<SearchHit[]>;
   onPick: (hit: SearchHit) => void;
 }
 
-const KIND_ICON: Record<SearchKind, string> = {
-  business: "●",
-  project: "📁",
-  task: "☑",
-  document: "📄",
+const KIND_ICON: Record<SearchKind, IconName> = {
+  business: "business",
+  project: "folder",
+  task: "check-square",
+  document: "document",
 };
 const KIND_LABEL: Record<SearchKind, string> = {
   business: "사업",
@@ -71,8 +72,16 @@ export function GlobalSearch({ onSearch, onPick }: GlobalSearchProps) {
                 onClick={() => pick(hit)}
                 style={resultRow}
               >
-                <span style={{ width: 16, textAlign: "center", fontSize: 12 }}>
-                  {KIND_ICON[hit.kind]}
+                <span
+                  style={{
+                    width: 16,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "var(--text2)",
+                  }}
+                >
+                  <Icon name={KIND_ICON[hit.kind]} size={14} />
                 </span>
                 <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {hit.title}

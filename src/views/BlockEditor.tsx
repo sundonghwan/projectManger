@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import type { Block, BlockType } from "../domain/types";
 import { parseContent } from "../domain/blockContent";
+import { Icon } from "../ui/icons/Icon";
 
 export interface BlockEditorProps {
   blocks: Block[];
@@ -44,7 +45,7 @@ export function BlockEditor({ blocks, onChangeText, onToggleCheck, onAddBlock, o
                     onClick={() => onToggleCheck(b)}
                     style={checkboxStyle(data.checked)}
                   >
-                    {data.checked ? "✓" : ""}
+                    {data.checked ? <Icon name="check" size={12} strokeWidth={2.5} /> : null}
                   </button>
                   <input
                     aria-label="블록 텍스트"
@@ -85,7 +86,7 @@ export function BlockEditor({ blocks, onChangeText, onToggleCheck, onAddBlock, o
               )}
             </div>
             <button aria-label="블록 삭제" onClick={() => onDelete(b)} style={deleteBtn}>
-              ×
+              <Icon name="close" size={15} />
             </button>
           </div>
         );
@@ -94,7 +95,7 @@ export function BlockEditor({ blocks, onChangeText, onToggleCheck, onAddBlock, o
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 16 }}>
         {ADDABLE.map((a) => (
           <button key={a.type} onClick={() => onAddBlock(a.type)} style={addBlockBtn}>
-            + {a.label}
+            <Icon name="plus" size={13} /> {a.label}
           </button>
         ))}
       </div>
@@ -136,25 +137,32 @@ function checkboxStyle(checked: boolean): CSSProperties {
     width: 17,
     height: 17,
     flexShrink: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
     borderRadius: 4,
     border: `1.5px solid ${checked ? "#22c55e" : "var(--border)"}`,
     background: checked ? "#22c55e" : "transparent",
     color: "#fff",
-    fontSize: 11,
     cursor: "pointer",
     padding: 0,
   };
 }
 const deleteBtn: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
   border: "none",
   background: "transparent",
   color: "var(--text3)",
   cursor: "pointer",
-  fontSize: 16,
   lineHeight: 1,
   padding: "2px 4px",
 };
 const addBlockBtn: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 4,
   border: "1px solid var(--border)",
   background: "transparent",
   color: "var(--text2)",

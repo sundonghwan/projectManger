@@ -1,5 +1,6 @@
 import { useState, type CSSProperties } from "react";
 import type { AuthType, ServerConnection } from "../domain/types";
+import { Icon } from "../ui/icons/Icon";
 
 export interface ServerFormData {
   name: string;
@@ -62,9 +63,16 @@ export function ServerPanel({ servers, onCreate, onArchive, onSetSecret, onConne
         servers.map((s) => (
           <div key={s.id} style={card} data-testid={`server-${s.id}`}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 14, fontWeight: 600, flex: 1 }}>🖥 {s.name}</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 600, flex: 1 }}>
+                <Icon name="server" size={15} style={{ color: "var(--text2)" }} />
+                {s.name}
+              </span>
               <span style={authBadge}>{AUTH_LABEL[s.authType as AuthType]}</span>
-              {s.secretRef && <span style={{ fontSize: 11, color: "var(--st-done)" }}>🔒 저장됨</span>}
+              {s.secretRef && (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--st-done)" }}>
+                  <Icon name="lock" size={12} /> 저장됨
+                </span>
+              )}
             </div>
             <div style={{ fontSize: 12, color: "var(--text2)", fontFamily: "var(--font-mono)", margin: "4px 0 8px" }}>
               {s.username}@{s.host}:{s.port}
@@ -104,8 +112,9 @@ export function ServerPanel({ servers, onCreate, onArchive, onSetSecret, onConne
           </div>
         ))
       )}
-      <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 12 }}>
-        ⚠ 비밀번호·패스프레이즈는 OS 키체인에 저장되며 DB에는 참조만 기록됩니다.
+      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text3)", marginTop: 12 }}>
+        <Icon name="alert" size={13} />
+        <span>비밀번호·패스프레이즈는 OS 키체인에 저장되며 DB에는 참조만 기록됩니다.</span>
       </div>
     </div>
   );

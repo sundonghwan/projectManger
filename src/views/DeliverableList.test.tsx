@@ -52,7 +52,7 @@ describe("DeliverableList", () => {
 
   it("+ 산출물 클릭 시 onCreate", async () => {
     const h = setup();
-    await userEvent.click(screen.getByRole("button", { name: "+ 산출물" }));
+    await userEvent.click(screen.getByRole("button", { name: "산출물" }));
     expect(h.onCreate).toHaveBeenCalled();
   });
 

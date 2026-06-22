@@ -2,6 +2,7 @@ import { useState, type CSSProperties, type ReactNode } from "react";
 import type { TreeRow } from "../domain/tree";
 import type { BusinessType } from "../domain/types";
 import { TYPE_COLOR, TYPE_LABEL } from "../ui/colors";
+import { Icon, type IconName } from "../ui/icons/Icon";
 import { CreatePopover, type AddKind } from "./CreatePopover";
 
 export type { AddKind };
@@ -31,14 +32,14 @@ export interface SidebarProps {
 const RENAMEABLE = new Set<TreeRow["type"]>(["business", "project", "document"]);
 const ARCHIVABLE = new Set<TreeRow["type"]>(["business", "project", "document", "deliverable"]);
 
-const ICON: Partial<Record<TreeRow["type"], string>> = {
-  dashboard: "📊",
-  document: "📄",
-  deliverable: "📦",
+const ICON: Partial<Record<TreeRow["type"], IconName>> = {
+  dashboard: "dashboard",
+  document: "document",
+  deliverable: "deliverable",
 };
 
-function projectIcon(expanded: boolean): string {
-  return expanded ? "📂" : "📁";
+function projectIcon(expanded: boolean): IconName {
+  return expanded ? "folder-open" : "folder";
 }
 
 export function Sidebar(props: SidebarProps) {
@@ -103,7 +104,7 @@ export function Sidebar(props: SidebarProps) {
 
       <div style={{ padding: "4px 8px 6px" }}>
         <button onClick={(e) => openMenu(e, { kind: "business" })} style={addBusinessStyle} aria-label="사업 추가">
-          <span style={{ width: 16, textAlign: "center", fontWeight: 600 }}>+</span>
+          <Icon name="plus" size={16} />
           <span>사업 추가</span>
         </button>
       </div>
@@ -139,7 +140,7 @@ export function Sidebar(props: SidebarProps) {
                   visibility: row.hasChildren ? "visible" : "hidden",
                 }}
               >
-                {row.expanded ? "▼" : "▶"}
+                <Icon name={row.expanded ? "chevron-down" : "chevron-right"} size={12} />
               </button>
 
               {row.type === "business" ? (
@@ -156,7 +157,11 @@ export function Sidebar(props: SidebarProps) {
                 </span>
               ) : (
                 <span style={iconWrap}>
-                  {row.type === "project" ? projectIcon(row.expanded) : ICON[row.type]}
+                  {row.type === "project" ? (
+                    <Icon name={projectIcon(row.expanded)} size={15} />
+                  ) : ICON[row.type] ? (
+                    <Icon name={ICON[row.type]!} size={15} />
+                  ) : null}
                 </span>
               )}
 
@@ -194,7 +199,7 @@ export function Sidebar(props: SidebarProps) {
                   onClick={(e) => openMenu(e, { kind: "child", row })}
                   style={addChildStyle}
                 >
-                  +
+                  <Icon name="plus" size={14} />
                 </button>
               )}
               {onArchive && ARCHIVABLE.has(row.type) && (
@@ -207,7 +212,7 @@ export function Sidebar(props: SidebarProps) {
                   }}
                   style={archiveStyle}
                 >
-                  🗑
+                  <Icon name="trash" size={13} />
                 </button>
               )}
             </div>
@@ -308,11 +313,13 @@ const caretStyle: CSSProperties = {
   width: 18,
   height: "var(--row-height)",
   flexShrink: 0,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
   border: "none",
   background: "transparent",
   cursor: "pointer",
-  color: "var(--text2)",
-  fontSize: 9,
+  color: "var(--text3)",
   padding: 0,
 };
 
@@ -323,7 +330,14 @@ const dotWrap: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
 };
-const iconWrap: CSSProperties = { width: 16, flexShrink: 0, textAlign: "center", fontSize: 13 };
+const iconWrap: CSSProperties = {
+  width: 16,
+  flexShrink: 0,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  color: "var(--text2)",
+};
 const labelStyle: CSSProperties = {
   flex: 1,
   overflow: "hidden",
@@ -346,22 +360,26 @@ const renameInput: CSSProperties = {
 const addChildStyle: CSSProperties = {
   width: 20,
   height: 20,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
   border: "none",
   background: "transparent",
   borderRadius: "var(--radius-sm)",
   cursor: "pointer",
   color: "var(--text2)",
-  fontSize: 13,
   flexShrink: 0,
 };
 const archiveStyle: CSSProperties = {
   width: 20,
   height: 20,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
   border: "none",
   background: "transparent",
   borderRadius: "var(--radius-sm)",
   cursor: "pointer",
   color: "var(--text2)",
-  fontSize: 11,
   flexShrink: 0,
 };

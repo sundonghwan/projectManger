@@ -49,7 +49,7 @@ describe("BlockEditor", () => {
 
   it("블록 추가 버튼이 타입별로 onAddBlock 호출", async () => {
     const h = setup([]);
-    await userEvent.click(screen.getByRole("button", { name: "+ 제목" }));
+    await userEvent.click(screen.getByRole("button", { name: "제목" }));
     expect(h.onAddBlock).toHaveBeenCalledWith("heading");
   });
 

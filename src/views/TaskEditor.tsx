@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from "react";
 import type { Label, Priority, Task } from "../domain/types";
 import { priorityLabel } from "../ui/colors";
+import { Icon } from "../ui/icons/Icon";
 import { LabelChips } from "./LabelChips";
 
 export interface TaskPatch {
@@ -50,7 +51,7 @@ export function TaskEditor({ task, labels, onSave, onAddLabel, onRemoveLabel, on
       <div style={modal} role="dialog" aria-label="태스크 편집" onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", alignItems: "center", marginBottom: 14 }}>
           <span style={{ fontSize: 15, fontWeight: 600, flex: 1 }}>태스크 편집</span>
-          <button aria-label="닫기" onClick={onClose} style={iconBtn}>×</button>
+          <button aria-label="닫기" onClick={onClose} style={iconBtn}><Icon name="close" size={16} /></button>
         </div>
 
         <label style={fieldLabel}>제목</label>
@@ -164,7 +165,7 @@ const input: CSSProperties = {
   marginBottom: 4,
   fontFamily: "inherit",
 };
-const iconBtn: CSSProperties = { border: "none", background: "transparent", color: "var(--text2)", fontSize: 18, cursor: "pointer" };
+const iconBtn: CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", color: "var(--text2)", cursor: "pointer", padding: 0 };
 const primaryBtn: CSSProperties = {
   flex: 1,
   border: "none",

@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import type { Label, Task } from "../domain/types";
 import { TASK_STATUS_COLOR, TASK_STATUS_LABEL, priorityColor, priorityLabel } from "../ui/colors";
+import { Icon } from "../ui/icons/Icon";
 import { LabelChips } from "./LabelChips";
 
 export interface TaskListProps {
@@ -46,16 +47,18 @@ export function TaskList({ tasks, onToggleDone, labelsByTask = {}, onRowClick }:
                 style={{
                   width: 15,
                   height: 15,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                   borderRadius: 4,
                   border: `1.5px solid ${done ? "#22c55e" : "var(--border)"}`,
                   background: done ? "#22c55e" : "transparent",
                   color: "#fff",
-                  fontSize: 10,
                   cursor: "pointer",
                   padding: 0,
                 }}
               >
-                {done ? "✓" : ""}
+                {done ? <Icon name="check" size={11} strokeWidth={2.5} /> : null}
               </button>
             </span>
             <span

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { api } from "../api/client";
 import type { RecurringTask, Template } from "../domain/types";
+import { Icon } from "../ui/icons/Icon";
 import { RecurringPanel, type RecurringFormData } from "./RecurringPanel";
 import { TemplatePanel, type TemplateFormData } from "./TemplatePanel";
 
@@ -78,7 +79,7 @@ export function AutomationModal({ businessId, projectId, onChanged, onClose }: A
       <div style={modal} role="dialog" aria-label="자동화" onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", alignItems: "center", marginBottom: 14 }}>
           <span style={{ fontSize: 15, fontWeight: 600, flex: 1 }}>자동화 (템플릿 · 반복)</span>
-          <button aria-label="닫기" onClick={onClose} style={{ border: "none", background: "transparent", color: "var(--text2)", fontSize: 18, cursor: "pointer" }}>×</button>
+          <button aria-label="닫기" onClick={onClose} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", color: "var(--text2)", cursor: "pointer", padding: 0 }}><Icon name="close" size={16} /></button>
         </div>
         {msg && <div style={{ fontSize: 12, color: "var(--text2)", marginBottom: 10 }}>{msg}</div>}
         <TemplatePanel templates={templates} onApply={applyTemplate} onCreate={createTemplate} onDelete={deleteTemplate} />

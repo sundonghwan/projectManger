@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import type { SearchKind, TrashItem } from "../domain/types";
+import { Icon } from "../ui/icons/Icon";
 
 export interface TrashPanelProps {
   items: TrashItem[];
@@ -20,8 +21,11 @@ export function TrashPanel({ items, onRestore, onPurge, onClose }: TrashPanelPro
     <div style={overlay} onClick={onClose} data-testid="trash-overlay">
       <div style={modal} role="dialog" aria-label="휴지통" onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", alignItems: "center", marginBottom: 12 }}>
-          <span style={{ fontSize: 15, fontWeight: 600, flex: 1 }}>🗑 휴지통</span>
-          <button aria-label="닫기" onClick={onClose} style={iconBtn}>×</button>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 15, fontWeight: 600, flex: 1 }}>
+            <Icon name="trash" size={16} />
+            휴지통
+          </span>
+          <button aria-label="닫기" onClick={onClose} style={iconBtn}><Icon name="close" size={16} /></button>
         </div>
         {items.length === 0 ? (
           <div style={{ padding: "20px 0", textAlign: "center", color: "var(--text3)", fontSize: 13 }}>
@@ -73,7 +77,7 @@ const row: CSSProperties = {
   padding: "8px 0",
   borderTop: "1px solid var(--border)",
 };
-const iconBtn: CSSProperties = { border: "none", background: "transparent", color: "var(--text2)", fontSize: 18, cursor: "pointer" };
+const iconBtn: CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", color: "var(--text2)", cursor: "pointer", padding: 0 };
 const restoreBtn: CSSProperties = {
   border: "1px solid var(--border)",
   background: "var(--bg)",

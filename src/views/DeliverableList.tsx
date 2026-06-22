@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import type { Deliverable, DeliverableStatus, DeliverableVersion } from "../domain/types";
 import { DELIVERABLE_STATUS_COLOR, DELIVERABLE_STATUS_LABEL } from "../ui/colors";
+import { Icon } from "../ui/icons/Icon";
 
 export interface DeliverableListProps {
   deliverables: Deliverable[];
@@ -24,7 +25,7 @@ export function DeliverableList(props: DeliverableListProps) {
       <div style={{ flex: 1, minWidth: 0, overflow: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", padding: "12px 20px" }}>
           <span style={{ fontSize: 15, fontWeight: 600, flex: 1 }}>산출물</span>
-          <button onClick={onCreate} style={addBtn}>+ 산출물</button>
+          <button onClick={onCreate} style={addBtn}><Icon name="plus" size={14} /> 산출물</button>
         </div>
         <div style={{ ...rowGrid, ...headerStyle }}>
           <span>이름</span>
@@ -49,8 +50,13 @@ export function DeliverableList(props: DeliverableListProps) {
                 boxShadow: d.id === selectedId ? "inset 2px 0 0 var(--accent)" : "none",
               }}
             >
-              <span style={{ fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {d.kind === "document" ? "📄" : "📦"} {d.title}
+              <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13.5, minWidth: 0 }}>
+                <Icon
+                  name={d.kind === "document" ? "document" : "deliverable"}
+                  size={15}
+                  style={{ color: "var(--text2)" }}
+                />
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.title}</span>
               </span>
               <span style={{ fontSize: 12, color: "var(--text2)" }}>
                 {d.kind === "document" ? "문서" : "파일"}
@@ -141,6 +147,9 @@ const detailPanel: CSSProperties = {
   overflow: "auto",
 };
 const addBtn: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 4,
   border: "1px solid var(--border)",
   background: "var(--bg)",
   color: "var(--accent)",

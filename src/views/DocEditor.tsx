@@ -1,5 +1,6 @@
 import type { Document } from "../domain/types";
 import { useBlocks } from "../hooks/useBlocks";
+import { Icon } from "../ui/icons/Icon";
 import { BlockEditor } from "./BlockEditor";
 
 export interface DocEditorProps {
@@ -19,7 +20,12 @@ export function DocEditor({ document }: DocEditorProps) {
         <h1 style={{ margin: "0 0 18px", fontSize: 30, fontWeight: 700, letterSpacing: "-0.5px" }}>
           {document.title}
         </h1>
-        {error && <div style={{ color: "#ef4444", fontSize: 13, marginBottom: 8 }}>⚠ {error}</div>}
+        {error && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#ef4444", fontSize: 13, marginBottom: 8 }}>
+            <Icon name="alert" size={15} />
+            <span>{error}</span>
+          </div>
+        )}
       </div>
       <BlockEditor
         blocks={blocks}

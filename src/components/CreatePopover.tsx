@@ -1,14 +1,15 @@
 import { useState, type CSSProperties } from "react";
 import type { BusinessType } from "../domain/types";
 import { TYPE_COLOR, TYPE_LABEL } from "../ui/colors";
+import { Icon, type IconName } from "../ui/icons/Icon";
 
 /** 노드에 추가할 수 있는 하위 항목 종류 */
 export type AddKind = "project" | "document" | "deliverable";
 
-const KIND_META: Record<AddKind, { label: string; icon: string }> = {
-  project: { label: "프로젝트", icon: "📁" },
-  document: { label: "문서", icon: "📄" },
-  deliverable: { label: "산출물", icon: "📦" },
+const KIND_META: Record<AddKind, { label: string; icon: IconName }> = {
+  project: { label: "프로젝트", icon: "folder" },
+  document: { label: "문서", icon: "document" },
+  deliverable: { label: "산출물", icon: "deliverable" },
 };
 
 const BIZ_TYPES: BusinessType[] = ["si", "internal", "ops", "etc"];
@@ -81,7 +82,7 @@ export function CreatePopover(props: CreatePopoverProps) {
                   onClick={() => setKind(k)}
                   style={chip(active, "var(--accent)")}
                 >
-                  <span>{KIND_META[k].icon}</span>
+                  <Icon name={KIND_META[k].icon} size={14} />
                   {KIND_META[k].label}
                 </button>
               );

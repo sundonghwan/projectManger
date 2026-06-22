@@ -29,7 +29,7 @@ function setup(servers: ServerConnection[] = [server()]) {
 describe("ServerPanel", () => {
   it("서버를 카드로 렌더", () => {
     setup();
-    expect(screen.getByText("🖥 스테이징")).toBeInTheDocument();
+    expect(screen.getByText("스테이징")).toBeInTheDocument();
     expect(screen.getByText("deploy@10.0.0.5:22")).toBeInTheDocument();
   });
 

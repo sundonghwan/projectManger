@@ -3,6 +3,7 @@ import { api } from "../api/client";
 import type { Business, Document, Project, TrashItem } from "../domain/types";
 import { TrashPanel } from "./TrashPanel";
 import { businessColor } from "../ui/colors";
+import { Icon } from "../ui/icons/Icon";
 import { useTasks } from "../hooks/useTasks";
 import { dashboardStats } from "../domain/dashboard";
 import { groupByStatus } from "../domain/kanban";
@@ -147,11 +148,11 @@ export function MainView({
             <span style={{ fontSize: 13, fontWeight: 600 }}>{business.name}</span>
             {project && (
               <>
-                <span style={{ color: "var(--text2)" }}>›</span>
+                <Icon name="chevron-right" size={14} style={{ color: "var(--text3)" }} />
                 <span style={{ fontSize: 13 }}>{project.name}</span>
               </>
             )}
-            <span style={{ color: "var(--text2)" }}>›</span>
+            <Icon name="chevron-right" size={14} style={{ color: "var(--text3)" }} />
             <span style={{ fontSize: 13, color: "var(--text2)" }}>{VIEW_LABEL[view]}</span>
           </div>
         ) : (
@@ -165,15 +166,15 @@ export function MainView({
             aria-label="테마 전환"
             title={theme === "light" ? "다크 모드" : "라이트 모드"}
           >
-            {theme === "light" ? "🌙" : "☀"}
+            <Icon name={theme === "light" ? "moon" : "sun"} size={16} />
           </button>
           {business && (
             <button onClick={() => setAutomationOpen(true)} style={iconBtn} aria-label="자동화" title="템플릿·반복 태스크">
-              ⚙
+              <Icon name="settings" size={16} />
             </button>
           )}
           <button onClick={() => void openTrash()} style={iconBtn} aria-label="휴지통" title="휴지통">
-            🗑
+            <Icon name="trash" size={16} />
           </button>
           <span style={{ width: 1, height: 18, background: "var(--border)", margin: "0 2px" }} />
           <button onClick={onExport} style={exportBtn} title="전체 데이터를 JSON으로 백업">
@@ -213,7 +214,12 @@ export function MainView({
       )}
 
       <div style={{ flex: 1, overflow: "auto", minHeight: 0 }}>
-        {shownError && <div style={errorBar}>⚠ {shownError}</div>}
+        {shownError && (
+          <div style={errorBar}>
+            <Icon name="alert" size={15} />
+            <span>{shownError}</span>
+          </div>
+        )}
         {!business ? (
           <Empty />
         ) : view === "dashboard" ? (
@@ -356,6 +362,9 @@ const iconBtn: React.CSSProperties = {
   cursor: "pointer",
 };
 const errorBar: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
   margin: "12px 16px",
   padding: "8px 12px",
   borderRadius: "var(--radius-md)",
