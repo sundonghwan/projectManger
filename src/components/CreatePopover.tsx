@@ -4,12 +4,13 @@ import { TYPE_COLOR, TYPE_LABEL } from "../ui/colors";
 import { Icon, type IconName } from "../ui/icons/Icon";
 
 /** 노드에 추가할 수 있는 하위 항목 종류 */
-export type AddKind = "project" | "document" | "deliverable";
+export type AddKind = "project" | "document" | "deliverable" | "folder";
 
 const KIND_META: Record<AddKind, { label: string; icon: IconName }> = {
   project: { label: "프로젝트", icon: "folder" },
   document: { label: "문서", icon: "document" },
   deliverable: { label: "산출물", icon: "deliverable" },
+  folder: { label: "폴더", icon: "folder" },
 };
 
 const BIZ_TYPES: BusinessType[] = ["si", "internal", "ops", "etc"];

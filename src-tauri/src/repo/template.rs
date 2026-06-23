@@ -75,7 +75,7 @@ pub fn apply_project(conn: &Connection, template_id: i64, business_id: i64) -> R
     if let Some(docs) = payload.get("documents").and_then(|x| x.as_array()) {
         for d in docs {
             let title = d.get("title").and_then(|x| x.as_str()).unwrap_or("제목 없음");
-            document::create(conn, business_id, Some(proj.id), title)?;
+            document::create(conn, business_id, Some(proj.id), None, title)?;
         }
     }
     Ok(proj.id)
@@ -93,7 +93,7 @@ pub fn apply_document(
         return Err(AppError::Invalid("문서 템플릿이 아닙니다".into()));
     }
     let payload: Value = serde_json::from_str(&t.payload).unwrap_or(Value::Null);
-    let doc = document::create(conn, business_id, project_id, &t.name)?;
+    let doc = document::create(conn, business_id, project_id, None, &t.name)?;
     if let Some(blocks) = payload.get("blocks").and_then(|x| x.as_array()) {
         for (i, b) in blocks.iter().enumerate() {
             let btype = b.get("type").and_then(|x| x.as_str()).unwrap_or("paragraph");

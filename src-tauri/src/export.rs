@@ -175,7 +175,7 @@ mod tests {
         let b = business::create(&c, "사업", "si", None).unwrap();
         let p = project::create(&c, b.id, "P").unwrap();
         task::create(&c, b.id, Some(p.id), "태스크", 2).unwrap();
-        let d = document::create(&c, b.id, None, "문서").unwrap();
+        let d = document::create(&c, b.id, None, None, "문서").unwrap();
         document::create_block(&c, d.id, "paragraph", "{\"text\":\"본문\"}", 1.0).unwrap();
 
         let v = export_data(&c).unwrap();
@@ -197,7 +197,7 @@ mod tests {
         let p = project::create(&src, b.id, "P").unwrap();
         task::create(&src, b.id, Some(p.id), "프로젝트 태스크", 3).unwrap();
         task::create(&src, b.id, None, "직속 태스크", 2).unwrap();
-        let d = document::create(&src, b.id, None, "문서").unwrap();
+        let d = document::create(&src, b.id, None, None, "문서").unwrap();
         document::create_block(&src, d.id, "paragraph", "{\"text\":\"x\"}", 1.0).unwrap();
         let exported = export_data(&src).unwrap();
 

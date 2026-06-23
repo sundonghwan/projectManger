@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./api/client";
 import { buildTree, rowId, type TreeRow } from "./domain/tree";
-import type { Business, BusinessType, Project } from "./domain/types";
+import type { Business, BusinessType, Folder, FolderKind, Project } from "./domain/types";
 import { Sidebar, type AddKind } from "./components/Sidebar";
 import { GlobalSearch } from "./components/GlobalSearch";
 import type { SearchHit } from "./domain/types";
@@ -12,6 +12,7 @@ import { useTheme } from "./hooks/useTheme";
 export default function App() {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<ViewKind>("dashboard");
@@ -48,6 +49,15 @@ export default function App() {
     }
   }, []);
 
+  const loadFolders = useCallback(async (businessId: number) => {
+    try {
+      const list = await api.folder.list(businessId);
+      setFolders((prev) => [...prev.filter((f) => f.businessId !== businessId), ...list]);
+    } catch (e) {
+      setError(String(e));
+    }
+  }, []);
+
   useEffect(() => {
     void loadBusinesses();
   }, [loadBusinesses]);
@@ -64,8 +74,8 @@ export default function App() {
   );
 
   const tree = useMemo(
-    () => buildTree({ businesses: visibleBusinesses, projects, expanded }),
-    [visibleBusinesses, projects, expanded],
+    () => buildTree({ businesses: visibleBusinesses, projects, folders, expanded }),
+    [visibleBusinesses, projects, folders, expanded],
   );
 
   const colorFor = useCallback(
@@ -83,20 +93,23 @@ export default function App() {
         if (next.has(row.id)) next.delete(row.id);
         else {
           next.add(row.id);
-          if (row.type === "business") void loadProjects(row.entityId);
+          if (row.type === "business") {
+            void loadProjects(row.entityId);
+            void loadFolders(row.entityId);
+          }
         }
         return next;
       });
     },
-    [loadProjects],
+    [loadProjects, loadFolders],
   );
 
   const onSelect = useCallback((row: TreeRow) => {
     setSelectedId(row.id);
     if (row.type === "dashboard" || row.type === "business") setView("dashboard");
     else if (row.type === "project") setView("kanban");
-    else if (row.type === "document") setView("doc");
-    else if (row.type === "deliverable") setView("deliverables");
+    else if (row.type === "document" || row.type === "docFolder") setView("doc");
+    else if (row.type === "deliverable" || row.type === "delivFolder") setView("deliverables");
   }, []);
 
   const onAddBusiness = useCallback(
@@ -117,34 +130,64 @@ export default function App() {
 
   const onAddChild = useCallback(
     async (row: TreeRow, kind: AddKind, name: string) => {
-      // 트리 추가 메뉴는 사업 아래 프로젝트 생성만 담당한다.
-      // (문서는 '문서' 노드의 '새 문서', 산출물은 '산출물' 노드의 '파일 업로드'로 생성)
-      if (kind !== "project" || row.type !== "business") return;
       try {
-        setExpanded((prev) => new Set(prev).add(row.id));
-        const p = await api.project.create({ businessId: row.entityId, name });
-        await loadProjects(row.entityId);
-        setSelectedId(rowId("project", p.id));
-        setView("kanban");
+        // 1) 사업 아래 프로젝트 생성
+        if (kind === "project" && row.type === "business") {
+          setExpanded((prev) => new Set(prev).add(row.id));
+          const p = await api.project.create({ businessId: row.entityId, name });
+          await loadProjects(row.entityId);
+          setSelectedId(rowId("project", p.id));
+          setView("kanban");
+          return;
+        }
+        // 2) 폴더 생성 — 진입 노드(문서/산출물) 아래 루트 폴더, 폴더 행 아래 하위 폴더
+        if (kind === "folder") {
+          let businessId: number;
+          let folderKind: FolderKind;
+          let parentId: number | null = null;
+          if (row.type === "document" || row.type === "deliverable") {
+            businessId = row.entityId; // 진입 노드의 entityId 는 사업 id
+            folderKind = row.type === "document" ? "document" : "deliverable";
+          } else if (row.type === "docFolder" || row.type === "delivFolder") {
+            const parent = folders.find((f) => f.id === row.entityId);
+            if (!parent) return;
+            businessId = parent.businessId;
+            folderKind = parent.kind;
+            parentId = parent.id;
+          } else {
+            return;
+          }
+          setExpanded((prev) => new Set(prev).add(row.id));
+          await api.folder.create({ businessId, kind: folderKind, parentId, name });
+          await loadFolders(businessId);
+        }
       } catch (e) {
         setError(String(e));
       }
     },
-    [loadProjects],
+    [loadProjects, loadFolders, folders],
   );
 
   const onArchive = useCallback(
     async (row: TreeRow) => {
-      const ok = window.confirm(`'${row.label}'을(를) 보관할까요? (휴지통에서 복구 가능)`);
-      if (!ok) return;
       try {
         if (row.type === "business") {
+          if (!window.confirm(`'${row.label}'을(를) 보관할까요? (휴지통에서 복구 가능)`)) return;
           await api.business.archive(row.entityId);
           await loadBusinesses();
         } else if (row.type === "project") {
+          if (!window.confirm(`'${row.label}'을(를) 보관할까요? (휴지통에서 복구 가능)`)) return;
           const p = projects.find((x) => x.id === row.entityId);
           await api.project.archive(row.entityId);
           if (p) await loadProjects(p.businessId);
+        } else if (row.type === "docFolder" || row.type === "delivFolder") {
+          if (!window.confirm(`폴더 '${row.label}'을(를) 삭제할까요? 안의 항목은 미분류로 이동하고, 하위 폴더도 함께 삭제됩니다.`))
+            return;
+          const f = folders.find((x) => x.id === row.entityId);
+          await api.folder.remove(row.entityId);
+          if (f) await loadFolders(f.businessId);
+        } else {
+          return;
         }
         if (selectedId === row.id) {
           setSelectedId(null);
@@ -154,7 +197,7 @@ export default function App() {
         setError(String(e));
       }
     },
-    [projects, selectedId, loadBusinesses, loadProjects],
+    [projects, folders, selectedId, loadBusinesses, loadProjects, loadFolders],
   );
 
   const onRename = useCallback(
@@ -167,24 +210,32 @@ export default function App() {
           const p = projects.find((x) => x.id === row.entityId);
           await api.project.rename(row.entityId, name);
           if (p) await loadProjects(p.businessId);
+        } else if (row.type === "docFolder" || row.type === "delivFolder") {
+          const f = folders.find((x) => x.id === row.entityId);
+          await api.folder.rename(row.entityId, name);
+          if (f) await loadFolders(f.businessId);
         }
       } catch (e) {
         setError(String(e));
       }
     },
-    [projects, loadBusinesses, loadProjects],
+    [projects, folders, loadBusinesses, loadProjects, loadFolders],
   );
 
   const onDataChanged = useCallback(async () => {
     await loadBusinesses();
-    for (const b of businesses) await loadProjects(b.id);
-  }, [businesses, loadBusinesses, loadProjects]);
+    for (const b of businesses) {
+      await loadProjects(b.id);
+      await loadFolders(b.id);
+    }
+  }, [businesses, loadBusinesses, loadProjects, loadFolders]);
 
   const navigateTo = useCallback(
     async (hit: SearchHit) => {
       const bizRow = rowId("business", hit.businessId);
       setExpanded((prev) => new Set(prev).add(bizRow));
       await loadProjects(hit.businessId);
+      void loadFolders(hit.businessId);
       if (hit.kind === "business") {
         setSelectedId(bizRow);
         setView("dashboard");
@@ -212,11 +263,13 @@ export default function App() {
         setView("kanban");
       }
     },
-    [loadProjects],
+    [loadProjects, loadFolders],
   );
 
+  const selectedRow = useMemo(() => tree.find((r) => r.id === selectedId) ?? null, [tree, selectedId]);
+
   const selectedBusiness = useMemo(() => {
-    const row = tree.find((r) => r.id === selectedId);
+    const row = selectedRow;
     if (!row) return businesses[0] ?? null;
     // 문서·산출물 진입 노드의 entityId 는 소속 사업 id (단일 진입 패턴).
     if (
@@ -230,14 +283,29 @@ export default function App() {
       const p = projects.find((x) => x.id === row.entityId);
       return p ? (businesses.find((b) => b.id === p.businessId) ?? null) : null;
     }
+    if (row.type === "docFolder" || row.type === "delivFolder") {
+      const f = folders.find((x) => x.id === row.entityId);
+      return f ? (businesses.find((b) => b.id === f.businessId) ?? null) : null;
+    }
     return businesses[0] ?? null;
-  }, [tree, selectedId, businesses, projects]);
+  }, [selectedRow, businesses, projects, folders]);
 
   const selectedProject = useMemo(() => {
-    const row = tree.find((r) => r.id === selectedId);
-    if (row?.type === "project") return projects.find((x) => x.id === row.entityId) ?? null;
+    if (selectedRow?.type === "project") return projects.find((x) => x.id === selectedRow.entityId) ?? null;
     return null;
-  }, [tree, selectedId, projects]);
+  }, [selectedRow, projects]);
+
+  // 선택된 폴더 id (폴더 행 선택 시) — 진입 노드 선택이면 null(=전체).
+  const selectedFolderId = useMemo(
+    () => (selectedRow?.type === "docFolder" || selectedRow?.type === "delivFolder" ? selectedRow.entityId : null),
+    [selectedRow],
+  );
+
+  // 현재 사업의 폴더 (뷰의 이동 드롭다운/필터용)
+  const businessFolders = useMemo(
+    () => folders.filter((f) => f.businessId === selectedBusiness?.id && !f.archivedAt),
+    [folders, selectedBusiness],
+  );
 
   return (
     <div style={{ display: "flex", height: "100%", overflow: "hidden" }}>
@@ -266,6 +334,8 @@ export default function App() {
         onDataChanged={onDataChanged}
         openDocId={pendingDocId}
         onDocOpened={() => setPendingDocId(null)}
+        folders={businessFolders}
+        selectedFolderId={selectedFolderId}
       />
     </div>
   );

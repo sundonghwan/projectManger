@@ -1,6 +1,7 @@
 pub mod business;
 pub mod deliverable;
 pub mod document;
+pub mod folder;
 pub mod label;
 pub mod project;
 pub mod recurring;

@@ -1,7 +1,7 @@
 use crate::error::Result;
 use crate::models::{
-    Block, Business, CommandSnippet, Deliverable, DeliverableVersion, Document, Label, Project,
-    RecurringTask, SearchHit, ServerConnection, Task, TaskLabel, Template, TrashItem,
+    Block, Business, CommandSnippet, Deliverable, DeliverableVersion, Document, Folder, Label,
+    Project, RecurringTask, SearchHit, ServerConnection, Task, TaskLabel, Template, TrashItem,
 };
 use crate::secrets;
 use crate::repo;
@@ -205,6 +205,7 @@ pub fn task_archive(state: State<AppState>, id: i64) -> Result<()> {
 pub struct DocumentCreate {
     pub business_id: i64,
     pub project_id: Option<i64>,
+    pub folder_id: Option<i64>,
     pub title: String,
 }
 
@@ -236,7 +237,13 @@ pub fn document_list(state: State<AppState>, business_id: i64) -> Result<Vec<Doc
 #[tauri::command]
 pub fn document_create(state: State<AppState>, input: DocumentCreate) -> Result<Document> {
     let conn = state.db.lock().unwrap();
-    repo::document::create(&conn, input.business_id, input.project_id, &input.title)
+    repo::document::create(&conn, input.business_id, input.project_id, input.folder_id, &input.title)
+}
+
+#[tauri::command]
+pub fn document_move(state: State<AppState>, id: i64, folder_id: Option<i64>) -> Result<Document> {
+    let conn = state.db.lock().unwrap();
+    repo::document::set_folder(&conn, id, folder_id)
 }
 
 #[tauri::command]
@@ -336,6 +343,7 @@ pub fn task_label_map(state: State<AppState>, business_id: i64) -> Result<Vec<Ta
 pub struct DeliverableCreate {
     pub business_id: i64,
     pub project_id: Option<i64>,
+    pub folder_id: Option<i64>,
     pub title: String,
     pub kind: String,
 }
@@ -357,7 +365,13 @@ pub fn deliverable_list(state: State<AppState>, business_id: i64) -> Result<Vec<
 #[tauri::command]
 pub fn deliverable_create(state: State<AppState>, input: DeliverableCreate) -> Result<Deliverable> {
     let conn = state.db.lock().unwrap();
-    repo::deliverable::create(&conn, input.business_id, input.project_id, &input.title, &input.kind)
+    repo::deliverable::create(&conn, input.business_id, input.project_id, input.folder_id, &input.title, &input.kind)
+}
+
+#[tauri::command]
+pub fn deliverable_move(state: State<AppState>, id: i64, folder_id: Option<i64>) -> Result<Deliverable> {
+    let conn = state.db.lock().unwrap();
+    repo::deliverable::set_folder(&conn, id, folder_id)
 }
 
 #[tauri::command]
@@ -392,6 +406,7 @@ pub fn deliverable_upload(
     state: State<AppState>,
     business_id: i64,
     project_id: Option<i64>,
+    folder_id: Option<i64>,
     paths: Vec<String>,
 ) -> Result<Vec<Deliverable>> {
     use tauri::Manager;
@@ -412,7 +427,7 @@ pub fn deliverable_upload(
             _ => continue,
         };
         // 1) 행 먼저 생성해 id 확보
-        let d = match repo::deliverable::create_file(&conn, business_id, project_id, &filename, &filename, size) {
+        let d = match repo::deliverable::create_file(&conn, business_id, project_id, folder_id, &filename, &filename, size) {
             Ok(d) => d,
             Err(_) => continue,
         };
@@ -442,6 +457,41 @@ pub fn deliverable_upload(
 pub fn deliverable_rename(state: State<AppState>, id: i64, title: String) -> Result<Deliverable> {
     let conn = state.db.lock().unwrap();
     repo::deliverable::rename(&conn, id, &title)
+}
+
+// ---- 폴더(산출물·문서 분류) ----
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderCreate {
+    pub business_id: i64,
+    pub kind: String, // document | deliverable
+    pub parent_id: Option<i64>,
+    pub name: String,
+}
+
+#[tauri::command]
+pub fn folder_list(state: State<AppState>, business_id: i64) -> Result<Vec<Folder>> {
+    let conn = state.db.lock().unwrap();
+    repo::folder::list_by_business(&conn, business_id)
+}
+
+#[tauri::command]
+pub fn folder_create(state: State<AppState>, input: FolderCreate) -> Result<Folder> {
+    let conn = state.db.lock().unwrap();
+    repo::folder::create(&conn, input.business_id, &input.kind, input.parent_id, &input.name)
+}
+
+#[tauri::command]
+pub fn folder_rename(state: State<AppState>, id: i64, name: String) -> Result<Folder> {
+    let conn = state.db.lock().unwrap();
+    repo::folder::rename(&conn, id, &name)
+}
+
+#[tauri::command]
+pub fn folder_delete(state: State<AppState>, id: i64) -> Result<()> {
+    let conn = state.db.lock().unwrap();
+    repo::folder::delete(&conn, id)
 }
 
 #[derive(Deserialize)]

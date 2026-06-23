@@ -1,19 +1,30 @@
 import { useRef, useState, type CSSProperties } from "react";
-import type { Document } from "../domain/types";
+import type { Document, Folder } from "../domain/types";
+import { folderOptions } from "../domain/folderOptions";
 import { Icon } from "../ui/icons/Icon";
 
 export interface DocumentListProps {
   documents: Document[];
   error: string | null;
+  /** 이동 드롭다운에 쓸 폴더 목록(이 사업·문서). 없으면 폴더 열 미노출. */
+  folders?: Folder[];
+  /** 현재 보고 있는 폴더 id (표시용) */
+  currentFolderId?: number | null;
   /** 사용자가 입력한 제목으로 새 문서 생성. */
   onCreate: (title: string) => void;
   onOpen: (id: number) => void;
   onRename: (id: number, title: string) => void;
+  /** 폴더 이동 (folderId=null 이면 미분류). 제공 시 폴더 열을 노출한다. */
+  onMove?: (id: number, folderId: number | null) => void;
   onArchive: (id: number) => void;
 }
 
 export function DocumentList(props: DocumentListProps) {
-  const { documents, error, onCreate, onOpen, onRename, onArchive } = props;
+  const { documents, error, folders = [], onCreate, onOpen, onRename, onMove, onArchive } = props;
+  const showFolders = !!onMove;
+  const opts = folderOptions(folders);
+  const cols = showFolders ? "1fr 150px 100px 92px" : "1fr 100px 92px";
+  const grid = { ...rowGrid, gridTemplateColumns: cols };
   const [editingId, setEditingId] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
   const renameDone = useRef(false); // Enter→blur 중복 커밋 방지
@@ -65,14 +76,15 @@ export function DocumentList(props: DocumentListProps) {
         </div>
       )}
 
-      <div style={{ ...rowGrid, ...headerStyle }}>
+      <div style={{ ...grid, ...headerStyle }}>
         <span>제목</span>
+        {showFolders && <span>폴더</span>}
         <span>생성일</span>
         <span style={{ textAlign: "right" }}>동작</span>
       </div>
 
       {creating && (
-        <div style={{ ...rowGrid, ...bodyRow }}>
+        <div style={{ ...grid, ...bodyRow }}>
           <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
             <Icon name="document" size={15} style={{ color: "var(--text2)", flexShrink: 0 }} />
             <input
@@ -89,6 +101,7 @@ export function DocumentList(props: DocumentListProps) {
               style={renameInput}
             />
           </span>
+          {showFolders && <span />}
           <span />
           <span />
         </div>
@@ -101,7 +114,7 @@ export function DocumentList(props: DocumentListProps) {
       ) : (
         <div style={{ flex: 1, overflow: "auto", minHeight: 0 }}>
           {documents.map((d) => (
-            <div key={d.id} data-testid={`doc-${d.id}`} style={{ ...rowGrid, ...bodyRow }}>
+            <div key={d.id} data-testid={`doc-${d.id}`} style={{ ...grid, ...bodyRow }}>
               <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                 <Icon name="document" size={15} style={{ color: "var(--text2)", flexShrink: 0 }} />
                 {editingId === d.id ? (
@@ -134,6 +147,24 @@ export function DocumentList(props: DocumentListProps) {
                   </span>
                 )}
               </span>
+
+              {showFolders && (
+                <span onClick={(e) => e.stopPropagation()}>
+                  <select
+                    aria-label={`${d.title} 폴더`}
+                    value={d.folderId ?? ""}
+                    onChange={(e) => onMove!(d.id, e.target.value === "" ? null : Number(e.target.value))}
+                    style={folderSelect}
+                  >
+                    <option value="">미분류</option>
+                    {opts.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.depth > 0 ? " " : ""}{o.label}
+                      </option>
+                    ))}
+                  </select>
+                </span>
+              )}
 
               <span style={{ fontSize: 12, color: "var(--text3)" }}>{d.createdAt.slice(0, 10)}</span>
 
@@ -169,6 +200,15 @@ const rowGrid: CSSProperties = {
   alignItems: "center",
   gap: 8,
   padding: "0 20px",
+};
+const folderSelect: CSSProperties = {
+  width: "100%",
+  fontSize: 11.5,
+  border: "1px solid var(--border)",
+  borderRadius: 4,
+  padding: "2px 4px",
+  background: "var(--bg)",
+  color: "var(--text2)",
 };
 const headerStyle: CSSProperties = {
   height: 32,

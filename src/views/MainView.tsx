@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api } from "../api/client";
-import type { Business, Project, TrashItem } from "../domain/types";
+import type { Business, Folder, Project, TrashItem } from "../domain/types";
 import { TrashPanel } from "./TrashPanel";
 import { businessColor } from "../ui/colors";
 import { Icon } from "../ui/icons/Icon";
@@ -58,6 +58,10 @@ export interface MainViewProps {
   /** 검색 등에서 문서 뷰 진입 시 자동으로 열 문서 id */
   openDocId?: number | null;
   onDocOpened?: () => void;
+  /** 현재 사업의 분류 폴더(문서+산출물) */
+  folders?: Folder[];
+  /** 사이드바에서 선택된 폴더 id (없으면 진입 노드=전체) */
+  selectedFolderId?: number | null;
 }
 
 export function MainView({
@@ -71,6 +75,8 @@ export function MainView({
   onDataChanged,
   openDocId,
   onDocOpened,
+  folders = [],
+  selectedFolderId = null,
 }: MainViewProps) {
   const {
     tasks,
@@ -252,6 +258,8 @@ export function MainView({
             onChanged={onDataChanged}
             initialOpenDocId={openDocId}
             onOpened={onDocOpened}
+            folders={folders.filter((f) => f.kind === "document")}
+            selectedFolderId={view === "doc" ? selectedFolderId : null}
           />
         ) : view === "deliverables" ? (
           <DeliverablesView
@@ -259,6 +267,8 @@ export function MainView({
             businessId={business.id}
             projectId={project?.id ?? null}
             onChanged={onDataChanged}
+            folders={folders.filter((f) => f.kind === "deliverable")}
+            selectedFolderId={view === "deliverables" ? selectedFolderId : null}
           />
         ) : view === "ssh" ? (
           <ServerView key={business.id} businessId={business.id} projectId={project?.id ?? null} />

@@ -14,6 +14,20 @@ export type DeliverableStatus = "draft" | "review" | "done";
 
 export type DeliverableKind = "file" | "document";
 
+/** 폴더 종류 — 산출물/문서 어느 쪽 분류인지 */
+export type FolderKind = "document" | "deliverable";
+
+/** 산출물·문서 분류 폴더(최대 2단계). parentId 가 없으면 루트 폴더. */
+export interface Folder {
+  id: number;
+  businessId: number;
+  kind: FolderKind;
+  parentId?: number | null;
+  name: string;
+  sortOrder: number;
+  archivedAt?: Timestamp | null;
+}
+
 /** 우선순위: 0 없음 · 1 낮음 · 2 보통 · 3 높음 · 4 긴급 */
 export type Priority = 0 | 1 | 2 | 3 | 4;
 
@@ -66,6 +80,7 @@ export interface Document {
   id: number;
   businessId: number;
   projectId?: number | null;
+  folderId?: number | null;
   title: string;
   icon?: string | null;
   body: string;
@@ -162,6 +177,7 @@ export interface Deliverable {
   id: number;
   businessId: number;
   projectId?: number | null;
+  folderId?: number | null;
   title: string;
   kind: DeliverableKind;
   documentId?: number | null;

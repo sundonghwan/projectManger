@@ -7,6 +7,7 @@ fn map_doc(row: &Row) -> rusqlite::Result<Document> {
         id: row.get("id")?,
         business_id: row.get("business_id")?,
         project_id: row.get("project_id")?,
+        folder_id: row.get("folder_id")?,
         title: row.get("title")?,
         icon: row.get("icon")?,
         body: row.get("body")?,
@@ -49,11 +50,12 @@ pub fn get(conn: &Connection, id: i64) -> Result<Document> {
         })
 }
 
-/// 문서 생성. project_id 가 있으면 사업 소속이어야 함.
+/// 문서 생성. project_id 가 있으면 사업 소속이어야 하고, folder_id 가 있으면 같은 사업의 문서 폴더여야 함.
 pub fn create(
     conn: &Connection,
     business_id: i64,
     project_id: Option<i64>,
+    folder_id: Option<i64>,
     title: &str,
 ) -> Result<Document> {
     if let Some(pid) = project_id {
@@ -66,6 +68,7 @@ pub fn create(
             return Err(AppError::Invalid("프로젝트가 해당 사업 소속이 아닙니다".into()));
         }
     }
+    crate::repo::folder::ensure_owns(conn, folder_id, business_id, "document")?;
     let title = if title.trim().is_empty() { "제목 없음" } else { title };
     let next: f64 = conn.query_row(
         "SELECT COALESCE(MAX(sort_order),0)+1 FROM document WHERE business_id=?1",
@@ -73,10 +76,21 @@ pub fn create(
         |r| r.get(0),
     )?;
     conn.execute(
-        "INSERT INTO document (business_id, project_id, title, sort_order) VALUES (?1,?2,?3,?4)",
-        params![business_id, project_id, title, next],
+        "INSERT INTO document (business_id, project_id, folder_id, title, sort_order) VALUES (?1,?2,?3,?4,?5)",
+        params![business_id, project_id, folder_id, title, next],
     )?;
     get(conn, conn.last_insert_rowid())
+}
+
+/// 문서를 폴더로 이동(또는 folder_id=None 으로 미분류). 같은 사업의 문서 폴더여야 함.
+pub fn set_folder(conn: &Connection, id: i64, folder_id: Option<i64>) -> Result<Document> {
+    let doc = get(conn, id)?;
+    crate::repo::folder::ensure_owns(conn, folder_id, doc.business_id, "document")?;
+    conn.execute(
+        "UPDATE document SET folder_id=?2, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?1",
+        params![id, folder_id],
+    )?;
+    get(conn, id)
 }
 
 pub fn rename(conn: &Connection, id: i64, title: &str) -> Result<Document> {
@@ -187,8 +201,8 @@ mod tests {
     #[test]
     fn create_doc_direct_and_in_project() {
         let (c, biz, proj) = setup();
-        let d1 = create(&c, biz, None, "사업 직속 문서").unwrap();
-        let d2 = create(&c, biz, Some(proj), "프로젝트 문서").unwrap();
+        let d1 = create(&c, biz, None, None, "사업 직속 문서").unwrap();
+        let d2 = create(&c, biz, Some(proj), None, "프로젝트 문서").unwrap();
         assert_eq!(d1.project_id, None);
         assert_eq!(d2.project_id, Some(proj));
         assert_eq!(list_by_business(&c, biz).unwrap().len(), 2);
@@ -197,7 +211,7 @@ mod tests {
     #[test]
     fn create_doc_blank_title_defaults() {
         let (c, biz, _) = setup();
-        let d = create(&c, biz, None, "   ").unwrap();
+        let d = create(&c, biz, None, None, "   ").unwrap();
         assert_eq!(d.title, "제목 없음");
     }
 
@@ -206,13 +220,29 @@ mod tests {
         let (c, biz, _) = setup();
         let other = business::create(&c, "다른", "ops", None).unwrap();
         let op = project::create(&c, other.id, "P").unwrap();
-        assert!(create(&c, biz, Some(op.id), "x").is_err());
+        assert!(create(&c, biz, Some(op.id), None, "x").is_err());
+    }
+
+    #[test]
+    fn create_in_folder_and_move() {
+        let (c, biz, _) = setup();
+        let f = crate::repo::folder::create(&c, biz, "document", None, "보고서").unwrap();
+        let d = create(&c, biz, None, Some(f.id), "분류 문서").unwrap();
+        assert_eq!(d.folder_id, Some(f.id));
+        // 미분류로 이동
+        let moved = set_folder(&c, d.id, None).unwrap();
+        assert_eq!(moved.folder_id, None);
+        // 다시 폴더로
+        assert_eq!(set_folder(&c, d.id, Some(f.id)).unwrap().folder_id, Some(f.id));
+        // 산출물 폴더로는 이동 불가
+        let df = crate::repo::folder::create(&c, biz, "deliverable", None, "납품").unwrap();
+        assert!(set_folder(&c, d.id, Some(df.id)).is_err());
     }
 
     #[test]
     fn rename_and_archive() {
         let (c, biz, _) = setup();
-        let d = create(&c, biz, None, "원래").unwrap();
+        let d = create(&c, biz, None, None, "원래").unwrap();
         assert_eq!(rename(&c, d.id, "새이름").unwrap().title, "새이름");
         archive(&c, d.id).unwrap();
         assert!(list_by_business(&c, biz).unwrap().is_empty());
@@ -221,7 +251,7 @@ mod tests {
     #[test]
     fn blocks_crud_and_order() {
         let (c, biz, _) = setup();
-        let d = create(&c, biz, None, "문서").unwrap();
+        let d = create(&c, biz, None, None, "문서").unwrap();
         let b1 = create_block(&c, d.id, "heading", "{\"text\":\"제목\"}", 1.0).unwrap();
         let _b2 = create_block(&c, d.id, "paragraph", "{\"text\":\"본문\"}", 2.0).unwrap();
         let blocks = list_blocks(&c, d.id).unwrap();
@@ -238,7 +268,7 @@ mod tests {
     #[test]
     fn deleting_document_cascades_blocks() {
         let (c, biz, _) = setup();
-        let d = create(&c, biz, None, "문서").unwrap();
+        let d = create(&c, biz, None, None, "문서").unwrap();
         create_block(&c, d.id, "paragraph", "{}", 1.0).unwrap();
         c.execute("DELETE FROM document WHERE id=?1", params![d.id]).unwrap();
         let count: i64 = c.query_row("SELECT count(*) FROM block", [], |r| r.get(0)).unwrap();

@@ -30,8 +30,9 @@ export interface SidebarProps {
 }
 
 // 문서·산출물은 트리에선 단일 진입 노드이므로 이름변경·보관 대상이 아니다(각 목록에서 처리).
-const RENAMEABLE = new Set<TreeRow["type"]>(["business", "project"]);
-const ARCHIVABLE = new Set<TreeRow["type"]>(["business", "project"]);
+const RENAMEABLE = new Set<TreeRow["type"]>(["business", "project", "docFolder", "delivFolder"]);
+const ARCHIVABLE = new Set<TreeRow["type"]>(["business", "project", "docFolder", "delivFolder"]);
+const FOLDER_TYPES = new Set<TreeRow["type"]>(["docFolder", "delivFolder"]);
 
 const ICON: Partial<Record<TreeRow["type"], IconName>> = {
   dashboard: "dashboard",
@@ -72,9 +73,15 @@ export function Sidebar(props: SidebarProps) {
     setMenu({ x: r.left, y: r.bottom + 4, ctx });
   };
 
-  // 문서·산출물은 각 진입 노드의 목록에서 생성하므로 트리 추가 메뉴에는 프로젝트만 둔다.
-  const allowedKinds: AddKind[] =
-    menu && menu.ctx.kind === "child" && menu.ctx.row.type === "business" ? ["project"] : [];
+  // 추가 메뉴 종류: 사업→프로젝트, 문서/산출물 진입 노드→폴더, 루트 폴더(depth2)→하위 폴더.
+  const allowedKinds: AddKind[] = (() => {
+    if (!menu || menu.ctx.kind !== "child") return [];
+    const r = menu.ctx.row;
+    if (r.type === "business") return ["project"];
+    if (r.type === "document" || r.type === "deliverable") return ["folder"];
+    if ((r.type === "docFolder" || r.type === "delivFolder") && r.depth === 2) return ["folder"];
+    return [];
+  })();
 
   const startEdit = (row: TreeRow) => {
     setEditingId(row.id);
@@ -115,7 +122,12 @@ export function Sidebar(props: SidebarProps) {
         )}
         {rows.map((row) => {
           const selected = row.id === selectedId;
-          const canAddChild = row.type === "business";
+          // +: 사업(프로젝트), 문서/산출물 진입 노드(루트 폴더), 루트 폴더(depth2, 하위 폴더)
+          const canAddChild =
+            row.type === "business" ||
+            row.type === "document" ||
+            row.type === "deliverable" ||
+            (FOLDER_TYPES.has(row.type) && row.depth === 2);
           return (
             <div
               key={row.id}
@@ -155,7 +167,7 @@ export function Sidebar(props: SidebarProps) {
                 </span>
               ) : (
                 <span style={iconWrap}>
-                  {row.type === "project" ? (
+                  {row.type === "project" || FOLDER_TYPES.has(row.type) ? (
                     <Icon name={projectIcon(row.expanded)} size={15} />
                   ) : ICON[row.type] ? (
                     <Icon name={ICON[row.type]!} size={15} />
