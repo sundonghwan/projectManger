@@ -181,6 +181,77 @@ impl Entity for RecurringTask {
     fn updated_at(&self) -> &str { &self.updated_at }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Block {
+    pub id: String,
+    pub parent_block_id: Option<String>,
+    pub r#type: String,
+    pub content: String,
+    pub sort_order: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Document {
+    pub id: String,
+    pub business_id: String,
+    pub project_id: Option<String>,
+    pub folder_id: Option<String>,
+    pub title: String,
+    pub icon: Option<String>,
+    pub body: String,
+    pub blocks: Vec<Block>,
+    pub sort_order: f64,
+    pub archived_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl Entity for Document {
+    fn collection() -> &'static str { "documents" }
+    fn id(&self) -> &str { &self.id }
+    fn updated_at(&self) -> &str { &self.updated_at }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeliverableVersion {
+    pub id: String,
+    pub version: i64,
+    pub file_path: Option<String>,
+    pub note: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Deliverable {
+    pub id: String,
+    pub business_id: String,
+    pub project_id: Option<String>,
+    pub folder_id: Option<String>,
+    pub title: String,
+    pub kind: String,
+    pub document_id: Option<String>,
+    pub file_path: Option<String>,
+    pub file_size: Option<i64>,
+    pub original_name: Option<String>,
+    pub status: String,
+    pub current_version: i64,
+    pub versions: Vec<DeliverableVersion>,
+    pub sort_order: f64,
+    pub archived_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl Entity for Deliverable {
+    fn collection() -> &'static str { "deliverables" }
+    fn id(&self) -> &str { &self.id }
+    fn updated_at(&self) -> &str { &self.updated_at }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -277,5 +348,55 @@ mod tests {
         assert_eq!(v["labelId"], "l1");
         assert_eq!(tl.id(), "tl1");
         assert_eq!(tl.updated_at(), "2026-01-02T00:00:00.000Z");
+    }
+
+    #[test]
+    fn document_with_inline_blocks_roundtrip() {
+        assert_eq!(Document::collection(), "documents");
+        let d = Document {
+            id: "d1".into(), business_id: "b1".into(), project_id: None,
+            folder_id: Some("f1".into()), title: "문서".into(), icon: None,
+            body: "본문".into(),
+            blocks: vec![Block {
+                id: "blk1".into(), parent_block_id: None,
+                r#type: "paragraph".into(), content: "{}".into(), sort_order: 1.0,
+            }],
+            sort_order: 0.0, archived_at: None,
+            created_at: "2026-01-01T00:00:00.000Z".into(),
+            updated_at: "2026-01-01T00:00:00.000Z".into(),
+        };
+        let v = serde_json::to_value(&d).unwrap();
+        assert_eq!(v["folderId"], "f1");
+        assert_eq!(v["blocks"][0]["type"], "paragraph");
+        let back: Document = serde_json::from_value(v).unwrap();
+        assert_eq!(back.blocks.len(), 1);
+        assert_eq!(back.blocks[0].id, "blk1");
+        assert_eq!(d.id(), "d1");
+    }
+
+    #[test]
+    fn deliverable_with_inline_versions_roundtrip() {
+        assert_eq!(Deliverable::collection(), "deliverables");
+        let d = Deliverable {
+            id: "dv1".into(), business_id: "b1".into(), project_id: Some("p1".into()),
+            folder_id: None, title: "산출물".into(), kind: "file".into(),
+            document_id: None, file_path: Some("/x".into()), file_size: Some(10),
+            original_name: Some("a.pdf".into()), status: "draft".into(),
+            current_version: 2,
+            versions: vec![DeliverableVersion {
+                id: "ver1".into(), version: 1, file_path: Some("/x".into()), note: None,
+                created_at: "2026-01-01T00:00:00.000Z".into(),
+            }],
+            sort_order: 0.0, archived_at: None,
+            created_at: "2026-01-01T00:00:00.000Z".into(),
+            updated_at: "2026-01-01T00:00:00.000Z".into(),
+        };
+        let v = serde_json::to_value(&d).unwrap();
+        assert_eq!(v["currentVersion"], 2);
+        assert_eq!(v["originalName"], "a.pdf");
+        assert_eq!(v["versions"][0]["version"], 1);
+        let back: Deliverable = serde_json::from_value(v).unwrap();
+        assert_eq!(back.versions.len(), 1);
+        assert_eq!(back.document_id, None);
     }
 }
