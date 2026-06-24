@@ -2,6 +2,7 @@ use crate::error::{AppError, Result};
 use crate::store::collection::Collection;
 use crate::store::entity::Entity;
 use crate::store::ids::now;
+use crate::store::model::Task;
 use crate::store::Store;
 use serde::Serialize;
 use std::collections::HashSet;
@@ -139,6 +140,22 @@ fn remove_task_labels_for(store: &mut Store, task_ids: &[String]) -> Result<()> 
     Ok(())
 }
 
+/// 시드 태스크들과 그 하위(parent_task_id 체인) 전체 id 를 BFS 로 수집(중복 제거).
+fn tasks_with_descendants(all: &[Task], seed: Vec<String>) -> Vec<String> {
+    let mut out = seed;
+    let mut i = 0;
+    while i < out.len() {
+        let cur = out[i].clone();
+        for t in all {
+            if t.parent_task_id.as_deref() == Some(cur.as_str()) && !out.iter().any(|x| x == &t.id) {
+                out.push(t.id.clone());
+            }
+        }
+        i += 1;
+    }
+    out
+}
+
 fn purge_business(store: &mut Store, id: &str) -> Result<()> {
     if store.businesses.get(id).is_none() {
         return Err(AppError::NotFound);
@@ -174,7 +191,13 @@ fn purge_project(store: &mut Store, id: &str) -> Result<()> {
     if store.projects.get(id).is_none() {
         return Err(AppError::NotFound);
     }
-    let task_ids = collect_ids(&store.tasks, |t| t.project_id.as_deref() == Some(id));
+    let all = store.tasks.list();
+    let direct: Vec<String> = all
+        .iter()
+        .filter(|t| t.project_id.as_deref() == Some(id))
+        .map(|t| t.id.clone())
+        .collect();
+    let task_ids = tasks_with_descendants(&all, direct);
     remove_task_labels_for(store, &task_ids)?;
     for x in &task_ids {
         store.tasks.remove(x)?;
@@ -197,17 +220,7 @@ fn purge_task(store: &mut Store, id: &str) -> Result<()> {
         return Err(AppError::NotFound);
     }
     let all = store.tasks.list();
-    let mut to_remove: Vec<String> = vec![id.to_string()];
-    let mut i = 0;
-    while i < to_remove.len() {
-        let cur = to_remove[i].clone();
-        for t in &all {
-            if t.parent_task_id.as_deref() == Some(cur.as_str()) && !to_remove.iter().any(|x| x == &t.id) {
-                to_remove.push(t.id.clone());
-            }
-        }
-        i += 1;
-    }
+    let to_remove = tasks_with_descendants(&all, vec![id.to_string()]);
     remove_task_labels_for(store, &to_remove)?;
     for x in &to_remove {
         store.tasks.remove(x)?;
@@ -364,6 +377,22 @@ mod tests {
         assert!(task::get(&s, &parent.id).is_err());
         assert!(task::get(&s, &child.id).is_err()); // 자식도 cascade
         assert!(label::map_for_business(&s, &b.id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn purge_project_cascades_grandchild_subtasks() {
+        let mut s = store();
+        let b = business::create(&mut s, "사업", "si", None).unwrap();
+        let p = project::create(&mut s, &b.id, "P").unwrap();
+        let parent = task::create(&mut s, &b.id, Some(&p.id), "부모", 2).unwrap();
+        // 프로젝트 미지정이지만 parent 의 자식인 서브태스크(직접 put)
+        let child = task::create(&mut s, &b.id, None, "자식", 2).unwrap();
+        let mut child2 = task::get(&s, &child.id).unwrap();
+        child2.parent_task_id = Some(parent.id.clone());
+        s.tasks.put(child2).unwrap();
+        purge(&mut s, "project", &p.id).unwrap();
+        assert!(task::get(&s, &parent.id).is_err());
+        assert!(task::get(&s, &child.id).is_err()); // 손자도 cascade
     }
 
     #[test]
