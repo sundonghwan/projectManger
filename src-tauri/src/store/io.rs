@@ -12,13 +12,18 @@ pub fn write_atomic<T: Serialize>(path: &Path, value: &T) -> Result<()> {
     }
     let bytes = serde_json::to_vec_pretty(value)
         .map_err(|_| AppError::Invalid("직렬화에 실패했습니다".into()))?;
-    let tmp = path.with_extension("tmp");
+    let file_name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| AppError::Invalid("파일명이 유효하지 않습니다".into()))?;
+    let tmp = path.with_file_name(format!(".{file_name}.tmp"));
     {
         let mut f = std::fs::File::create(&tmp)
             .map_err(|_| AppError::Invalid("임시 파일 생성에 실패했습니다".into()))?;
         f.write_all(&bytes)
             .map_err(|_| AppError::Invalid("파일 쓰기에 실패했습니다".into()))?;
-        f.sync_all().ok();
+        f.sync_all()
+            .map_err(|_| AppError::Invalid("파일 동기화에 실패했습니다".into()))?;
     }
     std::fs::rename(&tmp, path)
         .map_err(|_| AppError::Invalid("파일 교체에 실패했습니다".into()))?;
@@ -35,7 +40,6 @@ pub fn read_json<T: DeserializeOwned>(path: &Path) -> Result<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::error::Result;
     use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize, PartialEq, Debug)]
