@@ -6,8 +6,8 @@ import { RecurringPanel, type RecurringFormData } from "./RecurringPanel";
 import { TemplatePanel, type TemplateFormData } from "./TemplatePanel";
 
 export interface AutomationModalProps {
-  businessId: number;
-  projectId: number | null;
+  businessId: string;
+  projectId: string | null;
   onChanged: () => void;
   onClose: () => void;
 }
@@ -45,7 +45,7 @@ export function AutomationModal({ businessId, projectId, onChanged, onClose }: A
       setMsg(String(e));
     }
   };
-  const deleteTemplate = async (id: number) => {
+  const deleteTemplate = async (id: string) => {
     await api.template.delete(id);
     await reload();
   };
@@ -62,7 +62,7 @@ export function AutomationModal({ businessId, projectId, onChanged, onClose }: A
     await api.recurring.setActive(r.id, r.active !== 1);
     await reload();
   };
-  const deleteRecurring = async (id: number) => {
+  const deleteRecurring = async (id: string) => {
     await api.recurring.delete(id);
     await reload();
   };

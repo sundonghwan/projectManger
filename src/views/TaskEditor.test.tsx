@@ -5,15 +5,15 @@ import { TaskEditor } from "./TaskEditor";
 import type { Label, Task } from "../domain/types";
 
 const task: Task = {
-  id: 1,
-  businessId: 1,
+  id: "1",
+  businessId: "1",
   title: "로그인 API",
   status: "todo",
   priority: 3,
   dueDate: "2026-07-01",
   sortOrder: 1,
 };
-const labels: Label[] = [{ id: 5, name: "백엔드", color: "#3b82f6" }];
+const labels: Label[] = [{ id: "5", name: "백엔드", color: "#3b82f6" }];
 
 function setup() {
   const h = {

@@ -3,7 +3,7 @@ import { api } from "../api/client";
 import type { ServerConnection } from "../domain/types";
 import type { ServerFormData } from "../views/ServerPanel";
 
-export function useServers(businessId: number | null, projectId: number | null) {
+export function useServers(businessId: string | null, projectId: string | null) {
   const [servers, setServers] = useState<ServerConnection[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,7 +38,7 @@ export function useServers(businessId: number | null, projectId: number | null) 
   );
 
   const update = useCallback(
-    async (data: ServerFormData & { id: number }) => {
+    async (data: ServerFormData & { id: string }) => {
       try {
         const { id, ...rest } = data;
         await api.server.update({ id, ...rest });
@@ -51,7 +51,7 @@ export function useServers(businessId: number | null, projectId: number | null) 
   );
 
   const archive = useCallback(
-    async (id: number) => {
+    async (id: string) => {
       try {
         await api.server.archive(id);
         await reload();
@@ -63,7 +63,7 @@ export function useServers(businessId: number | null, projectId: number | null) 
   );
 
   const setSecret = useCallback(
-    async (id: number, secret: string) => {
+    async (id: string, secret: string) => {
       try {
         await api.server.setSecret(id, secret);
         await reload();

@@ -5,8 +5,8 @@ import { ServerPanel } from "./ServerPanel";
 import type { ServerConnection } from "../domain/types";
 
 const server = (over: Partial<ServerConnection> = {}): ServerConnection => ({
-  id: 1,
-  businessId: 1,
+  id: "1",
+  businessId: "1",
   name: "스테이징",
   host: "10.0.0.5",
   port: 22,
@@ -52,19 +52,19 @@ describe("ServerPanel", () => {
   it("접속 버튼은 onConnect", async () => {
     const h = setup();
     await userEvent.click(screen.getByRole("button", { name: "접속" }));
-    expect(h.onConnect).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
+    expect(h.onConnect).toHaveBeenCalledWith(expect.objectContaining({ id: "1" }));
   });
 
   it("시크릿 저장은 onSetSecret", async () => {
     const h = setup();
     await userEvent.type(screen.getByLabelText("스테이징 비밀값"), "pw123");
     await userEvent.click(screen.getByRole("button", { name: "시크릿 저장" }));
-    expect(h.onSetSecret).toHaveBeenCalledWith(1, "pw123");
+    expect(h.onSetSecret).toHaveBeenCalledWith("1", "pw123");
   });
 
   it("보관 버튼은 onArchive", async () => {
     const h = setup();
     await userEvent.click(screen.getByRole("button", { name: "스테이징 보관" }));
-    expect(h.onArchive).toHaveBeenCalledWith(1);
+    expect(h.onArchive).toHaveBeenCalledWith("1");
   });
 });

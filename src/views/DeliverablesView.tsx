@@ -4,13 +4,13 @@ import { DeliverableList } from "./DeliverableList";
 import type { Folder } from "../domain/types";
 
 export interface DeliverablesViewProps {
-  businessId: number;
-  projectId: number | null;
+  businessId: string;
+  projectId: string | null;
   onChanged: () => void;
   /** 이 사업의 산출물 폴더(이동 드롭다운/필터용) */
   folders?: Folder[];
   /** 선택된 폴더 id (없으면 전체). 새 업로드는 이 폴더에 들어간다. */
-  selectedFolderId?: number | null;
+  selectedFolderId?: string | null;
 }
 
 /** 산출물 뷰 컨테이너 — 파일 선택 다이얼로그 + 데이터 로딩을 useDeliverables에 위임. */

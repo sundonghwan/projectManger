@@ -60,12 +60,12 @@ export interface MainViewProps {
   onToggleTheme: () => void;
   onDataChanged: () => void;
   /** 검색 등에서 문서 뷰 진입 시 자동으로 열 문서 id */
-  openDocId?: number | null;
+  openDocId?: string | null;
   onDocOpened?: () => void;
   /** 현재 사업의 분류 폴더(문서+산출물) */
   folders?: Folder[];
   /** 사이드바에서 선택된 폴더 id (없으면 진입 노드=전체) */
-  selectedFolderId?: number | null;
+  selectedFolderId?: string | null;
 }
 
 export function MainView({
@@ -94,32 +94,12 @@ export function MainView({
     assignLabel,
     removeLabel,
   } = useTasks(business?.id ?? null, project?.id ?? null);
-  const [backupMsg, setBackupMsg] = useState<string | null>(null);
-  const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [trashOpen, setTrashOpen] = useState(false);
   const [trashItems, setTrashItems] = useState<TrashItem[]>([]);
   const [automationOpen, setAutomationOpen] = useState(false);
   const editingTask = tasks.find((t) => t.id === editingTaskId) ?? null;
   const shownError = error ?? taskError;
-
-  const onExport = async () => {
-    try {
-      const savedPath = await api.backup.exportJson();
-      setBackupMsg(`내보냄: ${savedPath}`);
-    } catch (e) {
-      setBackupMsg(`내보내기 실패: ${String(e)}`);
-    }
-  };
-
-  const onImport = async () => {
-    try {
-      await api.backup.importJson();
-      setBackupMsg("backup.json 에서 가져왔습니다.");
-      onDataChanged();
-    } catch (e) {
-      setBackupMsg(`가져오기 실패: ${String(e)}`);
-    }
-  };
 
   const openTrash = async () => {
     setTrashItems(await api.trash.list());
@@ -189,20 +169,8 @@ export function MainView({
           <button onClick={() => void openTrash()} style={iconBtn} aria-label="휴지통" title="휴지통">
             <Icon name="trash" size={16} />
           </button>
-          <span style={{ width: 1, height: 18, background: "var(--border)", margin: "0 2px" }} />
-          <button onClick={onExport} style={exportBtn} title="전체 데이터를 JSON으로 백업">
-            내보내기
-          </button>
-          <button onClick={onImport} style={exportBtn} title="backup.json에서 가져오기">
-            가져오기
-          </button>
         </div>
       </div>
-      {backupMsg && (
-        <div style={{ padding: "6px 14px", fontSize: 12, color: "var(--text2)", borderBottom: "1px solid var(--border)" }}>
-          {backupMsg}
-        </div>
-      )}
 
       {business && (
         <div style={tabbar}>
@@ -362,16 +330,6 @@ const tabStyle: React.CSSProperties = {
   background: "transparent",
   cursor: "pointer",
   marginBottom: -1,
-};
-const exportBtn: React.CSSProperties = {
-  border: "1px solid var(--border)",
-  background: "var(--bg)",
-  color: "var(--text2)",
-  borderRadius: "var(--radius-md)",
-  padding: "5px 12px",
-  fontSize: 12,
-  fontWeight: 600,
-  cursor: "pointer",
 };
 const iconBtn: React.CSSProperties = {
   width: 30,

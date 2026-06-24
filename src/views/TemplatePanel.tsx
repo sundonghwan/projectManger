@@ -11,7 +11,7 @@ export interface TemplatePanelProps {
   templates: Template[];
   onApply: (t: Template) => void;
   onCreate: (data: TemplateFormData) => void;
-  onDelete: (id: number) => void;
+  onDelete: (id: string) => void;
 }
 
 const PROJECT_SAMPLE = '{"tasks":[{"title":"킥오프","priority":3}],"documents":[{"title":"요건정의서"}]}';

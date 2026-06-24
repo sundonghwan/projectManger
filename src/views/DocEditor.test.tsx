@@ -16,8 +16,8 @@ import { DocEditor } from "./DocEditor";
 import { api } from "../api/client";
 
 const doc: Document = {
-  id: 1,
-  businessId: 1,
+  id: "1",
+  businessId: "1",
   projectId: null,
   title: "기획안",
   icon: null,
@@ -63,6 +63,6 @@ describe("DocEditor (markdown)", () => {
     await waitFor(() => expect(ta.value).toBe("# 안녕\n본문"));
     await userEvent.type(ta, " 끝");
     ta.blur();
-    expect(api.document.setBody).toHaveBeenCalledWith(1, "# 안녕\n본문 끝");
+    expect(api.document.setBody).toHaveBeenCalledWith("1", "# 안녕\n본문 끝");
   });
 });

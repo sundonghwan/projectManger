@@ -6,7 +6,7 @@ import { groupByStatus } from "../domain/kanban";
 import type { Task } from "../domain/types";
 
 const task = (o: Partial<Task> & Pick<Task, "id" | "status">): Task => ({
-  businessId: 1,
+  businessId: "1",
   title: `태스크 ${o.id}`,
   priority: 2,
   sortOrder: o.sortOrder ?? 0,
@@ -24,7 +24,7 @@ function setup(tasks: Task[], over: Partial<Parameters<typeof Kanban>[0]> = {}) 
 
 describe("Kanban", () => {
   it("4개 컬럼과 카운트를 렌더한다", () => {
-    setup([task({ id: 1, status: "todo" }), task({ id: 2, status: "doing" })]);
+    setup([task({ id: "1", status: "todo" }), task({ id: "2", status: "doing" })]);
     expect(screen.getByText("Todo")).toBeInTheDocument();
     expect(screen.getByText("Doing")).toBeInTheDocument();
     expect(screen.getByText("Review")).toBeInTheDocument();
@@ -32,7 +32,7 @@ describe("Kanban", () => {
   });
 
   it("카드를 해당 컬럼에 표시", () => {
-    setup([task({ id: 1, status: "todo" }), task({ id: 2, status: "done" })]);
+    setup([task({ id: "1", status: "todo" }), task({ id: "2", status: "done" })]);
     const todoCol = screen.getByTestId("col-todo");
     const doneCol = screen.getByTestId("col-done");
     expect(todoCol).toContainElement(screen.getByTestId("card-1"));
@@ -46,12 +46,12 @@ describe("Kanban", () => {
   });
 
   it("카드를 다른 컬럼에 드롭하면 onMove를 새 상태로 호출", () => {
-    const { onMove } = setup([task({ id: 1, status: "todo", sortOrder: 1 })]);
+    const { onMove } = setup([task({ id: "1", status: "todo", sortOrder: 1 })]);
     const card = screen.getByTestId("card-1");
     const doneCol = screen.getByTestId("col-done");
     const dt = { getData: () => "1", setData: vi.fn() };
     fireEvent.dragStart(card, { dataTransfer: dt });
     fireEvent.drop(doneCol, { dataTransfer: dt });
-    expect(onMove).toHaveBeenCalledWith(1, "done", expect.any(Number));
+    expect(onMove).toHaveBeenCalledWith("1", "done", expect.any(Number));
   });
 });

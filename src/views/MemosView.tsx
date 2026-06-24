@@ -2,7 +2,7 @@ import { useMemos } from "../hooks/useMemos";
 import { MemoList } from "./MemoList";
 
 export interface MemosViewProps {
-  businessId: number;
+  businessId: string;
   onChanged: () => void;
 }
 

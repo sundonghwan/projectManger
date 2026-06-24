@@ -7,7 +7,7 @@ import type { TreeRow } from "../domain/tree";
 const bizRow: TreeRow = {
   id: "business:1",
   type: "business",
-  entityId: 1,
+  entityId: "1",
   depth: 0,
   label: "SI사업 A",
   hasChildren: true,
@@ -16,7 +16,7 @@ const bizRow: TreeRow = {
 const dashRow: TreeRow = {
   id: "dashboard:1",
   type: "dashboard",
-  entityId: 1,
+  entityId: "1",
   depth: 1,
   label: "대시보드",
   hasChildren: false,
@@ -25,7 +25,7 @@ const dashRow: TreeRow = {
 const projRow: TreeRow = {
   id: "project:10",
   type: "project",
-  entityId: 10,
+  entityId: "10",
   depth: 1,
   label: "프로젝트 1",
   hasChildren: false,
@@ -70,7 +70,7 @@ describe("Sidebar", () => {
   it("사업 행에는 유형 컬러 점을 colorFor 값으로 표시", () => {
     const colorFor = vi.fn(() => "#22c55e");
     setup({ colorFor });
-    expect(colorFor).toHaveBeenCalledWith(1);
+    expect(colorFor).toHaveBeenCalledWith("1");
     expect(screen.getByTestId("biz-dot")).toHaveStyle({ background: "#22c55e" });
   });
 

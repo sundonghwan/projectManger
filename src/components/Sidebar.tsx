@@ -16,7 +16,7 @@ export interface SidebarProps {
   typeFilter?: Set<BusinessType>;
   onToggleType?: (type: BusinessType) => void;
   /** 사업 id → 표시 색상 (유형 컬러 또는 커스텀) */
-  colorFor: (businessEntityId: number) => string;
+  colorFor: (businessEntityId: string) => string;
   onSelect: (row: TreeRow) => void;
   onToggle: (row: TreeRow) => void;
   /** 사용자가 고른 유형·이름으로 새 사업 생성 */

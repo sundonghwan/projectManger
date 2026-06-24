@@ -5,8 +5,8 @@ import { GlobalSearch } from "./GlobalSearch";
 import type { SearchHit } from "../domain/types";
 
 const hits: SearchHit[] = [
-  { kind: "business", id: 1, title: "알파 사업", businessId: 1, projectId: null },
-  { kind: "task", id: 9, title: "알파 태스크", businessId: 1, projectId: 2 },
+  { kind: "business", id: "1", title: "알파 사업", businessId: "1", projectId: null },
+  { kind: "task", id: "9", title: "알파 태스크", businessId: "1", projectId: "2" },
 ];
 
 describe("GlobalSearch", () => {

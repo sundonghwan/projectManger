@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { TemplatePanel } from "./TemplatePanel";
 import type { Template } from "../domain/types";
 
-const tpl: Template = { id: 1, name: "표준 프로젝트", kind: "project", payload: "{}" };
+const tpl: Template = { id: "1", name: "표준 프로젝트", kind: "project", payload: "{}" };
 
 function setup(templates: Template[] = [tpl]) {
   const h = { onApply: vi.fn(), onCreate: vi.fn(), onDelete: vi.fn() };
@@ -32,6 +32,6 @@ describe("TemplatePanel", () => {
   it("삭제 → onDelete", async () => {
     const h = setup();
     await userEvent.click(screen.getByRole("button", { name: "표준 프로젝트 삭제" }));
-    expect(h.onDelete).toHaveBeenCalledWith(1);
+    expect(h.onDelete).toHaveBeenCalledWith("1");
   });
 });

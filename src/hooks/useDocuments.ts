@@ -4,8 +4,8 @@ import type { Document } from "../domain/types";
 
 /** 사업 문서 로딩 + 생성/이름변경/보관. (개별 문서는 목록에서 선택해 편집기로 연다) */
 export function useDocuments(
-  businessId: number | null,
-  projectId: number | null,
+  businessId: string | null,
+  projectId: string | null,
   onChanged?: () => void,
 ) {
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -30,7 +30,7 @@ export function useDocuments(
 
   /** 주어진 제목으로 새 문서 생성 후 생성된 문서를 반환(호출측에서 바로 편집기로 열 수 있게). */
   const create = useCallback(
-    async (title: string, folderId?: number | null): Promise<Document | null> => {
+    async (title: string, folderId?: string | null): Promise<Document | null> => {
       if (businessId == null) return null;
       const name = title.trim();
       if (!name) return null;
@@ -48,7 +48,7 @@ export function useDocuments(
   );
 
   const move = useCallback(
-    async (id: number, folderId: number | null) => {
+    async (id: string, folderId: string | null) => {
       try {
         await api.document.move(id, folderId);
         await reload();
@@ -61,7 +61,7 @@ export function useDocuments(
   );
 
   const rename = useCallback(
-    async (id: number, title: string) => {
+    async (id: string, title: string) => {
       try {
         await api.document.rename(id, title);
         await reload();
@@ -74,7 +74,7 @@ export function useDocuments(
   );
 
   const archive = useCallback(
-    async (id: number) => {
+    async (id: string) => {
       try {
         await api.document.archive(id);
         await reload();

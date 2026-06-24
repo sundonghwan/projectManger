@@ -12,7 +12,7 @@ export interface RecurringPanelProps {
   items: RecurringTask[];
   onCreate: (data: RecurringFormData) => void;
   onToggle: (item: RecurringTask) => void;
-  onDelete: (id: number) => void;
+  onDelete: (id: string) => void;
   onGenerate: () => void;
 }
 

@@ -9,14 +9,14 @@ export interface DocumentListProps {
   /** 이동 드롭다운에 쓸 폴더 목록(이 사업·문서). 없으면 폴더 열 미노출. */
   folders?: Folder[];
   /** 현재 보고 있는 폴더 id (표시용) */
-  currentFolderId?: number | null;
+  currentFolderId?: string | null;
   /** 사용자가 입력한 제목으로 새 문서 생성. */
   onCreate: (title: string) => void;
-  onOpen: (id: number) => void;
-  onRename: (id: number, title: string) => void;
+  onOpen: (id: string) => void;
+  onRename: (id: string, title: string) => void;
   /** 폴더 이동 (folderId=null 이면 미분류). 제공 시 폴더 열을 노출한다. */
-  onMove?: (id: number, folderId: number | null) => void;
-  onArchive: (id: number) => void;
+  onMove?: (id: string, folderId: string | null) => void;
+  onArchive: (id: string) => void;
 }
 
 export function DocumentList(props: DocumentListProps) {
@@ -25,7 +25,7 @@ export function DocumentList(props: DocumentListProps) {
   const opts = folderOptions(folders);
   const cols = showFolders ? "1fr 150px 100px 92px" : "1fr 100px 92px";
   const grid = { ...rowGrid, gridTemplateColumns: cols };
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const renameDone = useRef(false); // Enter→blur 중복 커밋 방지
   // 새 문서 인라인 이름 입력
@@ -153,7 +153,7 @@ export function DocumentList(props: DocumentListProps) {
                   <select
                     aria-label={`${d.title} 폴더`}
                     value={d.folderId ?? ""}
-                    onChange={(e) => onMove!(d.id, e.target.value === "" ? null : Number(e.target.value))}
+                    onChange={(e) => onMove!(d.id, e.target.value === "" ? null : e.target.value)}
                     style={folderSelect}
                   >
                     <option value="">미분류</option>

@@ -7,16 +7,16 @@ import { LabelChips } from "./LabelChips";
 
 export interface KanbanProps {
   columns: KanbanColumn[];
-  onMove: (taskId: number, status: TaskStatus, sortOrder: number) => void;
+  onMove: (taskId: string, status: TaskStatus, sortOrder: number) => void;
   onAddTask: (status: TaskStatus) => void;
-  labelsByTask?: Record<number, Label[]>;
-  onCardClick?: (taskId: number) => void;
+  labelsByTask?: Record<string, Label[]>;
+  onCardClick?: (taskId: string) => void;
 }
 
 export function Kanban({ columns, onMove, onAddTask, labelsByTask = {}, onCardClick }: KanbanProps) {
   const handleDrop = (col: KanbanColumn) => (e: DragEvent) => {
     e.preventDefault();
-    const id = Number(e.dataTransfer.getData("text/plain"));
+    const id = e.dataTransfer.getData("text/plain");
     if (!id) return;
     const last = col.tasks[col.tasks.length - 1];
     const sortOrder = computeSortOrder(last ? last.sortOrder : null, null);

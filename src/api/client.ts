@@ -37,7 +37,7 @@ export interface BusinessCreateInput {
   color?: string | null;
 }
 export interface BusinessUpdateInput {
-  id: number;
+  id: string;
   name: string;
   type: BusinessType;
   status: EntityStatus;
@@ -45,31 +45,31 @@ export interface BusinessUpdateInput {
   description?: string | null;
 }
 export interface ProjectCreateInput {
-  businessId: number;
+  businessId: string;
   name: string;
 }
 export interface ProjectUpdateInput {
-  id: number;
+  id: string;
   name: string;
   status: EntityStatus;
   description?: string | null;
   dueDate?: DateString | null;
 }
 export interface TaskCreateInput {
-  businessId: number;
-  projectId?: number | null;
+  businessId: string;
+  projectId?: string | null;
   title: string;
   priority?: Priority;
 }
 export interface TaskUpdateInput {
-  id: number;
+  id: string;
   title: string;
   priority: Priority;
   dueDate?: DateString | null;
   description?: string | null;
 }
 export interface TaskMoveInput {
-  id: number;
+  id: string;
   status: TaskStatus;
   sortOrder: number;
 }
@@ -79,105 +79,99 @@ export const api = {
     list: () => invoke<Business[]>("business_list"),
     create: (input: BusinessCreateInput) => invoke<Business>("business_create", { input }),
     update: (input: BusinessUpdateInput) => invoke<Business>("business_update", { input }),
-    rename: (id: number, name: string) => invoke<Business>("business_rename", { id, name }),
-    archive: (id: number) => invoke<void>("business_archive", { id }),
+    rename: (id: string, name: string) => invoke<Business>("business_rename", { id, name }),
+    archive: (id: string) => invoke<void>("business_archive", { id }),
   },
   project: {
-    list: (businessId: number) => invoke<Project[]>("project_list", { businessId }),
+    list: (businessId: string) => invoke<Project[]>("project_list", { businessId }),
     create: (input: ProjectCreateInput) => invoke<Project>("project_create", { input }),
     update: (input: ProjectUpdateInput) => invoke<Project>("project_update", { input }),
-    rename: (id: number, name: string) => invoke<Project>("project_rename", { id, name }),
-    archive: (id: number) => invoke<void>("project_archive", { id }),
+    rename: (id: string, name: string) => invoke<Project>("project_rename", { id, name }),
+    archive: (id: string) => invoke<void>("project_archive", { id }),
   },
   task: {
-    list: (businessId: number, projectId?: number | null) =>
+    list: (businessId: string, projectId?: string | null) =>
       invoke<Task[]>("task_list", { businessId, projectId: projectId ?? null }),
     create: (input: TaskCreateInput) => invoke<Task>("task_create", { input }),
     update: (input: TaskUpdateInput) => invoke<Task>("task_update", { input }),
     move: (input: TaskMoveInput) => invoke<Task>("task_move", { input }),
-    archive: (id: number) => invoke<void>("task_archive", { id }),
+    archive: (id: string) => invoke<void>("task_archive", { id }),
   },
   document: {
-    list: (businessId: number) => invoke<Document[]>("document_list", { businessId }),
+    list: (businessId: string) => invoke<Document[]>("document_list", { businessId }),
     create: (input: DocumentCreateInput) => invoke<Document>("document_create", { input }),
-    get: (id: number) => invoke<Document>("document_get", { id }),
-    rename: (id: number, title: string) => invoke<Document>("document_rename", { id, title }),
+    get: (id: string) => invoke<Document>("document_get", { id }),
+    rename: (id: string, title: string) => invoke<Document>("document_rename", { id, title }),
     /** 문서를 폴더로 이동(folderId=null 이면 미분류). */
-    move: (id: number, folderId: number | null) =>
+    move: (id: string, folderId: string | null) =>
       invoke<Document>("document_move", { id, folderId: folderId ?? null }),
     /** 본문(마크다운) 저장. */
-    setBody: (id: number, body: string) => invoke<void>("document_set_body", { id, body }),
-    archive: (id: number) => invoke<void>("document_archive", { id }),
+    setBody: (id: string, body: string) => invoke<void>("document_set_body", { id, body }),
+    archive: (id: string) => invoke<void>("document_archive", { id }),
   },
   block: {
-    list: (documentId: number) => invoke<Block[]>("block_list", { documentId }),
+    list: (documentId: string) => invoke<Block[]>("block_list", { documentId }),
     create: (input: BlockCreateInput) => invoke<Block>("block_create", { input }),
     update: (input: BlockUpdateInput) => invoke<Block>("block_update", { input }),
-    delete: (id: number) => invoke<void>("block_delete", { id }),
+    delete: (id: string) => invoke<void>("block_delete", { id }),
   },
   label: {
     list: () => invoke<Label[]>("label_list"),
     create: (name: string, color?: string | null) =>
       invoke<Label>("label_create", { input: { name, color: color ?? null } }),
-    assign: (taskId: number, labelId: number) =>
+    assign: (taskId: string, labelId: string) =>
       invoke<void>("label_assign", { input: { taskId, labelId } }),
-    unassign: (taskId: number, labelId: number) =>
+    unassign: (taskId: string, labelId: string) =>
       invoke<void>("label_unassign", { input: { taskId, labelId } }),
-    map: (businessId: number) => invoke<TaskLabel[]>("task_label_map", { businessId }),
-  },
-  backup: {
-    /** path 미지정 시 앱 데이터 폴더의 backup.json. 저장 경로 반환. */
-    exportJson: (path?: string | null) => invoke<string>("export_json", { path: path ?? null }),
-    /** path 미지정 시 앱 데이터 폴더의 backup.json 에서 가져오기(추가). */
-    importJson: (path?: string | null) => invoke<void>("import_json", { path: path ?? null }),
+    map: (businessId: string) => invoke<TaskLabel[]>("task_label_map", { businessId }),
   },
   deliverable: {
-    list: (businessId: number) => invoke<Deliverable[]>("deliverable_list", { businessId }),
+    list: (businessId: string) => invoke<Deliverable[]>("deliverable_list", { businessId }),
     /** 다중 파일 업로드 — 앱 데이터 폴더로 복사 후 생성된 산출물 목록 반환. folderId 지정 시 해당 폴더에 배치. */
-    upload: (businessId: number, projectId: number | null, paths: string[], folderId?: number | null) =>
+    upload: (businessId: string, projectId: string | null, paths: string[], folderId?: string | null) =>
       invoke<Deliverable[]>("deliverable_upload", {
         businessId,
         projectId: projectId ?? null,
         folderId: folderId ?? null,
         paths,
       }),
-    rename: (id: number, title: string) =>
+    rename: (id: string, title: string) =>
       invoke<Deliverable>("deliverable_rename", { id, title }),
-    setStatus: (id: number, status: DeliverableStatus) =>
+    setStatus: (id: string, status: DeliverableStatus) =>
       invoke<Deliverable>("deliverable_set_status", { id, status }),
     /** 산출물을 폴더로 이동(folderId=null 이면 미분류). */
-    move: (id: number, folderId: number | null) =>
+    move: (id: string, folderId: string | null) =>
       invoke<Deliverable>("deliverable_move", { id, folderId: folderId ?? null }),
     /** 복사 보관된 파일을 OS 기본 앱으로 연다. */
     open: (path: string) => openPath(path),
-    archive: (id: number) => invoke<void>("deliverable_archive", { id }),
+    archive: (id: string) => invoke<void>("deliverable_archive", { id }),
   },
   memo: {
-    list: (businessId: number) => invoke<Memo[]>("memo_list", { businessId }),
-    create: (businessId: number, title: string, body: string) =>
+    list: (businessId: string) => invoke<Memo[]>("memo_list", { businessId }),
+    create: (businessId: string, title: string, body: string) =>
       invoke<Memo>("memo_create", { input: { businessId, title, body } }),
-    update: (id: number, title: string, body: string) =>
+    update: (id: string, title: string, body: string) =>
       invoke<Memo>("memo_update", { input: { id, title, body } }),
-    setColor: (id: number, color: MemoColor | null) =>
+    setColor: (id: string, color: MemoColor | null) =>
       invoke<Memo>("memo_set_color", { id, color: color ?? null }),
-    setPinned: (id: number, pinned: boolean) => invoke<Memo>("memo_set_pinned", { id, pinned }),
-    archive: (id: number) => invoke<void>("memo_archive", { id }),
+    setPinned: (id: string, pinned: boolean) => invoke<Memo>("memo_set_pinned", { id, pinned }),
+    archive: (id: string) => invoke<void>("memo_archive", { id }),
   },
   folder: {
     /** 사업의 모든(문서·산출물) 폴더. 프론트가 kind/parentId 로 분기. */
-    list: (businessId: number) => invoke<Folder[]>("folder_list", { businessId }),
-    create: (input: { businessId: number; kind: FolderKind; parentId?: number | null; name: string }) =>
+    list: (businessId: string) => invoke<Folder[]>("folder_list", { businessId }),
+    create: (input: { businessId: string; kind: FolderKind; parentId?: string | null; name: string }) =>
       invoke<Folder>("folder_create", {
         input: { businessId: input.businessId, kind: input.kind, parentId: input.parentId ?? null, name: input.name },
       }),
-    rename: (id: number, name: string) => invoke<Folder>("folder_rename", { id, name }),
-    remove: (id: number) => invoke<void>("folder_delete", { id }),
+    rename: (id: string, name: string) => invoke<Folder>("folder_rename", { id, name }),
+    remove: (id: string) => invoke<void>("folder_delete", { id }),
   },
   server: {
-    list: (businessId: number) => invoke<ServerConnection[]>("server_list", { businessId }),
+    list: (businessId: string) => invoke<ServerConnection[]>("server_list", { businessId }),
     create: (input: {
-      businessId: number;
-      projectId?: number | null;
+      businessId: string;
+      projectId?: string | null;
       name: string;
       host: string;
       port: number;
@@ -186,7 +180,7 @@ export const api = {
       keyPath?: string | null;
     }) => invoke<ServerConnection>("server_create", { input }),
     update: (input: {
-      id: number;
+      id: string;
       name: string;
       host: string;
       port: number;
@@ -194,80 +188,80 @@ export const api = {
       authType: AuthType;
       keyPath?: string | null;
     }) => invoke<ServerConnection>("server_update", { input }),
-    archive: (id: number) => invoke<void>("server_archive", { id }),
-    setSecret: (id: number, secret: string) => invoke<void>("server_set_secret", { id, secret }),
-    clearSecret: (id: number) => invoke<void>("server_clear_secret", { id }),
-    hasSecret: (id: number) => invoke<boolean>("server_has_secret", { id }),
+    archive: (id: string) => invoke<void>("server_archive", { id }),
+    setSecret: (id: string, secret: string) => invoke<void>("server_set_secret", { id, secret }),
+    clearSecret: (id: string) => invoke<void>("server_clear_secret", { id }),
+    hasSecret: (id: string) => invoke<boolean>("server_has_secret", { id }),
   },
   snippet: {
-    list: (serverId: number) => invoke<CommandSnippet[]>("snippet_list", { serverId }),
-    create: (serverId: number, name: string, command: string) =>
+    list: (serverId: string) => invoke<CommandSnippet[]>("snippet_list", { serverId }),
+    create: (serverId: string, name: string, command: string) =>
       invoke<CommandSnippet>("snippet_create", { input: { serverId, name, command } }),
-    delete: (id: number) => invoke<void>("snippet_delete", { id }),
+    delete: (id: string) => invoke<void>("snippet_delete", { id }),
   },
   ssh: {
-    connect: (id: number) => invoke<void>("ssh_connect", { id }),
-    write: (id: number, data: string) => invoke<void>("ssh_write", { id, data }),
-    resize: (id: number, rows: number, cols: number) =>
+    connect: (id: string) => invoke<void>("ssh_connect", { id }),
+    write: (id: string, data: string) => invoke<void>("ssh_write", { id, data }),
+    resize: (id: string, rows: number, cols: number) =>
       invoke<void>("ssh_resize", { id, rows, cols }),
-    disconnect: (id: number) => invoke<void>("ssh_disconnect", { id }),
+    disconnect: (id: string) => invoke<void>("ssh_disconnect", { id }),
     /** 이 호스트가 이미 신뢰(known_hosts 등록)되어 있는지. */
-    hostStatus: (id: number) => invoke<boolean>("ssh_host_status", { id }),
+    hostStatus: (id: string) => invoke<boolean>("ssh_host_status", { id }),
     /** ssh-keyscan 으로 호스트 공개키·지문을 가져온다(아직 신뢰 X). */
-    scanHost: (id: number) => invoke<{ fingerprint: string; keyLines: string }>("ssh_scan_host", { id }),
+    scanHost: (id: string) => invoke<{ fingerprint: string; keyLines: string }>("ssh_scan_host", { id }),
     /** 사용자가 지문 확인 후 수락한 호스트 키를 앱 known_hosts 에 등록. */
     trustHost: (keyLines: string) => invoke<void>("ssh_trust_host", { keyLines }),
   },
   sftp: {
-    list: (id: number, path: string) => invoke<SftpEntry[]>("sftp_list", { id, path }),
+    list: (id: string, path: string) => invoke<SftpEntry[]>("sftp_list", { id, path }),
   },
   template: {
     list: () => invoke<Template[]>("template_list"),
     create: (name: string, kind: "project" | "document", payload: string) =>
       invoke<Template>("template_create", { input: { name, kind, payload } }),
-    delete: (id: number) => invoke<void>("template_delete", { id }),
-    applyProject: (templateId: number, businessId: number) =>
-      invoke<number>("template_apply_project", { templateId, businessId }),
-    applyDocument: (templateId: number, businessId: number, projectId?: number | null) =>
-      invoke<number>("template_apply_document", { templateId, businessId, projectId: projectId ?? null }),
+    delete: (id: string) => invoke<void>("template_delete", { id }),
+    applyProject: (templateId: string, businessId: string) =>
+      invoke<string>("template_apply_project", { templateId, businessId }),
+    applyDocument: (templateId: string, businessId: string, projectId?: string | null) =>
+      invoke<string>("template_apply_document", { templateId, businessId, projectId: projectId ?? null }),
   },
   recurring: {
-    list: (businessId: number) => invoke<RecurringTask[]>("recurring_list", { businessId }),
+    list: (businessId: string) => invoke<RecurringTask[]>("recurring_list", { businessId }),
     create: (input: {
-      businessId: number;
-      projectId?: number | null;
+      businessId: string;
+      projectId?: string | null;
       title: string;
       priority: number;
       intervalDays: number;
       nextRun: string;
     }) => invoke<RecurringTask>("recurring_create", { input }),
-    setActive: (id: number, active: boolean) =>
+    setActive: (id: string, active: boolean) =>
       invoke<void>("recurring_set_active", { id, active }),
-    delete: (id: number) => invoke<void>("recurring_delete", { id }),
+    delete: (id: string) => invoke<void>("recurring_delete", { id }),
     generate: (today: string) => invoke<number>("recurring_generate", { today }),
   },
   search: (query: string) => invoke<SearchHit[]>("search", { query }),
   trash: {
     list: () => invoke<TrashItem[]>("trash_list"),
-    restore: (kind: SearchKind, id: number) => invoke<void>("trash_restore", { kind, id }),
-    purge: (kind: SearchKind, id: number) => invoke<void>("trash_purge", { kind, id }),
+    restore: (kind: SearchKind, id: string) => invoke<void>("trash_restore", { kind, id }),
+    purge: (kind: SearchKind, id: string) => invoke<void>("trash_purge", { kind, id }),
   },
 };
 
 export interface DocumentCreateInput {
-  businessId: number;
-  projectId?: number | null;
-  folderId?: number | null;
+  businessId: string;
+  projectId?: string | null;
+  folderId?: string | null;
   title: string;
 }
 export interface BlockCreateInput {
-  documentId: number;
+  documentId: string;
   type: string;
   content: string;
   sortOrder: number;
 }
 export interface BlockUpdateInput {
-  id: number;
+  id: string;
   type: string;
   content: string;
 }

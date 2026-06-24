@@ -5,8 +5,8 @@ import { LabelChips } from "./LabelChips";
 import type { Label } from "../domain/types";
 
 const labels: Label[] = [
-  { id: 1, name: "백엔드", color: "#3b82f6" },
-  { id: 2, name: "긴급", color: "#ef4444" },
+  { id: "1", name: "백엔드", color: "#3b82f6" },
+  { id: "2", name: "긴급", color: "#ef4444" },
 ];
 
 describe("LabelChips", () => {

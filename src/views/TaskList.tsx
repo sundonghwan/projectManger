@@ -7,8 +7,8 @@ import { LabelChips } from "./LabelChips";
 export interface TaskListProps {
   tasks: Task[];
   onToggleDone: (task: Task) => void;
-  labelsByTask?: Record<number, Label[]>;
-  onRowClick?: (taskId: number) => void;
+  labelsByTask?: Record<string, Label[]>;
+  onRowClick?: (taskId: string) => void;
 }
 
 const COLS = "34px 1fr 96px 84px 90px 150px";

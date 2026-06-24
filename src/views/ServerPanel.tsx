@@ -15,9 +15,9 @@ export interface ServerPanelProps {
   servers: ServerConnection[];
   onCreate: (data: ServerFormData) => void;
   /** 기존 서버 접속정보 수정 */
-  onUpdate?: (data: ServerFormData & { id: number }) => void;
-  onArchive: (id: number) => void;
-  onSetSecret: (id: number, secret: string) => void;
+  onUpdate?: (data: ServerFormData & { id: string }) => void;
+  onArchive: (id: string) => void;
+  onSetSecret: (id: string, secret: string) => void;
   onConnect: (server: ServerConnection) => void;
   onBrowse?: (server: ServerConnection) => void;
 }
@@ -28,8 +28,8 @@ const EMPTY: ServerFormData = { name: "", host: "", port: 22, username: "", auth
 
 export function ServerPanel({ servers, onCreate, onUpdate, onArchive, onSetSecret, onConnect, onBrowse }: ServerPanelProps) {
   const [form, setForm] = useState<ServerFormData>(EMPTY);
-  const [secretInputs, setSecretInputs] = useState<Record<number, string>>({});
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [secretInputs, setSecretInputs] = useState<Record<string, string>>({});
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<ServerFormData>(EMPTY);
 
   const startEdit = (s: ServerConnection) => {

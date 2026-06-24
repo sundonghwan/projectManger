@@ -27,35 +27,35 @@ describe("api.business", () => {
   });
 
   it("archive는 id를 전달", async () => {
-    await api.business.archive(7);
-    expect(invoke).toHaveBeenCalledWith("business_archive", { id: 7 });
+    await api.business.archive("7");
+    expect(invoke).toHaveBeenCalledWith("business_archive", { id: "7" });
   });
 });
 
 describe("api.project", () => {
   it("list는 businessId를 전달", async () => {
-    await api.project.list(3);
-    expect(invoke).toHaveBeenCalledWith("project_list", { businessId: 3 });
+    await api.project.list("3");
+    expect(invoke).toHaveBeenCalledWith("project_list", { businessId: "3" });
   });
 
   it("create는 input 래퍼로 호출", async () => {
-    await api.project.create({ businessId: 3, name: "P1" });
+    await api.project.create({ businessId: "3", name: "P1" });
     expect(invoke).toHaveBeenCalledWith("project_create", {
-      input: { businessId: 3, name: "P1" },
+      input: { businessId: "3", name: "P1" },
     });
   });
 });
 
 describe("api.task", () => {
   it("list는 projectId 없으면 null로 정규화", async () => {
-    await api.task.list(3);
-    expect(invoke).toHaveBeenCalledWith("task_list", { businessId: 3, projectId: null });
+    await api.task.list("3");
+    expect(invoke).toHaveBeenCalledWith("task_list", { businessId: "3", projectId: null });
   });
 
   it("move는 칸반 이동 인자를 input으로 전달", async () => {
-    await api.task.move({ id: 1, status: "done", sortOrder: 5 });
+    await api.task.move({ id: "1", status: "done", sortOrder: 5 });
     expect(invoke).toHaveBeenCalledWith("task_move", {
-      input: { id: 1, status: "done", sortOrder: 5 },
+      input: { id: "1", status: "done", sortOrder: 5 },
     });
   });
 });

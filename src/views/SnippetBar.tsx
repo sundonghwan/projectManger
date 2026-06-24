@@ -6,7 +6,7 @@ export interface SnippetBarProps {
   snippets: CommandSnippet[];
   onRun: (command: string) => void;
   onCreate: (name: string, command: string) => void;
-  onDelete: (id: number) => void;
+  onDelete: (id: string) => void;
 }
 
 /** 터미널 명령 스니펫 바 — 즐겨찾는 명령 실행/추가/삭제. */

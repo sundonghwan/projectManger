@@ -5,8 +5,8 @@ import { RecurringPanel } from "./RecurringPanel";
 import type { RecurringTask } from "../domain/types";
 
 const item: RecurringTask = {
-  id: 1,
-  businessId: 1,
+  id: "1",
+  businessId: "1",
   title: "주간보고",
   priority: 2,
   intervalDays: 7,
@@ -41,7 +41,7 @@ describe("RecurringPanel", () => {
     await userEvent.click(screen.getByRole("button", { name: "일시중지" }));
     expect(h.onToggle).toHaveBeenCalledWith(item);
     await userEvent.click(screen.getByRole("button", { name: "주간보고 삭제" }));
-    expect(h.onDelete).toHaveBeenCalledWith(1);
+    expect(h.onDelete).toHaveBeenCalledWith("1");
     await userEvent.click(screen.getByRole("button", { name: "지금 생성" }));
     expect(h.onGenerate).toHaveBeenCalled();
   });

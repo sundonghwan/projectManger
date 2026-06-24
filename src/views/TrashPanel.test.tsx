@@ -5,8 +5,8 @@ import { TrashPanel } from "./TrashPanel";
 import type { TrashItem } from "../domain/types";
 
 const items: TrashItem[] = [
-  { kind: "task", id: 1, title: "보관된 태스크", archivedAt: "2026-06-20T00:00:00Z" },
-  { kind: "document", id: 2, title: "보관된 문서", archivedAt: "2026-06-19T00:00:00Z" },
+  { kind: "task", id: "1", title: "보관된 태스크", archivedAt: "2026-06-20T00:00:00Z" },
+  { kind: "document", id: "2", title: "보관된 문서", archivedAt: "2026-06-19T00:00:00Z" },
 ];
 
 function setup(list = items) {

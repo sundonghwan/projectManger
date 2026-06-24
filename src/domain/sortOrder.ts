@@ -28,6 +28,6 @@ export function isTooClose(before: number | null, after: number | null): boolean
 }
 
 /** 표시 순서대로 받은 id 목록에 STEP 간격의 새 sort_order를 부여(정밀도 소진 시 호출). */
-export function reindex(idsInOrder: number[]): { id: number; sortOrder: number }[] {
+export function reindex(idsInOrder: string[]): { id: string; sortOrder: number }[] {
   return idsInOrder.map((id, i) => ({ id, sortOrder: (i + 1) * STEP }));
 }

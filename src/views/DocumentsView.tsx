@@ -6,16 +6,16 @@ import { Icon } from "../ui/icons/Icon";
 import type { Folder } from "../domain/types";
 
 export interface DocumentsViewProps {
-  businessId: number;
-  projectId: number | null;
+  businessId: string;
+  projectId: string | null;
   onChanged: () => void;
   /** 진입 시 자동으로 열 문서 id (검색 등). 열린 뒤 onOpened 로 소비 통지. */
-  initialOpenDocId?: number | null;
+  initialOpenDocId?: string | null;
   onOpened?: () => void;
   /** 이 사업의 문서 폴더(이동 드롭다운/필터용) */
   folders?: Folder[];
   /** 선택된 폴더 id (없으면 전체). 새 문서는 이 폴더에 들어간다. */
-  selectedFolderId?: number | null;
+  selectedFolderId?: string | null;
 }
 
 /** 문서 뷰 컨테이너 — 목록과 편집기를 전환한다(산출물과 동일한 단일 진입 패턴). */
@@ -29,7 +29,7 @@ export function DocumentsView({
   selectedFolderId = null,
 }: DocumentsViewProps) {
   const d = useDocuments(businessId, projectId, onChanged);
-  const [openId, setOpenId] = useState<number | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
   const openDoc = d.documents.find((x) => x.id === openId) ?? null;
   // 선택된 폴더가 있으면 그 폴더 직속만, 없으면 전체.
   const shown = selectedFolderId == null

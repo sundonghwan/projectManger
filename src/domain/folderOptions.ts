@@ -3,7 +3,7 @@
 import type { Folder } from "./types";
 
 export interface FolderOption {
-  id: number;
+  id: string;
   label: string;
   /** 0=루트, 1=하위 */
   depth: number;

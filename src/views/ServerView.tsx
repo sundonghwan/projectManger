@@ -8,8 +8,8 @@ import { SftpBrowser } from "./SftpBrowser";
 import { Icon } from "../ui/icons/Icon";
 
 export interface ServerViewProps {
-  businessId: number;
-  projectId: number | null;
+  businessId: string;
+  projectId: string | null;
 }
 
 interface TrustPrompt {

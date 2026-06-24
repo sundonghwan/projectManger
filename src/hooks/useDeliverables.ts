@@ -4,8 +4,8 @@ import type { Deliverable, DeliverableStatus } from "../domain/types";
 
 /** 사업 산출물(업로드 파일) 로딩 + 업로드/상태변경/이름변경/열기/보관. */
 export function useDeliverables(
-  businessId: number | null,
-  projectId: number | null,
+  businessId: string | null,
+  projectId: string | null,
   onChanged?: () => void,
 ) {
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
@@ -30,7 +30,7 @@ export function useDeliverables(
   }, [reload]);
 
   const upload = useCallback(
-    async (paths: string[], folderId?: number | null) => {
+    async (paths: string[], folderId?: string | null) => {
       if (businessId == null || paths.length === 0) return;
       setUploading(true);
       try {
@@ -50,7 +50,7 @@ export function useDeliverables(
   );
 
   const move = useCallback(
-    async (id: number, folderId: number | null) => {
+    async (id: string, folderId: string | null) => {
       try {
         await api.deliverable.move(id, folderId);
         await reload();
@@ -63,7 +63,7 @@ export function useDeliverables(
   );
 
   const rename = useCallback(
-    async (id: number, title: string) => {
+    async (id: string, title: string) => {
       try {
         await api.deliverable.rename(id, title);
         await reload();
@@ -76,7 +76,7 @@ export function useDeliverables(
   );
 
   const setStatus = useCallback(
-    async (id: number, status: DeliverableStatus) => {
+    async (id: string, status: DeliverableStatus) => {
       try {
         await api.deliverable.setStatus(id, status);
         await reload();
@@ -100,7 +100,7 @@ export function useDeliverables(
   }, []);
 
   const archive = useCallback(
-    async (id: number) => {
+    async (id: string) => {
       try {
         await api.deliverable.archive(id);
         await reload();

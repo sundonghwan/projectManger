@@ -5,7 +5,7 @@ import { TaskList } from "./TaskList";
 import type { Task } from "../domain/types";
 
 const task = (o: Partial<Task> & Pick<Task, "id" | "status">): Task => ({
-  businessId: 1,
+  businessId: "1",
   title: `태스크 ${o.id}`,
   priority: 2,
   sortOrder: 0,
@@ -14,7 +14,7 @@ const task = (o: Partial<Task> & Pick<Task, "id" | "status">): Task => ({
 
 describe("TaskList", () => {
   it("태스크 행과 상태를 렌더", () => {
-    render(<TaskList tasks={[task({ id: 1, status: "doing" })]} onToggleDone={vi.fn()} />);
+    render(<TaskList tasks={[task({ id: "1", status: "doing" })]} onToggleDone={vi.fn()} />);
     expect(screen.getByText("태스크 1")).toBeInTheDocument();
     expect(screen.getByText("Doing")).toBeInTheDocument();
   });
@@ -25,13 +25,13 @@ describe("TaskList", () => {
   });
 
   it("완료된 태스크는 체크 상태", () => {
-    render(<TaskList tasks={[task({ id: 2, status: "done" })]} onToggleDone={vi.fn()} />);
+    render(<TaskList tasks={[task({ id: "2", status: "done" })]} onToggleDone={vi.fn()} />);
     expect(screen.getByRole("checkbox")).toHaveAttribute("aria-checked", "true");
   });
 
   it("체크박스 클릭 시 onToggleDone 호출", async () => {
     const onToggleDone = vi.fn();
-    const t = task({ id: 3, status: "todo" });
+    const t = task({ id: "3", status: "todo" });
     render(<TaskList tasks={[t]} onToggleDone={onToggleDone} />);
     await userEvent.click(screen.getByRole("checkbox"));
     expect(onToggleDone).toHaveBeenCalledWith(t);

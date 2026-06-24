@@ -3,7 +3,7 @@ import { KANBAN_STATUSES, groupByStatus } from "./kanban";
 import type { Task } from "./types";
 
 const task = (o: Partial<Task> & Pick<Task, "id" | "status">): Task => ({
-  businessId: 1,
+  businessId: "1",
   title: `t${o.id}`,
   priority: 2,
   sortOrder: 0,
@@ -19,10 +19,10 @@ describe("groupByStatus", () => {
 
   it("태스크를 상태별 컬럼에 분배한다", () => {
     const cols = groupByStatus([
-      task({ id: 1, status: "todo" }),
-      task({ id: 2, status: "doing" }),
-      task({ id: 3, status: "doing" }),
-      task({ id: 4, status: "done" }),
+      task({ id: "1", status: "todo" }),
+      task({ id: "2", status: "doing" }),
+      task({ id: "3", status: "doing" }),
+      task({ id: "4", status: "done" }),
     ]);
     const byStatus = Object.fromEntries(cols.map((c) => [c.status, c.tasks.length]));
     expect(byStatus).toEqual({ todo: 1, doing: 2, review: 0, done: 1 });
@@ -30,11 +30,11 @@ describe("groupByStatus", () => {
 
   it("각 컬럼 내부는 sortOrder 오름차순", () => {
     const cols = groupByStatus([
-      task({ id: 1, status: "todo", sortOrder: 3 }),
-      task({ id: 2, status: "todo", sortOrder: 1 }),
-      task({ id: 3, status: "todo", sortOrder: 2 }),
+      task({ id: "1", status: "todo", sortOrder: 3 }),
+      task({ id: "2", status: "todo", sortOrder: 1 }),
+      task({ id: "3", status: "todo", sortOrder: 2 }),
     ]);
     const todo = cols.find((c) => c.status === "todo")!;
-    expect(todo.tasks.map((t) => t.id)).toEqual([2, 3, 1]);
+    expect(todo.tasks.map((t) => t.id)).toEqual(["2", "3", "1"]);
   });
 });

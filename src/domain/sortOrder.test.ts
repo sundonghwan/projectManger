@@ -55,10 +55,10 @@ describe("isTooClose", () => {
 
 describe("reindex", () => {
   it("표시 순서대로 STEP 간격의 새 sort_order를 부여한다", () => {
-    expect(reindex([7, 3, 9])).toEqual([
-      { id: 7, sortOrder: STEP },
-      { id: 3, sortOrder: STEP * 2 },
-      { id: 9, sortOrder: STEP * 3 },
+    expect(reindex(["7", "3", "9"])).toEqual([
+      { id: "7", sortOrder: STEP },
+      { id: "3", sortOrder: STEP * 2 },
+      { id: "9", sortOrder: STEP * 3 },
     ]);
   });
 
@@ -67,7 +67,7 @@ describe("reindex", () => {
   });
 
   it("재배치 결과는 순증가한다", () => {
-    const result = reindex([5, 1, 4, 2, 3]);
+    const result = reindex(["5", "1", "4", "2", "3"]);
     const orders = result.map((r) => r.sortOrder);
     for (let i = 1; i < orders.length; i++) {
       expect(orders[i]).toBeGreaterThan(orders[i - 1]);

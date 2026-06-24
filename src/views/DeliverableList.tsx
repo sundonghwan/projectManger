@@ -12,21 +12,21 @@ export interface DeliverableListProps {
   /** 이동 드롭다운에 쓸 폴더 목록(이 사업·산출물). 없으면 폴더 열 미노출. */
   folders?: Folder[];
   /** 현재 보고 있는 폴더 id (표시용) */
-  currentFolderId?: number | null;
+  currentFolderId?: string | null;
   onUpload: () => void;
-  onSetStatus: (id: number, status: DeliverableStatus) => void;
-  onRename: (id: number, title: string) => void;
+  onSetStatus: (id: string, status: DeliverableStatus) => void;
+  onRename: (id: string, title: string) => void;
   /** 폴더 이동 (folderId=null 이면 미분류). 제공 시 폴더 열을 노출한다. */
-  onMove?: (id: number, folderId: number | null) => void;
+  onMove?: (id: string, folderId: string | null) => void;
   onOpen: (d: Deliverable) => void;
-  onArchive: (id: number) => void;
+  onArchive: (id: string) => void;
 }
 
 const STATUSES: DeliverableStatus[] = ["draft", "review", "done"];
 
 export function DeliverableList(props: DeliverableListProps) {
   const { deliverables, error, uploading, folders = [], onUpload, onSetStatus, onRename, onMove, onOpen, onArchive } = props;
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const renameDone = useRef(false); // Enter→blur 중복 커밋 방지
 
@@ -139,7 +139,7 @@ export function DeliverableList(props: DeliverableListProps) {
                   <select
                     aria-label={`${d.title} 폴더`}
                     value={d.folderId ?? ""}
-                    onChange={(e) => onMove!(d.id, e.target.value === "" ? null : Number(e.target.value))}
+                    onChange={(e) => onMove!(d.id, e.target.value === "" ? null : e.target.value)}
                     style={folderSelect}
                   >
                     <option value="">미분류</option>

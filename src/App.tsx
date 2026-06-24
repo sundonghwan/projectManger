@@ -18,7 +18,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<ViewKind>("dashboard");
   // 검색 등에서 특정 문서를 바로 편집기로 열도록 전달하는 대상 id (열린 뒤 소비됨)
-  const [pendingDocId, setPendingDocId] = useState<number | null>(null);
+  const [pendingDocId, setPendingDocId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { theme, toggle: toggleTheme } = useTheme();
   const [typeFilter, setTypeFilter] = useState<Set<BusinessType>>(new Set());
@@ -42,7 +42,7 @@ export default function App() {
     }
   }, []);
 
-  const loadProjects = useCallback(async (businessId: number) => {
+  const loadProjects = useCallback(async (businessId: string) => {
     try {
       const list = await api.project.list(businessId);
       setProjects((prev) => [...prev.filter((p) => p.businessId !== businessId), ...list]);
@@ -51,7 +51,7 @@ export default function App() {
     }
   }, []);
 
-  const loadFolders = useCallback(async (businessId: number) => {
+  const loadFolders = useCallback(async (businessId: string) => {
     try {
       const list = await api.folder.list(businessId);
       setFolders((prev) => [...prev.filter((f) => f.businessId !== businessId), ...list]);
@@ -81,7 +81,7 @@ export default function App() {
   );
 
   const colorFor = useCallback(
-    (entityId: number) => {
+    (entityId: string) => {
       const b = businesses.find((x) => x.id === entityId);
       return b ? businessColor(b.type, b.color) : "#94a3b8";
     },
@@ -144,9 +144,9 @@ export default function App() {
         }
         // 2) 폴더 생성 — 진입 노드(문서/산출물) 아래 루트 폴더, 폴더 행 아래 하위 폴더
         if (kind === "folder") {
-          let businessId: number;
+          let businessId: string;
           let folderKind: FolderKind;
-          let parentId: number | null = null;
+          let parentId: string | null = null;
           if (row.type === "document" || row.type === "deliverable") {
             businessId = row.entityId; // 진입 노드의 entityId 는 사업 id
             folderKind = row.type === "document" ? "document" : "deliverable";

@@ -31,8 +31,8 @@ export type MemoColor =
 
 /** 사업별 메모(Keep식) — 색상·고정·보관 */
 export interface Memo {
-  id: number;
-  businessId: number;
+  id: string;
+  businessId: string;
   title: string;
   body: string;
   color?: MemoColor | null;
@@ -45,10 +45,10 @@ export interface Memo {
 
 /** 산출물·문서 분류 폴더(최대 2단계). parentId 가 없으면 루트 폴더. */
 export interface Folder {
-  id: number;
-  businessId: number;
+  id: string;
+  businessId: string;
   kind: FolderKind;
-  parentId?: number | null;
+  parentId?: string | null;
   name: string;
   sortOrder: number;
   archivedAt?: Timestamp | null;
@@ -65,7 +65,7 @@ export type Timestamp = string;
 export type DateString = string;
 
 export interface Business {
-  id: number;
+  id: string;
   name: string;
   type: BusinessType;
   color?: string | null;
@@ -76,8 +76,8 @@ export interface Business {
 }
 
 export interface Project {
-  id: number;
-  businessId: number;
+  id: string;
+  businessId: string;
   name: string;
   description?: string | null;
   status: EntityStatus;
@@ -88,10 +88,10 @@ export interface Project {
 }
 
 export interface Task {
-  id: number;
-  businessId: number;
-  projectId?: number | null;
-  parentTaskId?: number | null;
+  id: string;
+  businessId: string;
+  projectId?: string | null;
+  parentTaskId?: string | null;
   title: string;
   description?: string | null;
   status: TaskStatus;
@@ -103,10 +103,10 @@ export interface Task {
 }
 
 export interface Document {
-  id: number;
-  businessId: number;
-  projectId?: number | null;
-  folderId?: number | null;
+  id: string;
+  businessId: string;
+  projectId?: string | null;
+  folderId?: string | null;
   title: string;
   icon?: string | null;
   body: string;
@@ -116,22 +116,22 @@ export interface Document {
 }
 
 export interface Label {
-  id: number;
+  id: string;
   name: string;
   color?: string | null;
 }
 
 export interface Template {
-  id: number;
+  id: string;
   name: string;
   kind: "project" | "document";
   payload: string;
 }
 
 export interface RecurringTask {
-  id: number;
-  businessId: number;
-  projectId?: number | null;
+  id: string;
+  businessId: string;
+  projectId?: string | null;
   title: string;
   priority: Priority;
   intervalDays: number;
@@ -141,8 +141,8 @@ export interface RecurringTask {
 }
 
 export interface CommandSnippet {
-  id: number;
-  serverConnectionId?: number | null;
+  id: string;
+  serverId: string;
   name: string;
   command: string;
   sortOrder: number;
@@ -158,15 +158,15 @@ export type SearchKind = "business" | "project" | "task" | "document" | "deliver
 
 export interface SearchHit {
   kind: SearchKind;
-  id: number;
+  id: string;
   title: string;
-  businessId: number;
-  projectId?: number | null;
+  businessId: string;
+  projectId?: string | null;
 }
 
 export interface TrashItem {
   kind: SearchKind;
-  id: number;
+  id: string;
   title: string;
   archivedAt?: string | null;
   /** 산출물 보관 항목의 파일 크기(바이트). */
@@ -175,8 +175,8 @@ export interface TrashItem {
 
 /** 태스크-라벨 조인 행 */
 export interface TaskLabel {
-  taskId: number;
-  labelId: number;
+  taskId: string;
+  labelId: string;
   name: string;
   color?: string | null;
 }
@@ -190,9 +190,8 @@ export type BlockType =
   | "divider";
 
 export interface Block {
-  id: number;
-  documentId: number;
-  parentBlockId?: number | null;
+  id: string;
+  parentBlockId?: string | null;
   type: BlockType;
   /** 종류별 속성 JSON 문자열 (예: {"text":"...","checked":false}) */
   content: string;
@@ -200,13 +199,13 @@ export interface Block {
 }
 
 export interface Deliverable {
-  id: number;
-  businessId: number;
-  projectId?: number | null;
-  folderId?: number | null;
+  id: string;
+  businessId: string;
+  projectId?: string | null;
+  folderId?: string | null;
   title: string;
   kind: DeliverableKind;
-  documentId?: number | null;
+  documentId?: string | null;
   filePath?: string | null;
   fileSize?: number | null;
   originalName?: string | null;
@@ -218,8 +217,7 @@ export interface Deliverable {
 }
 
 export interface DeliverableVersion {
-  id: number;
-  deliverableId: number;
+  id: string;
   version: number;
   filePath?: string | null;
   note?: string | null;
@@ -227,9 +225,9 @@ export interface DeliverableVersion {
 }
 
 export interface ServerConnection {
-  id: number;
-  businessId: number;
-  projectId?: number | null;
+  id: string;
+  businessId: string;
+  projectId?: string | null;
   name: string;
   host: string;
   port: number;

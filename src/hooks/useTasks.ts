@@ -4,9 +4,9 @@ import type { Label, Task, TaskStatus } from "../domain/types";
 import { groupLabelsByTask } from "../domain/labels";
 
 /** 선택된 사업/프로젝트의 태스크 로딩 + 생성/이동/완료토글 + 라벨. */
-export function useTasks(businessId: number | null, projectId: number | null) {
+export function useTasks(businessId: string | null, projectId: string | null) {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [labelsByTask, setLabelsByTask] = useState<Record<number, Label[]>>({});
+  const [labelsByTask, setLabelsByTask] = useState<Record<string, Label[]>>({});
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
@@ -50,7 +50,7 @@ export function useTasks(businessId: number | null, projectId: number | null) {
   );
 
   const move = useCallback(
-    async (id: number, status: TaskStatus, sortOrder: number) => {
+    async (id: string, status: TaskStatus, sortOrder: number) => {
       try {
         await api.task.move({ id, status, sortOrder });
         await reload();
@@ -87,7 +87,7 @@ export function useTasks(businessId: number | null, projectId: number | null) {
   );
 
   const archive = useCallback(
-    async (id: number) => {
+    async (id: string) => {
       try {
         await api.task.archive(id);
         await reload();
@@ -99,7 +99,7 @@ export function useTasks(businessId: number | null, projectId: number | null) {
   );
 
   const assignLabel = useCallback(
-    async (taskId: number, name: string, color: string) => {
+    async (taskId: string, name: string, color: string) => {
       try {
         const label = await api.label.create(name, color);
         await api.label.assign(taskId, label.id);
@@ -112,7 +112,7 @@ export function useTasks(businessId: number | null, projectId: number | null) {
   );
 
   const removeLabel = useCallback(
-    async (taskId: number, labelId: number) => {
+    async (taskId: string, labelId: string) => {
       try {
         await api.label.unassign(taskId, labelId);
         await reload();

@@ -20,7 +20,7 @@ export interface TreeRow {
   /** 노드 종류 */
   type: TreeNodeType;
   /** 원본 엔티티 id (dashboard·document·deliverable 진입 노드는 소속 사업 id, 폴더는 폴더 id) */
-  entityId: number;
+  entityId: string;
   depth: number;
   label: string;
   hasChildren: boolean;
@@ -37,7 +37,7 @@ export interface TreeInput {
 }
 
 /** 노드 종류 + 엔티티 id → 고유 행 키 */
-export function rowId(type: TreeNodeType, entityId: number): string {
+export function rowId(type: TreeNodeType, entityId: string): string {
   return `${type}:${entityId}`;
 }
 
@@ -101,7 +101,7 @@ export function buildTree(input: TreeInput): TreeRow[] {
 function pushEntryWithFolders(
   rows: TreeRow[],
   entryType: "document" | "deliverable",
-  businessId: number,
+  businessId: string,
   label: string,
   folders: Folder[],
   expanded: Set<string>,
@@ -153,6 +153,6 @@ function pushEntryWithFolders(
 }
 
 /** 사업 단위 진입 의사행(대시보드) — entityId 는 소속 사업 id. */
-function entry(type: TreeNodeType, businessId: number, label: string): TreeRow {
+function entry(type: TreeNodeType, businessId: string, label: string): TreeRow {
   return { id: rowId(type, businessId), type, entityId: businessId, depth: 1, label, hasChildren: false, expanded: false };
 }

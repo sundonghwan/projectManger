@@ -8,10 +8,10 @@ export interface MemoListProps {
   memos: Memo[];
   error: string | null;
   onCreate: (title: string, body: string) => void;
-  onUpdate: (id: number, title: string, body: string) => void;
-  onSetColor: (id: number, color: MemoColor | null) => void;
-  onSetPinned: (id: number, pinned: boolean) => void;
-  onArchive: (id: number) => void;
+  onUpdate: (id: string, title: string, body: string) => void;
+  onSetColor: (id: string, color: MemoColor | null) => void;
+  onSetPinned: (id: string, pinned: boolean) => void;
+  onArchive: (id: string) => void;
 }
 
 export function MemoList(props: MemoListProps) {
@@ -162,9 +162,9 @@ function Card({
 }: {
   memo: Memo;
   onOpen: () => void;
-  onSetColor: (id: number, color: MemoColor | null) => void;
-  onSetPinned: (id: number, pinned: boolean) => void;
-  onArchive: (id: number) => void;
+  onSetColor: (id: string, color: MemoColor | null) => void;
+  onSetPinned: (id: string, pinned: boolean) => void;
+  onArchive: (id: string) => void;
 }) {
   const [palette, setPalette] = useState(false);
   return (

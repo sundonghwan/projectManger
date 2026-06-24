@@ -5,7 +5,7 @@ import { SnippetBar } from "./SnippetBar";
 import type { CommandSnippet } from "../domain/types";
 
 const snippets: CommandSnippet[] = [
-  { id: 1, serverConnectionId: 1, name: "배포", command: "./deploy.sh", sortOrder: 1 },
+  { id: "1", serverId: "1", name: "배포", command: "./deploy.sh", sortOrder: 1 },
 ];
 
 function setup(list = snippets) {
@@ -24,7 +24,7 @@ describe("SnippetBar", () => {
   it("삭제 버튼은 onDelete", async () => {
     const h = setup();
     await userEvent.click(screen.getByRole("button", { name: "배포 삭제" }));
-    expect(h.onDelete).toHaveBeenCalledWith(1);
+    expect(h.onDelete).toHaveBeenCalledWith("1");
   });
 
   it("스니펫 추가 폼으로 onCreate", async () => {

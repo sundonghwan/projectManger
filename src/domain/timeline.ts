@@ -1,7 +1,7 @@
 import type { Task, TaskStatus } from "./types";
 
 export interface TimelineItem {
-  id: number;
+  id: string;
   title: string;
   dueDate: string;
   status: TaskStatus;
