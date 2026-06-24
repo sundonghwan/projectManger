@@ -7,6 +7,7 @@ mod models;
 mod repo;
 mod secrets;
 mod sftp;
+mod store;
 mod terminal;
 
 use std::sync::Mutex;
