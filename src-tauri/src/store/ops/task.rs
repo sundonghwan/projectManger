@@ -2,6 +2,7 @@ use crate::error::{AppError, Result};
 use crate::store::ids::{new_id, now};
 use crate::store::model::Task;
 use crate::store::Store;
+use crate::store::ops::util::cmp_sort;
 
 const STATUSES: [&str; 4] = ["todo", "doing", "review", "done"];
 
@@ -24,12 +25,7 @@ pub fn list(store: &Store, business_id: &str, project_id: Option<&str>) -> Resul
     out.sort_by(|a, b| {
         a.status
             .cmp(&b.status)
-            .then_with(|| {
-                a.sort_order
-                    .partial_cmp(&b.sort_order)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            })
-            .then_with(|| a.id.cmp(&b.id))
+            .then_with(|| cmp_sort(a.sort_order, &a.id, b.sort_order, &b.id))
     });
     Ok(out)
 }

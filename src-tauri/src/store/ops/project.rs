@@ -2,6 +2,7 @@ use crate::error::{AppError, Result};
 use crate::store::ids::{new_id, now};
 use crate::store::model::Project;
 use crate::store::Store;
+use crate::store::ops::util::cmp_sort;
 
 /// 특정 사업의 보관되지 않은 프로젝트를 sort_order, id 순으로 조회.
 pub fn list_by_business(store: &Store, business_id: &str) -> Result<Vec<Project>> {
@@ -11,12 +12,7 @@ pub fn list_by_business(store: &Store, business_id: &str) -> Result<Vec<Project>
         .into_iter()
         .filter(|p| p.business_id == business_id && p.archived_at.is_none())
         .collect();
-    out.sort_by(|a, b| {
-        a.sort_order
-            .partial_cmp(&b.sort_order)
-            .unwrap_or(std::cmp::Ordering::Equal)
-            .then_with(|| a.id.cmp(&b.id))
-    });
+    out.sort_by(|a, b| cmp_sort(a.sort_order, &a.id, b.sort_order, &b.id));
     Ok(out)
 }
 
