@@ -12,3 +12,4 @@ pub mod recurring;
 pub mod search;
 pub mod trash;
 pub mod server;
+pub mod snippet;
