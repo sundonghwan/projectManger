@@ -1,10 +1,6 @@
 mod commands;
-mod db;
 mod error;
-mod export;
 mod hostkey;
-mod models;
-mod repo;
 mod secrets;
 mod sftp;
 mod store;

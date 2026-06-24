@@ -3,8 +3,6 @@ use serde::{Serialize, Serializer};
 /// 앱 단일 에러 타입. Tauri 커맨드 경계에서 문자열로 직렬화되어 프론트로 전달.
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
-    #[error("데이터베이스 오류: {0}")]
-    Db(#[from] rusqlite::Error),
     #[error("대상을 찾을 수 없음")]
     NotFound,
     #[error("잘못된 요청: {0}")]
