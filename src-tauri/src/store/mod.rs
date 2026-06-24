@@ -6,7 +6,10 @@ pub mod model;
 
 use crate::error::Result;
 use crate::store::collection::Collection;
-use crate::store::model::{Business, Project, Task};
+use crate::store::model::{
+    Business, Deliverable, Document, Folder, Label, Memo, Project, RecurringTask, Task, TaskLabel,
+    Template,
+};
 use std::path::PathBuf;
 
 /// 파일 기반 데이터 저장소. 컬렉션별 인메모리 인덱스를 모아 제공한다.
@@ -15,6 +18,14 @@ pub struct Store {
     pub businesses: Collection<Business>,
     pub projects: Collection<Project>,
     pub tasks: Collection<Task>,
+    pub folders: Collection<Folder>,
+    pub memos: Collection<Memo>,
+    pub labels: Collection<Label>,
+    pub task_labels: Collection<TaskLabel>,
+    pub templates: Collection<Template>,
+    pub recurring: Collection<RecurringTask>,
+    pub documents: Collection<Document>,
+    pub deliverables: Collection<Deliverable>,
 }
 
 impl Store {
@@ -24,6 +35,14 @@ impl Store {
             businesses: Collection::new(&root),
             projects: Collection::new(&root),
             tasks: Collection::new(&root),
+            folders: Collection::new(&root),
+            memos: Collection::new(&root),
+            labels: Collection::new(&root),
+            task_labels: Collection::new(&root),
+            templates: Collection::new(&root),
+            recurring: Collection::new(&root),
+            documents: Collection::new(&root),
+            deliverables: Collection::new(&root),
             root,
         };
         s.load()?;
@@ -35,6 +54,14 @@ impl Store {
         self.businesses.load()?;
         self.projects.load()?;
         self.tasks.load()?;
+        self.folders.load()?;
+        self.memos.load()?;
+        self.labels.load()?;
+        self.task_labels.load()?;
+        self.templates.load()?;
+        self.recurring.load()?;
+        self.documents.load()?;
+        self.deliverables.load()?;
         Ok(())
     }
 
@@ -126,5 +153,35 @@ mod tests {
         let mut orphans = s.orphan_task_ids();
         orphans.sort();
         assert_eq!(orphans, vec!["no_biz".to_string(), "no_proj".to_string()]);
+    }
+
+    #[test]
+    fn all_collections_persist_across_reopen() {
+        use crate::store::model::{Folder, Memo, Document, Block};
+        let root = tmp_root();
+        {
+            let mut s = Store::open(root.clone()).unwrap();
+            s.folders.put(Folder {
+                id: "f1".into(), business_id: "b1".into(), kind: "document".into(),
+                parent_id: None, name: "F".into(), sort_order: 0.0, archived_at: None,
+                created_at: now(), updated_at: now(),
+            }).unwrap();
+            s.memos.put(Memo {
+                id: "m1".into(), business_id: "b1".into(), title: "T".into(), body: "B".into(),
+                color: None, pinned: 0, sort_order: 0.0, archived_at: None,
+                created_at: now(), updated_at: now(),
+            }).unwrap();
+            s.documents.put(Document {
+                id: "d1".into(), business_id: "b1".into(), project_id: None, folder_id: None,
+                title: "D".into(), icon: None, body: "".into(),
+                blocks: vec![Block { id: "blk".into(), parent_block_id: None,
+                    r#type: "paragraph".into(), content: "{}".into(), sort_order: 0.0 }],
+                sort_order: 0.0, archived_at: None, created_at: now(), updated_at: now(),
+            }).unwrap();
+        }
+        let s2 = Store::open(root).unwrap();
+        assert_eq!(s2.folders.len(), 1);
+        assert_eq!(s2.memos.len(), 1);
+        assert_eq!(s2.documents.get("d1").unwrap().blocks.len(), 1);
     }
 }
