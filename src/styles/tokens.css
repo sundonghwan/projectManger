@@ -39,6 +39,16 @@
   --pr-normal: #94a3b8;
   --pr-low: #cbd5e1;
 
+  /* 메모 카드 색상 (Keep식 파스텔) */
+  --memo-red: #faafa8;
+  --memo-orange: #f7ca9b;
+  --memo-yellow: #fff8b8;
+  --memo-green: #d3f8c8;
+  --memo-teal: #bdf0e4;
+  --memo-blue: #cbe0fb;
+  --memo-purple: #e4d4fb;
+  --memo-gray: #e9e9e6;
+
   /* 간격 (4px 그리드) */
   --space-1: 4px;
   --space-2: 8px;
@@ -80,6 +90,16 @@
   --text3: #6f6f68;
   --accent: #7b7bf0;
   --accent-hover: #8e8ef5;
+
+  /* 메모 카드 색상 — 다크 틴트 */
+  --memo-red: #5c2b29;
+  --memo-orange: #614a2a;
+  --memo-yellow: #5f5a1f;
+  --memo-green: #2f5226;
+  --memo-teal: #16504b;
+  --memo-blue: #20395c;
+  --memo-purple: #412a5e;
+  --memo-gray: #3a3a36;
 }
 
 * {

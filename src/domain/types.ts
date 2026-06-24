@@ -17,6 +17,32 @@ export type DeliverableKind = "file" | "document";
 /** 폴더 종류 — 산출물/문서 어느 쪽 분류인지 */
 export type FolderKind = "document" | "deliverable";
 
+/** 메모 카드 색상 팔레트 키 (null/default = 기본색) */
+export type MemoColor =
+  | "default"
+  | "red"
+  | "orange"
+  | "yellow"
+  | "green"
+  | "teal"
+  | "blue"
+  | "purple"
+  | "gray";
+
+/** 사업별 메모(Keep식) — 색상·고정·보관 */
+export interface Memo {
+  id: number;
+  businessId: number;
+  title: string;
+  body: string;
+  color?: MemoColor | null;
+  /** 0/1 */
+  pinned: number;
+  sortOrder: number;
+  archivedAt?: Timestamp | null;
+  createdAt: Timestamp;
+}
+
 /** 산출물·문서 분류 폴더(최대 2단계). parentId 가 없으면 루트 폴더. */
 export interface Folder {
   id: number;
@@ -128,7 +154,7 @@ export interface SftpEntry {
   size: number;
 }
 
-export type SearchKind = "business" | "project" | "task" | "document" | "deliverable";
+export type SearchKind = "business" | "project" | "task" | "document" | "deliverable" | "memo";
 
 export interface SearchHit {
   kind: SearchKind;

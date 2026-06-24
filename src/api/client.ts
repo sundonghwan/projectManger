@@ -14,6 +14,8 @@ import type {
   Folder,
   FolderKind,
   Label,
+  Memo,
+  MemoColor,
   Priority,
   AuthType,
   Project,
@@ -149,6 +151,17 @@ export const api = {
     /** 복사 보관된 파일을 OS 기본 앱으로 연다. */
     open: (path: string) => openPath(path),
     archive: (id: number) => invoke<void>("deliverable_archive", { id }),
+  },
+  memo: {
+    list: (businessId: number) => invoke<Memo[]>("memo_list", { businessId }),
+    create: (businessId: number, title: string, body: string) =>
+      invoke<Memo>("memo_create", { input: { businessId, title, body } }),
+    update: (id: number, title: string, body: string) =>
+      invoke<Memo>("memo_update", { input: { id, title, body } }),
+    setColor: (id: number, color: MemoColor | null) =>
+      invoke<Memo>("memo_set_color", { id, color: color ?? null }),
+    setPinned: (id: number, pinned: boolean) => invoke<Memo>("memo_set_pinned", { id, pinned }),
+    archive: (id: number) => invoke<void>("memo_archive", { id }),
   },
   folder: {
     /** 사업의 모든(문서·산출물) 폴더. 프론트가 kind/parentId 로 분기. */

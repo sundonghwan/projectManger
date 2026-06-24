@@ -13,6 +13,7 @@ import { TaskList } from "./TaskList";
 import { DocumentsView } from "./DocumentsView";
 import { TaskEditor } from "./TaskEditor";
 import { DeliverablesView } from "./DeliverablesView";
+import { MemosView } from "./MemosView";
 import { ServerView } from "./ServerView";
 import { TimelineView } from "./TimelineView";
 import { AutomationModal } from "./AutomationModal";
@@ -24,6 +25,7 @@ export type ViewKind =
   | "timeline"
   | "doc"
   | "deliverables"
+  | "memo"
   | "ssh";
 
 const TABS: { key: ViewKind; label: string }[] = [
@@ -33,6 +35,7 @@ const TABS: { key: ViewKind; label: string }[] = [
   { key: "timeline", label: "타임라인" },
   { key: "doc", label: "문서" },
   { key: "deliverables", label: "산출물" },
+  { key: "memo", label: "메모" },
   { key: "ssh", label: "터미널" },
 ];
 
@@ -43,6 +46,7 @@ const VIEW_LABEL: Record<ViewKind, string> = {
   timeline: "타임라인",
   doc: "문서",
   deliverables: "산출물",
+  memo: "메모",
   ssh: "SSH 터미널",
 };
 
@@ -270,6 +274,8 @@ export function MainView({
             folders={folders.filter((f) => f.kind === "deliverable")}
             selectedFolderId={view === "deliverables" ? selectedFolderId : null}
           />
+        ) : view === "memo" ? (
+          <MemosView key={business.id} businessId={business.id} onChanged={onDataChanged} />
         ) : view === "ssh" ? null : (
           <div style={{ padding: "24px 28px", color: "var(--text2)" }}>
             <strong style={{ color: "var(--text)" }}>{VIEW_LABEL[view]}</strong> — 다음 단계에서 지원

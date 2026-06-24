@@ -1,7 +1,7 @@
 use crate::error::Result;
 use crate::models::{
     Block, Business, CommandSnippet, Deliverable, DeliverableVersion, Document, Folder, Label,
-    Project, RecurringTask, SearchHit, ServerConnection, Task, TaskLabel, Template, TrashItem,
+    Memo, Project, RecurringTask, SearchHit, ServerConnection, Task, TaskLabel, Template, TrashItem,
 };
 use crate::secrets;
 use crate::repo;
@@ -492,6 +492,60 @@ pub fn folder_rename(state: State<AppState>, id: i64, name: String) -> Result<Fo
 pub fn folder_delete(state: State<AppState>, id: i64) -> Result<()> {
     let conn = state.db.lock().unwrap();
     repo::folder::delete(&conn, id)
+}
+
+// ---- 메모(사업별 Keep식) ----
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoCreate {
+    pub business_id: i64,
+    pub title: String,
+    pub body: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoUpdate {
+    pub id: i64,
+    pub title: String,
+    pub body: String,
+}
+
+#[tauri::command]
+pub fn memo_list(state: State<AppState>, business_id: i64) -> Result<Vec<Memo>> {
+    let conn = state.db.lock().unwrap();
+    repo::memo::list_by_business(&conn, business_id)
+}
+
+#[tauri::command]
+pub fn memo_create(state: State<AppState>, input: MemoCreate) -> Result<Memo> {
+    let conn = state.db.lock().unwrap();
+    repo::memo::create(&conn, input.business_id, &input.title, &input.body)
+}
+
+#[tauri::command]
+pub fn memo_update(state: State<AppState>, input: MemoUpdate) -> Result<Memo> {
+    let conn = state.db.lock().unwrap();
+    repo::memo::update(&conn, input.id, &input.title, &input.body)
+}
+
+#[tauri::command]
+pub fn memo_set_color(state: State<AppState>, id: i64, color: Option<String>) -> Result<Memo> {
+    let conn = state.db.lock().unwrap();
+    repo::memo::set_color(&conn, id, color.as_deref())
+}
+
+#[tauri::command]
+pub fn memo_set_pinned(state: State<AppState>, id: i64, pinned: bool) -> Result<Memo> {
+    let conn = state.db.lock().unwrap();
+    repo::memo::set_pinned(&conn, id, pinned)
+}
+
+#[tauri::command]
+pub fn memo_archive(state: State<AppState>, id: i64) -> Result<()> {
+    let conn = state.db.lock().unwrap();
+    repo::memo::archive(&conn, id)
 }
 
 #[derive(Deserialize)]
