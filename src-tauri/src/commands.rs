@@ -805,6 +805,35 @@ pub fn trash_purge(state: State<AppState>, kind: String, id: i64) -> Result<()> 
 
 /// 전체 데이터를 JSON으로 내보낸다. path 미지정 시 앱 데이터 폴더의 backup.json.
 /// 저장한 경로를 반환.
+///
+/// 보안(CWE-22/73): 외부에서 임의 경로가 들어와도 앱 데이터 폴더 밖을 읽고/쓰지 못하도록
+/// 제한한다. 정상 흐름은 path=None(앱 데이터의 backup.json)이며, path가 주어지면 앱 데이터
+/// 폴더 하위인지 검증한다.
+fn resolve_backup_path(app: &tauri::AppHandle, path: Option<String>) -> Result<std::path::PathBuf> {
+    use crate::error::AppError;
+    use tauri::Manager;
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| AppError::Invalid(format!("앱 데이터 경로 오류: {e}")))?;
+    std::fs::create_dir_all(&dir).ok();
+    let base = std::fs::canonicalize(&dir).unwrap_or(dir);
+    match path {
+        None => Ok(base.join("backup.json")),
+        Some(p) => {
+            let target = std::path::PathBuf::from(&p);
+            let parent = target.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(&base);
+            let parent_canon = std::fs::canonicalize(parent)
+                .map_err(|_| AppError::Invalid("백업 경로가 유효하지 않습니다".into()))?;
+            if !parent_canon.starts_with(&base) {
+                return Err(AppError::Invalid("백업 경로는 앱 데이터 폴더 안이어야 합니다".into()));
+            }
+            let name = target.file_name().ok_or_else(|| AppError::Invalid("백업 파일명이 필요합니다".into()))?;
+            Ok(parent_canon.join(name))
+        }
+    }
+}
+
 #[tauri::command]
 pub fn export_json(
     app: tauri::AppHandle,
@@ -812,19 +841,8 @@ pub fn export_json(
     path: Option<String>,
 ) -> Result<String> {
     use crate::error::AppError;
-    use tauri::Manager;
 
-    let target = match path {
-        Some(p) => std::path::PathBuf::from(p),
-        None => {
-            let dir = app
-                .path()
-                .app_data_dir()
-                .map_err(|e| AppError::Invalid(format!("앱 데이터 경로 오류: {e}")))?;
-            std::fs::create_dir_all(&dir).ok();
-            dir.join("backup.json")
-        }
-    };
+    let target = resolve_backup_path(&app, path)?;
 
     let data = {
         let conn = state.db.lock().unwrap();
@@ -845,18 +863,8 @@ pub fn import_json(
     path: Option<String>,
 ) -> Result<()> {
     use crate::error::AppError;
-    use tauri::Manager;
 
-    let target = match path {
-        Some(p) => std::path::PathBuf::from(p),
-        None => {
-            let dir = app
-                .path()
-                .app_data_dir()
-                .map_err(|e| AppError::Invalid(format!("앱 데이터 경로 오류: {e}")))?;
-            dir.join("backup.json")
-        }
-    };
+    let target = resolve_backup_path(&app, path)?;
     let text = std::fs::read_to_string(&target)
         .map_err(|e| AppError::Invalid(format!("파일 읽기 실패: {e}")))?;
     let value: serde_json::Value =

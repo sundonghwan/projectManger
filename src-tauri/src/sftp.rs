@@ -63,10 +63,24 @@ pub fn build_sftp_args(server: &ServerConnection) -> Vec<String> {
     args
 }
 
+/// sftp batch 명령(`ls -l "<path>"`) 문맥 주입 방지(CWE-78 관련): 따옴표·백슬래시·개행·
+/// 기타 제어문자를 제거한다. '"' 만 막으면 '\' 로 인용 구조를 교란할 수 있어 '\\' 도 제거.
+/// 결과가 비면 "." 로 대체.
+pub fn sanitize_remote_path(path: &str) -> String {
+    let safe: String = path
+        .chars()
+        .filter(|c| *c != '"' && *c != '\\' && !c.is_control())
+        .collect();
+    if safe.trim().is_empty() {
+        ".".to_string()
+    } else {
+        safe
+    }
+}
+
 /// 원격 디렉터리 나열. (키 기반 인증 필요 — 실 서버 대상 검증 요)
 pub fn list(server: &ServerConnection, path: &str) -> Result<Vec<SftpEntry>> {
-    let safe = path.replace(['"', '\n', '\r'], "");
-    let safe = if safe.trim().is_empty() { ".".to_string() } else { safe };
+    let safe = sanitize_remote_path(path);
 
     let mut child = Command::new("sftp")
         .args(build_sftp_args(server))
@@ -147,6 +161,17 @@ mod tests {
         let out = "sftp> ls -l /home\ndrwxr-xr-x 2 u g 4096 Jun 20 10:00 docs\n-rw-r--r-- 1 u g 5 Jun 20 10:00 a.txt\n";
         let entries = parse_listing(out);
         assert_eq!(entries.len(), 2);
+    }
+
+    #[test]
+    fn sanitize_strips_quote_backslash_control_and_defaults() {
+        assert_eq!(sanitize_remote_path("/var/www"), "/var/www");
+        // 따옴표·백슬래시·개행 제거
+        assert_eq!(sanitize_remote_path("a\"b\\c\nd"), "abcd");
+        // 제어문자 제거
+        assert_eq!(sanitize_remote_path("x\u{7}y"), "xy");
+        // 빈/공백 → "."
+        assert_eq!(sanitize_remote_path("   "), ".");
     }
 
     #[test]
