@@ -36,6 +36,6 @@ pub fn delete(ref_key: &str) -> Result<()> {
 }
 
 /// 서버 연결 id로 결정적 참조 키 생성.
-pub fn ref_for_server(server_id: i64) -> String {
+pub fn ref_for_server(server_id: &str) -> String {
     format!("ssh/conn-{server_id}")
 }

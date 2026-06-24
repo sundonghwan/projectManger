@@ -1,7 +1,7 @@
 // SFTP 파일 브라우징 — 시스템 sftp 를 배치 모드로 실행해 디렉터리를 나열.
 // 키 기반(BatchMode) 인증 전제. ls -l 출력 파싱이 핵심 로직(테스트 대상).
 use crate::error::{AppError, Result};
-use crate::models::ServerConnection;
+use crate::store::model::Server;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::process::{Command, Stdio};
@@ -42,7 +42,7 @@ pub fn parse_listing(out: &str) -> Vec<SftpEntry> {
     out.lines().filter_map(parse_ls_line).collect()
 }
 
-pub fn build_sftp_args(server: &ServerConnection, known_hosts: Option<&str>) -> Vec<String> {
+pub fn build_sftp_args(server: &Server, known_hosts: Option<&str>) -> Vec<String> {
     let mut args = vec![
         "-b".to_string(),
         "-".to_string(),
@@ -83,7 +83,7 @@ pub fn sanitize_remote_path(path: &str) -> String {
 }
 
 /// 원격 디렉터리 나열. (키 기반 인증 필요 — 실 서버 대상 검증 요)
-pub fn list(server: &ServerConnection, path: &str, known_hosts: Option<&str>) -> Result<Vec<SftpEntry>> {
+pub fn list(server: &Server, path: &str, known_hosts: Option<&str>) -> Result<Vec<SftpEntry>> {
     let safe = sanitize_remote_path(path);
 
     let mut child = Command::new("sftp")
@@ -117,10 +117,10 @@ pub fn list(server: &ServerConnection, path: &str, known_hosts: Option<&str>) ->
 mod tests {
     use super::*;
 
-    fn server() -> ServerConnection {
-        ServerConnection {
-            id: 1,
-            business_id: 1,
+    fn server() -> Server {
+        Server {
+            id: "1".into(),
+            business_id: "b1".into(),
             project_id: None,
             name: "s".into(),
             host: "h".into(),
@@ -131,6 +131,8 @@ mod tests {
             secret_ref: None,
             last_used_at: None,
             archived_at: None,
+            created_at: "2026-01-01T00:00:00.000Z".into(),
+            updated_at: "2026-01-01T00:00:00.000Z".into(),
         }
     }
 

@@ -1,7 +1,7 @@
 // SSH 터미널 — 시스템 ssh 를 PTY로 실행하고 입출력을 프론트(xterm.js)와 스트리밍.
 // 키 기반 인증을 기본으로 하고, 비밀번호 인증은 OS 키체인의 값을 사용한다.
 use crate::error::{AppError, Result};
-use crate::models::ServerConnection;
+use crate::store::model::Server;
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use std::collections::HashMap;
 use std::io::{Read, Write};
@@ -12,7 +12,7 @@ use tauri::{AppHandle, Emitter};
 /// 보안(CWE-295): 호스트 키를 엄격 검증(`StrictHostKeyChecking=yes`)하고, 앱 전용
 /// known_hosts 파일을 사용한다. 처음 보는 호스트는 상위 계층(지문 확인 UI)에서 먼저
 /// 신뢰 등록한 뒤 접속하므로, 여기서 `yes` 로 두어도 정상 접속된다.
-pub fn build_ssh_args(server: &ServerConnection, known_hosts: Option<&str>) -> Vec<String> {
+pub fn build_ssh_args(server: &Server, known_hosts: Option<&str>) -> Vec<String> {
     let mut args = vec![
         "-tt".to_string(),
         "-p".to_string(),
@@ -41,10 +41,10 @@ struct Session {
 
 #[derive(Default)]
 pub struct TerminalManager {
-    sessions: Mutex<HashMap<i64, Session>>,
+    sessions: Mutex<HashMap<String, Session>>,
 }
 
-pub fn connect(app: &AppHandle, manager: &TerminalManager, server: &ServerConnection) -> Result<()> {
+pub fn connect(app: &AppHandle, manager: &TerminalManager, server: &Server) -> Result<()> {
     let pty = native_pty_system();
     let pair = pty
         .openpty(PtySize { rows: 24, cols: 80, pixel_width: 0, pixel_height: 0 })
@@ -71,7 +71,8 @@ pub fn connect(app: &AppHandle, manager: &TerminalManager, server: &ServerConnec
         .take_writer()
         .map_err(|e| AppError::Invalid(format!("PTY 라이터 오류: {e}")))?;
 
-    let id = server.id;
+    let id = server.id.clone();
+    let id2 = id.clone();
     let app2 = app.clone();
     std::thread::spawn(move || {
         let mut buf = [0u8; 4096];
@@ -80,13 +81,13 @@ pub fn connect(app: &AppHandle, manager: &TerminalManager, server: &ServerConnec
                 Ok(0) => break,
                 Ok(n) => {
                     let chunk = String::from_utf8_lossy(&buf[..n]).to_string();
-                    let _ = app2.emit(&format!("terminal://data/{id}"), chunk);
+                    let _ = app2.emit(&format!("terminal://data/{id2}"), chunk);
                 }
                 Err(_) => break,
             }
         }
         let _ = child.wait();
-        let _ = app2.emit(&format!("terminal://exit/{id}"), ());
+        let _ = app2.emit(&format!("terminal://exit/{id2}"), ());
     });
 
     manager
@@ -97,9 +98,9 @@ pub fn connect(app: &AppHandle, manager: &TerminalManager, server: &ServerConnec
     Ok(())
 }
 
-pub fn write(manager: &TerminalManager, id: i64, data: &str) -> Result<()> {
+pub fn write(manager: &TerminalManager, id: &str, data: &str) -> Result<()> {
     let mut sessions = manager.sessions.lock().unwrap();
-    let s = sessions.get_mut(&id).ok_or(AppError::NotFound)?;
+    let s = sessions.get_mut(id).ok_or(AppError::NotFound)?;
     s.writer
         .write_all(data.as_bytes())
         .map_err(|e| AppError::Invalid(format!("쓰기 실패: {e}")))?;
@@ -107,16 +108,16 @@ pub fn write(manager: &TerminalManager, id: i64, data: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn resize(manager: &TerminalManager, id: i64, rows: u16, cols: u16) -> Result<()> {
+pub fn resize(manager: &TerminalManager, id: &str, rows: u16, cols: u16) -> Result<()> {
     let sessions = manager.sessions.lock().unwrap();
-    let s = sessions.get(&id).ok_or(AppError::NotFound)?;
+    let s = sessions.get(id).ok_or(AppError::NotFound)?;
     s.master
         .resize(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
         .map_err(|e| AppError::Invalid(format!("리사이즈 실패: {e}")))
 }
 
-pub fn disconnect(manager: &TerminalManager, id: i64) -> Result<()> {
-    manager.sessions.lock().unwrap().remove(&id);
+pub fn disconnect(manager: &TerminalManager, id: &str) -> Result<()> {
+    manager.sessions.lock().unwrap().remove(id);
     Ok(())
 }
 
@@ -124,10 +125,10 @@ pub fn disconnect(manager: &TerminalManager, id: i64) -> Result<()> {
 mod tests {
     use super::*;
 
-    fn server() -> ServerConnection {
-        ServerConnection {
-            id: 1,
-            business_id: 1,
+    fn server() -> Server {
+        Server {
+            id: "1".into(),
+            business_id: "b1".into(),
             project_id: None,
             name: "s".into(),
             host: "example.com".into(),
@@ -138,6 +139,8 @@ mod tests {
             secret_ref: None,
             last_used_at: None,
             archived_at: None,
+            created_at: "2026-01-01T00:00:00.000Z".into(),
+            updated_at: "2026-01-01T00:00:00.000Z".into(),
         }
     }
 

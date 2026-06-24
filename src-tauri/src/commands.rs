@@ -1,24 +1,21 @@
 use crate::error::Result;
-use crate::models::{CommandSnippet, ServerConnection};
 use crate::secrets;
-use crate::repo;
 use crate::store::model::{
     Block, Business, Deliverable, DeliverableVersion, Document, Folder, Label, Memo, Project,
-    RecurringTask, Task, Template,
+    RecurringTask, Server, Snippet, Task, Template,
 };
 use crate::store::ops;
 use crate::store::ops::label::TaskLabelView;
 use crate::store::ops::search::SearchHit;
 use crate::store::ops::trash::TrashItem;
-use rusqlite::Connection;
 use serde::Deserialize;
 use std::sync::Mutex;
 use tauri::State;
 
-/// 앱 전역 상태 — SSH/백업용 SQLite 연결과, vault 데이터용 파일 Store.
+/// 앱 전역 상태 — vault 데이터용 파일 Store와, SSH 등 로컬 전용 LocalStore.
 pub struct AppState {
-    pub db: Mutex<Connection>,
     pub store: Mutex<crate::store::Store>,
+    pub local: Mutex<crate::store::local::LocalStore>,
 }
 
 #[derive(Deserialize)]
@@ -562,8 +559,8 @@ pub fn memo_archive(state: State<AppState>, id: String) -> Result<()> {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerCreate {
-    pub business_id: i64,
-    pub project_id: Option<i64>,
+    pub business_id: String,
+    pub project_id: Option<String>,
     pub name: String,
     pub host: String,
     pub port: i64,
@@ -575,7 +572,7 @@ pub struct ServerCreate {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerUpdate {
-    pub id: i64,
+    pub id: String,
     pub name: String,
     pub host: String,
     pub port: i64,
@@ -585,18 +582,18 @@ pub struct ServerUpdate {
 }
 
 #[tauri::command]
-pub fn server_list(state: State<AppState>, business_id: i64) -> Result<Vec<ServerConnection>> {
-    let conn = state.db.lock().unwrap();
-    repo::server::list_by_business(&conn, business_id)
+pub fn server_list(state: State<AppState>, business_id: String) -> Result<Vec<Server>> {
+    let local = state.local.lock().unwrap();
+    ops::server::list_by_business(&local, &business_id)
 }
 
 #[tauri::command]
-pub fn server_create(state: State<AppState>, input: ServerCreate) -> Result<ServerConnection> {
-    let conn = state.db.lock().unwrap();
-    repo::server::create(
-        &conn,
-        input.business_id,
-        input.project_id,
+pub fn server_create(state: State<AppState>, input: ServerCreate) -> Result<Server> {
+    let mut local = state.local.lock().unwrap();
+    ops::server::create(
+        &mut local,
+        &input.business_id,
+        input.project_id.as_deref(),
         &input.name,
         &input.host,
         input.port,
@@ -607,11 +604,11 @@ pub fn server_create(state: State<AppState>, input: ServerCreate) -> Result<Serv
 }
 
 #[tauri::command]
-pub fn server_update(state: State<AppState>, input: ServerUpdate) -> Result<ServerConnection> {
-    let conn = state.db.lock().unwrap();
-    repo::server::update(
-        &conn,
-        input.id,
+pub fn server_update(state: State<AppState>, input: ServerUpdate) -> Result<Server> {
+    let mut local = state.local.lock().unwrap();
+    ops::server::update(
+        &mut local,
+        &input.id,
         &input.name,
         &input.host,
         input.port,
@@ -622,61 +619,61 @@ pub fn server_update(state: State<AppState>, input: ServerUpdate) -> Result<Serv
 }
 
 #[tauri::command]
-pub fn server_archive(state: State<AppState>, id: i64) -> Result<()> {
-    let conn = state.db.lock().unwrap();
+pub fn server_archive(state: State<AppState>, id: String) -> Result<()> {
     // 보관 시 키체인 시크릿도 제거
-    let _ = secrets::delete(&secrets::ref_for_server(id));
-    repo::server::archive(&conn, id)
+    let _ = secrets::delete(&secrets::ref_for_server(&id));
+    let mut local = state.local.lock().unwrap();
+    ops::server::archive(&mut local, &id)
 }
 
-/// 서버 비밀값(비밀번호/패스프레이즈)을 OS 키체인에 저장. DB엔 참조 키만 기록.
+/// 서버 비밀값(비밀번호/패스프레이즈)을 OS 키체인에 저장. LocalStore엔 참조 키만 기록.
 #[tauri::command]
-pub fn server_set_secret(state: State<AppState>, id: i64, secret: String) -> Result<()> {
-    let secret_ref = secrets::ref_for_server(id);
-    secrets::set(&secret_ref, &secret)?;
-    let conn = state.db.lock().unwrap();
-    repo::server::set_secret_ref(&conn, id, Some(&secret_ref))
+pub fn server_set_secret(state: State<AppState>, id: String, secret: String) -> Result<()> {
+    let r = secrets::ref_for_server(&id);
+    secrets::set(&r, &secret)?;
+    let mut local = state.local.lock().unwrap();
+    ops::server::set_secret_ref(&mut local, &id, Some(&r))
 }
 
 /// 키체인에 저장된 비밀값 제거 + 참조 해제.
 #[tauri::command]
-pub fn server_clear_secret(state: State<AppState>, id: i64) -> Result<()> {
-    secrets::delete(&secrets::ref_for_server(id))?;
-    let conn = state.db.lock().unwrap();
-    repo::server::set_secret_ref(&conn, id, None)
+pub fn server_clear_secret(state: State<AppState>, id: String) -> Result<()> {
+    secrets::delete(&secrets::ref_for_server(&id))?;
+    let mut local = state.local.lock().unwrap();
+    ops::server::set_secret_ref(&mut local, &id, None)
 }
 
 /// 비밀값 저장 여부(참조 키 존재).
 #[tauri::command]
-pub fn server_has_secret(state: State<AppState>, id: i64) -> Result<bool> {
-    let conn = state.db.lock().unwrap();
-    Ok(repo::server::get(&conn, id)?.secret_ref.is_some())
+pub fn server_has_secret(state: State<AppState>, id: String) -> Result<bool> {
+    let local = state.local.lock().unwrap();
+    Ok(ops::server::get(&local, &id)?.secret_ref.is_some())
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SnippetCreate {
-    pub server_id: i64,
+    pub server_id: String,
     pub name: String,
     pub command: String,
 }
 
 #[tauri::command]
-pub fn snippet_list(state: State<AppState>, server_id: i64) -> Result<Vec<CommandSnippet>> {
-    let conn = state.db.lock().unwrap();
-    repo::snippet::list_by_server(&conn, server_id)
+pub fn snippet_list(state: State<AppState>, server_id: String) -> Result<Vec<Snippet>> {
+    let local = state.local.lock().unwrap();
+    ops::snippet::list_by_server(&local, &server_id)
 }
 
 #[tauri::command]
-pub fn snippet_create(state: State<AppState>, input: SnippetCreate) -> Result<CommandSnippet> {
-    let conn = state.db.lock().unwrap();
-    repo::snippet::create(&conn, input.server_id, &input.name, &input.command)
+pub fn snippet_create(state: State<AppState>, input: SnippetCreate) -> Result<Snippet> {
+    let mut local = state.local.lock().unwrap();
+    ops::snippet::create(&mut local, &input.server_id, &input.name, &input.command)
 }
 
 #[tauri::command]
-pub fn snippet_delete(state: State<AppState>, id: i64) -> Result<()> {
-    let conn = state.db.lock().unwrap();
-    repo::snippet::delete(&conn, id)
+pub fn snippet_delete(state: State<AppState>, id: String) -> Result<()> {
+    let mut local = state.local.lock().unwrap();
+    ops::snippet::delete(&mut local, &id)
 }
 
 // ---- SSH 터미널 ----
@@ -686,36 +683,36 @@ pub fn ssh_connect(
     app: tauri::AppHandle,
     state: State<AppState>,
     term: State<crate::terminal::TerminalManager>,
-    id: i64,
+    id: String,
 ) -> Result<()> {
     let server = {
-        let conn = state.db.lock().unwrap();
-        repo::server::get(&conn, id)?
+        let local = state.local.lock().unwrap();
+        ops::server::get(&local, &id)?
     };
     crate::terminal::connect(&app, &term, &server)?;
-    let conn = state.db.lock().unwrap();
-    let _ = repo::server::touch_last_used(&conn, id);
+    let mut local = state.local.lock().unwrap();
+    let _ = ops::server::touch_last_used(&mut local, &id);
     Ok(())
 }
 
 #[tauri::command]
-pub fn ssh_write(term: State<crate::terminal::TerminalManager>, id: i64, data: String) -> Result<()> {
-    crate::terminal::write(&term, id, &data)
+pub fn ssh_write(term: State<crate::terminal::TerminalManager>, id: String, data: String) -> Result<()> {
+    crate::terminal::write(&term, &id, &data)
 }
 
 #[tauri::command]
 pub fn ssh_resize(
     term: State<crate::terminal::TerminalManager>,
-    id: i64,
+    id: String,
     rows: u16,
     cols: u16,
 ) -> Result<()> {
-    crate::terminal::resize(&term, id, rows, cols)
+    crate::terminal::resize(&term, &id, rows, cols)
 }
 
 #[tauri::command]
-pub fn ssh_disconnect(term: State<crate::terminal::TerminalManager>, id: i64) -> Result<()> {
-    crate::terminal::disconnect(&term, id)
+pub fn ssh_disconnect(term: State<crate::terminal::TerminalManager>, id: String) -> Result<()> {
+    crate::terminal::disconnect(&term, &id)
 }
 
 /// SFTP 디렉터리 나열 (키 기반 인증).
@@ -723,12 +720,12 @@ pub fn ssh_disconnect(term: State<crate::terminal::TerminalManager>, id: i64) ->
 pub fn sftp_list(
     app: tauri::AppHandle,
     state: State<AppState>,
-    id: i64,
+    id: String,
     path: String,
 ) -> Result<Vec<crate::sftp::SftpEntry>> {
     let server = {
-        let conn = state.db.lock().unwrap();
-        repo::server::get(&conn, id)?
+        let local = state.local.lock().unwrap();
+        ops::server::get(&local, &id)?
     };
     let kh = crate::hostkey::known_hosts_path(&app).map(|p| p.to_string_lossy().to_string());
     crate::sftp::list(&server, &path, kh.as_deref())
@@ -745,10 +742,10 @@ pub struct HostScanResult {
 
 /// 해당 서버 호스트가 이미 신뢰(known_hosts 등록)되어 있는지.
 #[tauri::command]
-pub fn ssh_host_status(app: tauri::AppHandle, state: State<AppState>, id: i64) -> Result<bool> {
+pub fn ssh_host_status(app: tauri::AppHandle, state: State<AppState>, id: String) -> Result<bool> {
     let server = {
-        let conn = state.db.lock().unwrap();
-        repo::server::get(&conn, id)?
+        let local = state.local.lock().unwrap();
+        ops::server::get(&local, &id)?
     };
     let kh = crate::hostkey::known_hosts_path(&app)
         .ok_or_else(|| crate::error::AppError::Invalid("앱 데이터 경로 오류".into()))?;
@@ -757,10 +754,10 @@ pub fn ssh_host_status(app: tauri::AppHandle, state: State<AppState>, id: i64) -
 
 /// ssh-keyscan 으로 호스트 공개키·지문을 가져온다(아직 신뢰하지 않음). 사용자 확인용.
 #[tauri::command]
-pub fn ssh_scan_host(state: State<AppState>, id: i64) -> Result<HostScanResult> {
+pub fn ssh_scan_host(state: State<AppState>, id: String) -> Result<HostScanResult> {
     let server = {
-        let conn = state.db.lock().unwrap();
-        repo::server::get(&conn, id)?
+        let local = state.local.lock().unwrap();
+        ops::server::get(&local, &id)?
     };
     let (fingerprint, key_lines) = crate::hostkey::scan(&server.host, server.port)?;
     Ok(HostScanResult { fingerprint, key_lines })
@@ -909,72 +906,3 @@ pub fn trash_purge(state: State<AppState>, kind: String, id: String) -> Result<(
     Ok(())
 }
 
-/// 전체 데이터를 JSON으로 내보낸다. path 미지정 시 앱 데이터 폴더의 backup.json.
-/// 저장한 경로를 반환.
-///
-/// 보안(CWE-22/73): 외부에서 임의 경로가 들어와도 앱 데이터 폴더 밖을 읽고/쓰지 못하도록
-/// 제한한다. 정상 흐름은 path=None(앱 데이터의 backup.json)이며, path가 주어지면 앱 데이터
-/// 폴더 하위인지 검증한다.
-fn resolve_backup_path(app: &tauri::AppHandle, path: Option<String>) -> Result<std::path::PathBuf> {
-    use crate::error::AppError;
-    use tauri::Manager;
-    let dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| AppError::Invalid(format!("앱 데이터 경로 오류: {e}")))?;
-    std::fs::create_dir_all(&dir).ok();
-    let base = std::fs::canonicalize(&dir).unwrap_or(dir);
-    match path {
-        None => Ok(base.join("backup.json")),
-        Some(p) => {
-            let target = std::path::PathBuf::from(&p);
-            let parent = target.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(&base);
-            let parent_canon = std::fs::canonicalize(parent)
-                .map_err(|_| AppError::Invalid("백업 경로가 유효하지 않습니다".into()))?;
-            if !parent_canon.starts_with(&base) {
-                return Err(AppError::Invalid("백업 경로는 앱 데이터 폴더 안이어야 합니다".into()));
-            }
-            let name = target.file_name().ok_or_else(|| AppError::Invalid("백업 파일명이 필요합니다".into()))?;
-            Ok(parent_canon.join(name))
-        }
-    }
-}
-
-#[tauri::command]
-pub fn export_json(
-    app: tauri::AppHandle,
-    state: State<AppState>,
-    path: Option<String>,
-) -> Result<String> {
-    use crate::error::AppError;
-
-    let target = resolve_backup_path(&app, path)?;
-
-    let data = {
-        let conn = state.db.lock().unwrap();
-        crate::export::export_data(&conn)?
-    };
-    let pretty =
-        serde_json::to_string_pretty(&data).map_err(|e| AppError::Invalid(e.to_string()))?;
-    std::fs::write(&target, pretty.as_bytes())
-        .map_err(|e| AppError::Invalid(format!("파일 쓰기 실패: {e}")))?;
-    Ok(target.to_string_lossy().to_string())
-}
-
-/// JSON 백업 파일을 현재 DB에 추가 가져오기. path 미지정 시 앱 데이터 폴더의 backup.json.
-#[tauri::command]
-pub fn import_json(
-    app: tauri::AppHandle,
-    state: State<AppState>,
-    path: Option<String>,
-) -> Result<()> {
-    use crate::error::AppError;
-
-    let target = resolve_backup_path(&app, path)?;
-    let text = std::fs::read_to_string(&target)
-        .map_err(|e| AppError::Invalid(format!("파일 읽기 실패: {e}")))?;
-    let value: serde_json::Value =
-        serde_json::from_str(&text).map_err(|e| AppError::Invalid(format!("JSON 파싱 실패: {e}")))?;
-    let conn = state.db.lock().unwrap();
-    crate::export::import_data(&conn, &value)
-}
