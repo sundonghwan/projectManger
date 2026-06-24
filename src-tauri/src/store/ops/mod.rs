@@ -7,3 +7,4 @@ pub mod document;
 pub mod deliverable;
 pub mod label;
 pub mod memo;
+pub mod template;
