@@ -23,23 +23,25 @@ impl<T: Entity> Collection<T> {
         self.dir.join(format!("{id}.json"))
     }
 
-    /// 디스크에서 전량 로드(인메모리 초기화). 손상된 파일은 건너뛴다.
+    /// 디스크에서 전량 로드. 손상되거나 읽을 수 없는 항목은 건너뛴다.
+    /// 로컬 맵에 모은 뒤 성공 시에만 교체하므로, 디렉터리 읽기 실패 시
+    /// 기존 인메모리 데이터를 잃지 않는다.
     pub fn load(&mut self) -> Result<()> {
-        self.items.clear();
-        if !self.dir.exists() {
-            return Ok(());
-        }
-        let rd = std::fs::read_dir(&self.dir)
-            .map_err(|_| AppError::Invalid("디렉터리 읽기에 실패했습니다".into()))?;
-        for entry in rd {
-            let entry = entry.map_err(|_| AppError::Invalid("디렉터리 항목 읽기에 실패했습니다".into()))?;
-            let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) == Some("json") {
-                if let Ok(item) = io::read_json::<T>(&path) {
-                    self.items.insert(item.id().to_string(), item);
+        let mut loaded: HashMap<String, T> = HashMap::new();
+        if self.dir.exists() {
+            let rd = std::fs::read_dir(&self.dir)
+                .map_err(|_| AppError::Invalid("디렉터리 읽기에 실패했습니다".into()))?;
+            for entry in rd {
+                let Ok(entry) = entry else { continue };
+                let path = entry.path();
+                if path.extension().and_then(|e| e.to_str()) == Some("json") {
+                    if let Ok(item) = io::read_json::<T>(&path) {
+                        loaded.insert(item.id().to_string(), item);
+                    }
                 }
             }
         }
+        self.items = loaded;
         Ok(())
     }
 
