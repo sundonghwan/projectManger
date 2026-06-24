@@ -10,3 +10,4 @@ pub mod memo;
 pub mod template;
 pub mod recurring;
 pub mod search;
+pub mod trash;
