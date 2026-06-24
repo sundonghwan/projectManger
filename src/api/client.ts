@@ -246,6 +246,12 @@ export const api = {
     restore: (kind: SearchKind, id: string) => invoke<void>("trash_restore", { kind, id }),
     purge: (kind: SearchKind, id: string) => invoke<void>("trash_purge", { kind, id }),
   },
+  vault: {
+    /** 현재 vault 폴더(null = 기본 위치). */
+    path: () => invoke<string | null>("vault_path"),
+    /** vault 폴더 지정 후 Store 재오픈. */
+    set: (path: string) => invoke<void>("vault_set", { path }),
+  },
 };
 
 export interface DocumentCreateInput {

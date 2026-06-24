@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { api } from "../api/client";
 import type { Business, Folder, Project, TrashItem } from "../domain/types";
 import { TrashPanel } from "./TrashPanel";
@@ -17,6 +17,7 @@ import { MemosView } from "./MemosView";
 import { ServerView } from "./ServerView";
 import { TimelineView } from "./TimelineView";
 import { AutomationModal } from "./AutomationModal";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 
 export type ViewKind =
   | "dashboard"
@@ -98,6 +99,22 @@ export function MainView({
   const [trashOpen, setTrashOpen] = useState(false);
   const [trashItems, setTrashItems] = useState<TrashItem[]>([]);
   const [automationOpen, setAutomationOpen] = useState(false);
+  const [vaultPath, setVaultPath] = useState<string | null>(null);
+  const [vaultPopover, setVaultPopover] = useState(false);
+  const vaultBtnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    api.vault.path().then(setVaultPath).catch(() => {});
+  }, []);
+
+  const changeVault = async () => {
+    const picked = await openDialog({ directory: true, multiple: false, title: "Vault 폴더 선택" });
+    if (typeof picked === "string") {
+      await api.vault.set(picked);
+      setVaultPath(picked);
+      window.location.reload();
+    }
+  };
   const editingTask = tasks.find((t) => t.id === editingTaskId) ?? null;
   const shownError = error ?? taskError;
 
@@ -166,6 +183,33 @@ export function MainView({
               <Icon name="settings" size={16} />
             </button>
           )}
+          <div style={{ position: "relative" }}>
+            <button
+              ref={vaultBtnRef}
+              onClick={() => setVaultPopover((v) => !v)}
+              style={iconBtn}
+              aria-label="Vault 설정"
+              title="Vault 폴더 설정"
+            >
+              <Icon name="folder" size={16} />
+            </button>
+            {vaultPopover && (
+              <div style={vaultPopoverStyle}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>
+                  Vault 폴더
+                </div>
+                <div style={{ fontSize: 11, color: "var(--text2)", wordBreak: "break-all", marginBottom: 8 }}>
+                  {vaultPath ?? "기본 위치(appData)"}
+                </div>
+                <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 10, lineHeight: 1.5 }}>
+                  iCloud Drive / Dropbox 등 동기화 폴더에 두면<br />여러 기기에서 동기화됩니다.
+                </div>
+                <button onClick={() => { setVaultPopover(false); void changeVault(); }} style={vaultChangeBtn}>
+                  Vault 변경
+                </button>
+              </div>
+            )}
+          </div>
           <button onClick={() => void openTrash()} style={iconBtn} aria-label="휴지통" title="휴지통">
             <Icon name="trash" size={16} />
           </button>
@@ -354,4 +398,26 @@ const errorBar: React.CSSProperties = {
   background: "rgba(239,68,68,.1)",
   color: "#ef4444",
   fontSize: 13,
+};
+const vaultPopoverStyle: React.CSSProperties = {
+  position: "absolute",
+  top: "calc(100% + 6px)",
+  right: 0,
+  width: 240,
+  padding: "12px 14px",
+  background: "var(--bg)",
+  border: "1px solid var(--border)",
+  borderRadius: "var(--radius-md)",
+  boxShadow: "0 4px 16px rgba(0,0,0,.12)",
+  zIndex: 100,
+};
+const vaultChangeBtn: React.CSSProperties = {
+  width: "100%",
+  padding: "5px 10px",
+  fontSize: 12,
+  border: "1px solid var(--border)",
+  background: "var(--bg)",
+  color: "var(--text2)",
+  borderRadius: "var(--radius-md)",
+  cursor: "pointer",
 };
