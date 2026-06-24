@@ -252,6 +252,49 @@ impl Entity for Deliverable {
     fn updated_at(&self) -> &str { &self.updated_at }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Server {
+    pub id: String,
+    pub business_id: String,
+    pub project_id: Option<String>,
+    pub name: String,
+    pub host: String,
+    pub port: i64,
+    pub username: String,
+    pub auth_type: String,
+    pub key_path: Option<String>,
+    pub secret_ref: Option<String>,
+    pub last_used_at: Option<String>,
+    pub archived_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl Entity for Server {
+    fn collection() -> &'static str { "servers" }
+    fn id(&self) -> &str { &self.id }
+    fn updated_at(&self) -> &str { &self.updated_at }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Snippet {
+    pub id: String,
+    pub server_id: String,
+    pub name: String,
+    pub command: String,
+    pub sort_order: f64,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl Entity for Snippet {
+    fn collection() -> &'static str { "snippets" }
+    fn id(&self) -> &str { &self.id }
+    fn updated_at(&self) -> &str { &self.updated_at }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -398,5 +441,31 @@ mod tests {
         let back: Deliverable = serde_json::from_value(v).unwrap();
         assert_eq!(back.versions.len(), 1);
         assert_eq!(back.document_id, None);
+    }
+
+    #[test]
+    fn server_and_snippet_metadata_and_roundtrip() {
+        assert_eq!(Server::collection(), "servers");
+        assert_eq!(Snippet::collection(), "snippets");
+        let s = Server {
+            id: "s1".into(), business_id: "b1".into(), project_id: None, name: "스테이징".into(),
+            host: "10.0.0.5".into(), port: 22, username: "deploy".into(), auth_type: "key".into(),
+            key_path: Some("/home/u/.ssh/id".into()), secret_ref: None, last_used_at: None,
+            archived_at: None, created_at: "2026-01-01T00:00:00.000Z".into(),
+            updated_at: "2026-01-02T00:00:00.000Z".into(),
+        };
+        let v = serde_json::to_value(&s).unwrap();
+        assert_eq!(v["businessId"], "b1");
+        assert_eq!(v["authType"], "key");
+        assert!(v["projectId"].is_null());
+        assert_eq!(s.id(), "s1");
+        let sn = Snippet {
+            id: "n1".into(), server_id: "s1".into(), name: "배포".into(), command: "./d.sh".into(),
+            sort_order: 1.0, created_at: "2026-01-01T00:00:00.000Z".into(),
+            updated_at: "2026-01-01T00:00:00.000Z".into(),
+        };
+        let vn = serde_json::to_value(&sn).unwrap();
+        assert_eq!(vn["serverId"], "s1");
+        assert_eq!(sn.id(), "n1");
     }
 }

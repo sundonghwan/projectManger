@@ -4,6 +4,7 @@ pub mod entity;
 pub mod collection;
 pub mod model;
 pub mod ops;
+pub mod local;
 
 use crate::error::Result;
 use crate::store::collection::Collection;
