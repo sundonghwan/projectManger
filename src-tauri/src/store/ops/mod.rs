@@ -8,3 +8,4 @@ pub mod deliverable;
 pub mod label;
 pub mod memo;
 pub mod template;
+pub mod recurring;
