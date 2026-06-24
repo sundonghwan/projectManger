@@ -19,7 +19,8 @@ pub fn run() {
             let dir = app.path().app_data_dir().expect("app_data_dir 를 찾을 수 없음");
             std::fs::create_dir_all(&dir).ok();
             let store_root = config::store_root(&dir);
-            let store = store::Store::open(store_root).expect("Store 초기화 실패");
+            let store = store::Store::open(store_root)
+                .unwrap_or_else(|_| store::Store::open(dir.join(".projectManger")).expect("기본 Store 초기화 실패"));
             let local_root = dir.join("local");
             let local = store::local::LocalStore::open(local_root).expect("LocalStore 초기화 실패");
             app.manage(commands::AppState {

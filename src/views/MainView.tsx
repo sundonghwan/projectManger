@@ -108,11 +108,14 @@ export function MainView({
   }, []);
 
   const changeVault = async () => {
-    const picked = await openDialog({ directory: true, multiple: false, title: "Vault 폴더 선택" });
-    if (typeof picked === "string") {
-      await api.vault.set(picked);
-      setVaultPath(picked);
-      window.location.reload();
+    try {
+      const picked = await openDialog({ directory: true, multiple: false, title: "Vault 폴더 선택" });
+      if (typeof picked === "string") {
+        await api.vault.set(picked);
+        window.location.reload();
+      }
+    } catch (e) {
+      alert(`Vault 변경 실패: ${e}`);
     }
   };
   const editingTask = tasks.find((t) => t.id === editingTaskId) ?? null;

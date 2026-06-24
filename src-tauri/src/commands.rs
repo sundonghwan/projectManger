@@ -929,10 +929,22 @@ pub fn vault_set(app: tauri::AppHandle, state: State<AppState>, path: String) ->
     if trimmed.is_empty() {
         return Err(crate::error::AppError::Invalid("vault 경로가 비어 있습니다".into()));
     }
+    if !std::path::Path::new(trimmed).is_dir() {
+        return Err(crate::error::AppError::Invalid("선택한 vault 폴더가 존재하지 않습니다".into()));
+    }
+    let prev = crate::config::read_vault_path(&dir);
     crate::config::write_vault_path(&dir, Some(trimmed))?;
     let new_root = crate::config::store_root(&dir);
-    let new_store = crate::store::Store::open(new_root)?;
-    *state.store.lock().unwrap() = new_store;
-    Ok(())
+    match crate::store::Store::open(new_root) {
+        Ok(new_store) => {
+            *state.store.lock().unwrap() = new_store;
+            Ok(())
+        }
+        Err(e) => {
+            // 롤백: 이전 vault 설정 복원
+            let _ = crate::config::write_vault_path(&dir, prev.as_deref());
+            Err(e)
+        }
+    }
 }
 
