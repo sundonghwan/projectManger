@@ -36,7 +36,16 @@ impl<T: Entity> Collection<T> {
                 let path = entry.path();
                 if path.extension().and_then(|e| e.to_str()) == Some("json") {
                     if let Ok(item) = io::read_json::<T>(&path) {
-                        loaded.insert(item.id().to_string(), item);
+                        let id = item.id().to_string();
+                        // 같은 id를 가진 파일이 둘 이상이면(동기화 제공자가 만든 충돌
+                        // 복사본 예: `<id> 2.json`), updated_at 이 더 최신인 것을 결정적으로
+                        // 유지한다(LWW). 동률이면 먼저 본 것 유지. read_dir 순서에 의존하지 않음.
+                        match loaded.get(&id) {
+                            Some(existing) if existing.updated_at() >= item.updated_at() => {}
+                            _ => {
+                                loaded.insert(id, item);
+                            }
+                        }
                     }
                 }
             }
@@ -149,5 +158,28 @@ mod tests {
         let mut c: Collection<Widget> = Collection::new(&root);
         assert!(c.load().is_ok());
         assert_eq!(c.len(), 0);
+    }
+
+    #[test]
+    fn load_resolves_duplicate_id_by_lww() {
+        // 동기화 충돌 복사본 모사: 같은 id "x"를 가진 두 파일, updated_at 다름.
+        let root = tmp_root();
+        let dir = root.join("widgets");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("x.json"),
+            r#"{"id":"x","name":"old","updated_at":"2026-01-01T00:00:00.000Z"}"#,
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("x 2.json"),
+            r#"{"id":"x","name":"new","updated_at":"2026-06-01T00:00:00.000Z"}"#,
+        )
+        .unwrap();
+        let mut c: Collection<Widget> = Collection::new(&root);
+        c.load().unwrap();
+        // 최신 updated_at 을 가진 항목이 결정적으로 승리(read_dir 순서 무관).
+        assert_eq!(c.len(), 1);
+        assert_eq!(c.get("x").unwrap().name, "new");
     }
 }
