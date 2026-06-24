@@ -14,6 +14,8 @@ export interface ServerFormData {
 export interface ServerPanelProps {
   servers: ServerConnection[];
   onCreate: (data: ServerFormData) => void;
+  /** 기존 서버 접속정보 수정 */
+  onUpdate?: (data: ServerFormData & { id: number }) => void;
   onArchive: (id: number) => void;
   onSetSecret: (id: number, secret: string) => void;
   onConnect: (server: ServerConnection) => void;
@@ -24,9 +26,29 @@ const AUTH_LABEL: Record<AuthType, string> = { key: "키 기반", password: "비
 
 const EMPTY: ServerFormData = { name: "", host: "", port: 22, username: "", authType: "key", keyPath: null };
 
-export function ServerPanel({ servers, onCreate, onArchive, onSetSecret, onConnect, onBrowse }: ServerPanelProps) {
+export function ServerPanel({ servers, onCreate, onUpdate, onArchive, onSetSecret, onConnect, onBrowse }: ServerPanelProps) {
   const [form, setForm] = useState<ServerFormData>(EMPTY);
   const [secretInputs, setSecretInputs] = useState<Record<number, string>>({});
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState<ServerFormData>(EMPTY);
+
+  const startEdit = (s: ServerConnection) => {
+    setEditingId(s.id);
+    setEditForm({
+      name: s.name,
+      host: s.host,
+      port: s.port,
+      username: s.username,
+      authType: s.authType as AuthType,
+      keyPath: s.keyPath ?? null,
+    });
+  };
+  const submitEdit = () => {
+    if (editingId == null) return;
+    if (!editForm.name.trim() || !editForm.host.trim() || !editForm.username.trim()) return;
+    onUpdate?.({ id: editingId, ...editForm });
+    setEditingId(null);
+  };
 
   const submit = () => {
     if (!form.name.trim() || !form.host.trim() || !form.username.trim()) return;
@@ -62,6 +84,27 @@ export function ServerPanel({ servers, onCreate, onArchive, onSetSecret, onConne
       ) : (
         servers.map((s) => (
           <div key={s.id} style={card} data-testid={`server-${s.id}`}>
+            {editingId === s.id ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <input aria-label="이름 수정" placeholder="이름" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} style={{ ...input, flex: 2, minWidth: 0 }} />
+                  <input aria-label="호스트 수정" placeholder="host" value={editForm.host} onChange={(e) => setEditForm({ ...editForm, host: e.target.value })} style={{ ...input, flex: 2, minWidth: 0 }} />
+                  <input aria-label="포트 수정" type="number" value={editForm.port} onChange={(e) => setEditForm({ ...editForm, port: Number(e.target.value) })} style={{ ...input, width: 70 }} />
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <input aria-label="사용자 수정" placeholder="user" value={editForm.username} onChange={(e) => setEditForm({ ...editForm, username: e.target.value })} style={{ ...input, flex: 1, minWidth: 0 }} />
+                  <select aria-label="인증 방식 수정" value={editForm.authType} onChange={(e) => setEditForm({ ...editForm, authType: e.target.value as AuthType })} style={{ ...input, width: 110 }}>
+                    <option value="key">키 기반</option>
+                    <option value="password">비밀번호</option>
+                    <option value="agent">에이전트</option>
+                  </select>
+                  <span style={{ flex: 1 }} />
+                  <button onClick={submitEdit} style={primaryBtn}>저장</button>
+                  <button onClick={() => setEditingId(null)} style={secondaryBtn}>취소</button>
+                </div>
+              </div>
+            ) : (
+              <>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 600, flex: 1 }}>
                 <Icon name="server" size={15} style={{ color: "var(--text2)" }} />
@@ -77,38 +120,43 @@ export function ServerPanel({ servers, onCreate, onArchive, onSetSecret, onConne
             <div style={{ fontSize: 12, color: "var(--text2)", fontFamily: "var(--font-mono)", margin: "4px 0 8px" }}>
               {s.username}@{s.host}:{s.port}
             </div>
-            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
               <button onClick={() => onConnect(s)} style={primaryBtn}>접속</button>
               {onBrowse && (
                 <button onClick={() => onBrowse(s)} style={secondaryBtn} aria-label={`${s.name} 파일`}>파일</button>
               )}
-              {s.authType !== "agent" && (
-                <>
-                  <input
-                    aria-label={`${s.name} 비밀값`}
-                    type="password"
-                    placeholder={s.authType === "password" ? "비밀번호" : "패스프레이즈"}
-                    value={secretInputs[s.id] ?? ""}
-                    onChange={(e) => setSecretInputs({ ...secretInputs, [s.id]: e.target.value })}
-                    style={{ ...input, width: 140 }}
-                  />
-                  <button
-                    onClick={() => {
-                      const v = secretInputs[s.id];
-                      if (v) {
-                        onSetSecret(s.id, v);
-                        setSecretInputs({ ...secretInputs, [s.id]: "" });
-                      }
-                    }}
-                    style={secondaryBtn}
-                  >
-                    시크릿 저장
-                  </button>
-                </>
+              {onUpdate && (
+                <button onClick={() => startEdit(s)} style={secondaryBtn} aria-label={`${s.name} 수정`}>수정</button>
               )}
               <span style={{ flex: 1 }} />
               <button onClick={() => onArchive(s.id)} style={dangerBtn} aria-label={`${s.name} 보관`}>보관</button>
             </div>
+            {s.authType !== "agent" && (
+              <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 8 }}>
+                <input
+                  aria-label={`${s.name} 비밀값`}
+                  type="password"
+                  placeholder={s.authType === "password" ? "비밀번호" : "패스프레이즈"}
+                  value={secretInputs[s.id] ?? ""}
+                  onChange={(e) => setSecretInputs({ ...secretInputs, [s.id]: e.target.value })}
+                  style={{ ...input, flex: 1, minWidth: 0 }}
+                />
+                <button
+                  onClick={() => {
+                    const v = secretInputs[s.id];
+                    if (v) {
+                      onSetSecret(s.id, v);
+                      setSecretInputs({ ...secretInputs, [s.id]: "" });
+                    }
+                  }}
+                  style={secondaryBtn}
+                >
+                  시크릿 저장
+                </button>
+              </div>
+            )}
+              </>
+            )}
           </div>
         ))
       )}
@@ -132,6 +180,6 @@ const input: CSSProperties = {
   fontFamily: "inherit",
 };
 const authBadge: CSSProperties = { fontSize: 11, fontWeight: 600, color: "var(--text2)", background: "var(--hover)", borderRadius: 4, padding: "2px 7px" };
-const primaryBtn: CSSProperties = { border: "none", background: "var(--accent)", color: "#fff", borderRadius: "var(--radius-md)", padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" };
-const secondaryBtn: CSSProperties = { border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text)", borderRadius: "var(--radius-md)", padding: "6px 10px", fontSize: 12, cursor: "pointer" };
-const dangerBtn: CSSProperties = { border: "1px solid var(--border)", background: "var(--bg)", color: "var(--st-danger)", borderRadius: "var(--radius-md)", padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" };
+const primaryBtn: CSSProperties = { border: "none", background: "var(--accent)", color: "#fff", borderRadius: "var(--radius-md)", padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 };
+const secondaryBtn: CSSProperties = { border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text)", borderRadius: "var(--radius-md)", padding: "6px 10px", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 };
+const dangerBtn: CSSProperties = { border: "1px solid var(--border)", background: "var(--bg)", color: "var(--st-danger)", borderRadius: "var(--radius-md)", padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 };

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildTree, rowId, type TreeInput } from "./tree";
-import type { Business, Project } from "./types";
+import type { Business, Folder, Project } from "./types";
 
 // --- 테스트 픽스처 헬퍼 (필요한 필드만 채우고 나머지 기본값) ---
 const biz = (o: Partial<Business> & Pick<Business, "id" | "name">): Business => ({
@@ -91,5 +91,75 @@ describe("rowId", () => {
     expect(rowId("project", 10)).toBe("project:10");
     expect(rowId("document", 1)).toBe("document:1");
     expect(rowId("deliverable", 1)).toBe("deliverable:1");
+  });
+});
+
+const fold = (o: Partial<Folder> & Pick<Folder, "id" | "name" | "kind">): Folder => ({
+  businessId: 1,
+  parentId: null,
+  sortOrder: 0,
+  archivedAt: null,
+  ...o,
+});
+
+describe("buildTree 폴더", () => {
+  it("폴더가 있으면 진입 노드 hasChildren=true, 펼치면 루트 폴더(depth2)를 노출한다", () => {
+    const rows = buildTree({
+      ...empty,
+      businesses: [biz({ id: 1, name: "A" })],
+      folders: [fold({ id: 7, name: "보고서", kind: "deliverable" })],
+      expanded: new Set([rowId("business", 1), rowId("deliverable", 1)]),
+    });
+    const entry = rows.find((r) => r.id === "deliverable:1")!;
+    expect(entry).toMatchObject({ hasChildren: true, expanded: true });
+    const folderRow = rows.find((r) => r.id === "delivFolder:7")!;
+    expect(folderRow).toMatchObject({ type: "delivFolder", depth: 2, label: "보고서", entityId: 7 });
+  });
+
+  it("진입 노드를 접으면 폴더는 노출되지 않는다", () => {
+    const rows = buildTree({
+      ...empty,
+      businesses: [biz({ id: 1, name: "A" })],
+      folders: [fold({ id: 7, name: "보고서", kind: "deliverable" })],
+      expanded: new Set([rowId("business", 1)]), // deliverable 진입 노드는 접힘
+    });
+    expect(rows.find((r) => r.id === "delivFolder:7")).toBeUndefined();
+    expect(rows.find((r) => r.id === "deliverable:1")).toMatchObject({ hasChildren: true, expanded: false });
+  });
+
+  it("루트 폴더를 펼치면 하위 폴더(depth3)를 노출한다", () => {
+    const rows = buildTree({
+      ...empty,
+      businesses: [biz({ id: 1, name: "A" })],
+      folders: [
+        fold({ id: 7, name: "보고서", kind: "document" }),
+        fold({ id: 8, name: "1차", kind: "document", parentId: 7 }),
+      ],
+      expanded: new Set([rowId("business", 1), rowId("document", 1), rowId("docFolder", 7)]),
+    });
+    const root = rows.find((r) => r.id === "docFolder:7")!;
+    expect(root).toMatchObject({ hasChildren: true, expanded: true });
+    const sub = rows.find((r) => r.id === "docFolder:8")!;
+    expect(sub).toMatchObject({ type: "docFolder", depth: 3, label: "1차" });
+  });
+
+  it("문서 폴더와 산출물 폴더는 각자 진입 노드 아래로만 들어간다", () => {
+    const rows = buildTree({
+      ...empty,
+      businesses: [biz({ id: 1, name: "A" })],
+      folders: [
+        fold({ id: 1, name: "문서폴더", kind: "document" }),
+        fold({ id: 2, name: "산출물폴더", kind: "deliverable" }),
+      ],
+      expanded: new Set([rowId("business", 1), rowId("document", 1), rowId("deliverable", 1)]),
+    });
+    expect(rows.find((r) => r.id === "docFolder:1")).toBeDefined();
+    expect(rows.find((r) => r.id === "delivFolder:2")).toBeDefined();
+    // 문서 진입 노드 아래에 산출물 폴더가 끼지 않는다
+    const docIdx = rows.findIndex((r) => r.id === "document:1");
+    const delivIdx = rows.findIndex((r) => r.id === "deliverable:1");
+    const docFolderIdx = rows.findIndex((r) => r.id === "docFolder:1");
+    expect(docFolderIdx).toBeGreaterThan(docIdx);
+    expect(docFolderIdx).toBeLessThan(delivIdx);
   });
 });

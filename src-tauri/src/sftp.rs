@@ -42,17 +42,21 @@ pub fn parse_listing(out: &str) -> Vec<SftpEntry> {
     out.lines().filter_map(parse_ls_line).collect()
 }
 
-pub fn build_sftp_args(server: &ServerConnection) -> Vec<String> {
+pub fn build_sftp_args(server: &ServerConnection, known_hosts: Option<&str>) -> Vec<String> {
     let mut args = vec![
         "-b".to_string(),
         "-".to_string(),
         "-P".to_string(),
         server.port.to_string(),
         "-o".to_string(),
-        "StrictHostKeyChecking=accept-new".to_string(),
+        "StrictHostKeyChecking=yes".to_string(),
         "-o".to_string(),
         "BatchMode=yes".to_string(),
     ];
+    if let Some(kh) = known_hosts {
+        args.push("-o".to_string());
+        args.push(format!("UserKnownHostsFile={kh}"));
+    }
     if let Some(k) = &server.key_path {
         if !k.trim().is_empty() {
             args.push("-i".to_string());
@@ -63,13 +67,27 @@ pub fn build_sftp_args(server: &ServerConnection) -> Vec<String> {
     args
 }
 
+/// sftp batch 명령(`ls -l "<path>"`) 문맥 주입 방지(CWE-78 관련): 따옴표·백슬래시·개행·
+/// 기타 제어문자를 제거한다. '"' 만 막으면 '\' 로 인용 구조를 교란할 수 있어 '\\' 도 제거.
+/// 결과가 비면 "." 로 대체.
+pub fn sanitize_remote_path(path: &str) -> String {
+    let safe: String = path
+        .chars()
+        .filter(|c| *c != '"' && *c != '\\' && !c.is_control())
+        .collect();
+    if safe.trim().is_empty() {
+        ".".to_string()
+    } else {
+        safe
+    }
+}
+
 /// 원격 디렉터리 나열. (키 기반 인증 필요 — 실 서버 대상 검증 요)
-pub fn list(server: &ServerConnection, path: &str) -> Result<Vec<SftpEntry>> {
-    let safe = path.replace(['"', '\n', '\r'], "");
-    let safe = if safe.trim().is_empty() { ".".to_string() } else { safe };
+pub fn list(server: &ServerConnection, path: &str, known_hosts: Option<&str>) -> Result<Vec<SftpEntry>> {
+    let safe = sanitize_remote_path(path);
 
     let mut child = Command::new("sftp")
-        .args(build_sftp_args(server))
+        .args(build_sftp_args(server, known_hosts))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -150,9 +168,22 @@ mod tests {
     }
 
     #[test]
+    fn sanitize_strips_quote_backslash_control_and_defaults() {
+        assert_eq!(sanitize_remote_path("/var/www"), "/var/www");
+        // 따옴표·백슬래시·개행 제거
+        assert_eq!(sanitize_remote_path("a\"b\\c\nd"), "abcd");
+        // 제어문자 제거
+        assert_eq!(sanitize_remote_path("x\u{7}y"), "xy");
+        // 빈/공백 → "."
+        assert_eq!(sanitize_remote_path("   "), ".");
+    }
+
+    #[test]
     fn sftp_args_have_batch_port_key() {
-        let a = build_sftp_args(&server());
+        let a = build_sftp_args(&server(), Some("/tmp/kh"));
         assert!(a.contains(&"BatchMode=yes".to_string()));
+        assert!(a.contains(&"StrictHostKeyChecking=yes".to_string()));
+        assert!(a.contains(&"UserKnownHostsFile=/tmp/kh".to_string()));
         assert!(a.contains(&"2222".to_string()));
         assert!(a.contains(&"u@h".to_string()));
         assert!(a.contains(&"/k".to_string()));

@@ -3,6 +3,7 @@ import { useDocuments } from "../hooks/useDocuments";
 import { DocumentList } from "./DocumentList";
 import { DocEditor } from "./DocEditor";
 import { Icon } from "../ui/icons/Icon";
+import type { Folder } from "../domain/types";
 
 export interface DocumentsViewProps {
   businessId: number;
@@ -11,13 +12,29 @@ export interface DocumentsViewProps {
   /** 진입 시 자동으로 열 문서 id (검색 등). 열린 뒤 onOpened 로 소비 통지. */
   initialOpenDocId?: number | null;
   onOpened?: () => void;
+  /** 이 사업의 문서 폴더(이동 드롭다운/필터용) */
+  folders?: Folder[];
+  /** 선택된 폴더 id (없으면 전체). 새 문서는 이 폴더에 들어간다. */
+  selectedFolderId?: number | null;
 }
 
 /** 문서 뷰 컨테이너 — 목록과 편집기를 전환한다(산출물과 동일한 단일 진입 패턴). */
-export function DocumentsView({ businessId, projectId, onChanged, initialOpenDocId, onOpened }: DocumentsViewProps) {
+export function DocumentsView({
+  businessId,
+  projectId,
+  onChanged,
+  initialOpenDocId,
+  onOpened,
+  folders = [],
+  selectedFolderId = null,
+}: DocumentsViewProps) {
   const d = useDocuments(businessId, projectId, onChanged);
   const [openId, setOpenId] = useState<number | null>(null);
   const openDoc = d.documents.find((x) => x.id === openId) ?? null;
+  // 선택된 폴더가 있으면 그 폴더 직속만, 없으면 전체.
+  const shown = selectedFolderId == null
+    ? d.documents
+    : d.documents.filter((x) => x.folderId === selectedFolderId);
 
   // 검색 등으로 특정 문서가 지정되면 해당 문서를 열고 소비 통지한다.
   useEffect(() => {
@@ -47,15 +64,18 @@ export function DocumentsView({ businessId, projectId, onChanged, initialOpenDoc
 
   return (
     <DocumentList
-      documents={d.documents}
+      documents={shown}
       error={d.error}
+      folders={folders}
+      currentFolderId={selectedFolderId}
       onCreate={(title) => {
-        void d.create(title).then((doc) => {
+        void d.create(title, selectedFolderId).then((doc) => {
           if (doc) setOpenId(doc.id);
         });
       }}
       onOpen={(id) => setOpenId(id)}
       onRename={(id, title) => void d.rename(id, title)}
+      onMove={(id, folderId) => void d.move(id, folderId)}
       onArchive={(id) => {
         if (!window.confirm("이 문서를 삭제할까요? (휴지통에서 복구 가능)")) return;
         if (openId === id) setOpenId(null);

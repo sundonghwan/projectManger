@@ -30,12 +30,12 @@ export function useDocuments(
 
   /** 주어진 제목으로 새 문서 생성 후 생성된 문서를 반환(호출측에서 바로 편집기로 열 수 있게). */
   const create = useCallback(
-    async (title: string): Promise<Document | null> => {
+    async (title: string, folderId?: number | null): Promise<Document | null> => {
       if (businessId == null) return null;
       const name = title.trim();
       if (!name) return null;
       try {
-        const doc = await api.document.create({ businessId, projectId, title: name });
+        const doc = await api.document.create({ businessId, projectId, folderId: folderId ?? null, title: name });
         await reload();
         onChanged?.();
         return doc;
@@ -45,6 +45,19 @@ export function useDocuments(
       }
     },
     [businessId, projectId, reload, onChanged],
+  );
+
+  const move = useCallback(
+    async (id: number, folderId: number | null) => {
+      try {
+        await api.document.move(id, folderId);
+        await reload();
+        onChanged?.();
+      } catch (e) {
+        setError(String(e));
+      }
+    },
+    [reload, onChanged],
   );
 
   const rename = useCallback(
@@ -73,5 +86,5 @@ export function useDocuments(
     [reload, onChanged],
   );
 
-  return { documents, error, reload, create, rename, archive };
+  return { documents, error, reload, create, rename, archive, move };
 }

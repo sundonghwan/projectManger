@@ -1,7 +1,7 @@
 use crate::error::Result;
 use crate::models::{
-    Block, Business, CommandSnippet, Deliverable, DeliverableVersion, Document, Label, Project,
-    RecurringTask, SearchHit, ServerConnection, Task, TaskLabel, Template, TrashItem,
+    Block, Business, CommandSnippet, Deliverable, DeliverableVersion, Document, Folder, Label,
+    Memo, Project, RecurringTask, SearchHit, ServerConnection, Task, TaskLabel, Template, TrashItem,
 };
 use crate::secrets;
 use crate::repo;
@@ -205,6 +205,7 @@ pub fn task_archive(state: State<AppState>, id: i64) -> Result<()> {
 pub struct DocumentCreate {
     pub business_id: i64,
     pub project_id: Option<i64>,
+    pub folder_id: Option<i64>,
     pub title: String,
 }
 
@@ -236,7 +237,13 @@ pub fn document_list(state: State<AppState>, business_id: i64) -> Result<Vec<Doc
 #[tauri::command]
 pub fn document_create(state: State<AppState>, input: DocumentCreate) -> Result<Document> {
     let conn = state.db.lock().unwrap();
-    repo::document::create(&conn, input.business_id, input.project_id, &input.title)
+    repo::document::create(&conn, input.business_id, input.project_id, input.folder_id, &input.title)
+}
+
+#[tauri::command]
+pub fn document_move(state: State<AppState>, id: i64, folder_id: Option<i64>) -> Result<Document> {
+    let conn = state.db.lock().unwrap();
+    repo::document::set_folder(&conn, id, folder_id)
 }
 
 #[tauri::command]
@@ -336,6 +343,7 @@ pub fn task_label_map(state: State<AppState>, business_id: i64) -> Result<Vec<Ta
 pub struct DeliverableCreate {
     pub business_id: i64,
     pub project_id: Option<i64>,
+    pub folder_id: Option<i64>,
     pub title: String,
     pub kind: String,
 }
@@ -357,7 +365,13 @@ pub fn deliverable_list(state: State<AppState>, business_id: i64) -> Result<Vec<
 #[tauri::command]
 pub fn deliverable_create(state: State<AppState>, input: DeliverableCreate) -> Result<Deliverable> {
     let conn = state.db.lock().unwrap();
-    repo::deliverable::create(&conn, input.business_id, input.project_id, &input.title, &input.kind)
+    repo::deliverable::create(&conn, input.business_id, input.project_id, input.folder_id, &input.title, &input.kind)
+}
+
+#[tauri::command]
+pub fn deliverable_move(state: State<AppState>, id: i64, folder_id: Option<i64>) -> Result<Deliverable> {
+    let conn = state.db.lock().unwrap();
+    repo::deliverable::set_folder(&conn, id, folder_id)
 }
 
 #[tauri::command]
@@ -392,6 +406,7 @@ pub fn deliverable_upload(
     state: State<AppState>,
     business_id: i64,
     project_id: Option<i64>,
+    folder_id: Option<i64>,
     paths: Vec<String>,
 ) -> Result<Vec<Deliverable>> {
     use tauri::Manager;
@@ -412,7 +427,7 @@ pub fn deliverable_upload(
             _ => continue,
         };
         // 1) 행 먼저 생성해 id 확보
-        let d = match repo::deliverable::create_file(&conn, business_id, project_id, &filename, &filename, size) {
+        let d = match repo::deliverable::create_file(&conn, business_id, project_id, folder_id, &filename, &filename, size) {
             Ok(d) => d,
             Err(_) => continue,
         };
@@ -442,6 +457,95 @@ pub fn deliverable_upload(
 pub fn deliverable_rename(state: State<AppState>, id: i64, title: String) -> Result<Deliverable> {
     let conn = state.db.lock().unwrap();
     repo::deliverable::rename(&conn, id, &title)
+}
+
+// ---- 폴더(산출물·문서 분류) ----
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderCreate {
+    pub business_id: i64,
+    pub kind: String, // document | deliverable
+    pub parent_id: Option<i64>,
+    pub name: String,
+}
+
+#[tauri::command]
+pub fn folder_list(state: State<AppState>, business_id: i64) -> Result<Vec<Folder>> {
+    let conn = state.db.lock().unwrap();
+    repo::folder::list_by_business(&conn, business_id)
+}
+
+#[tauri::command]
+pub fn folder_create(state: State<AppState>, input: FolderCreate) -> Result<Folder> {
+    let conn = state.db.lock().unwrap();
+    repo::folder::create(&conn, input.business_id, &input.kind, input.parent_id, &input.name)
+}
+
+#[tauri::command]
+pub fn folder_rename(state: State<AppState>, id: i64, name: String) -> Result<Folder> {
+    let conn = state.db.lock().unwrap();
+    repo::folder::rename(&conn, id, &name)
+}
+
+#[tauri::command]
+pub fn folder_delete(state: State<AppState>, id: i64) -> Result<()> {
+    let conn = state.db.lock().unwrap();
+    repo::folder::delete(&conn, id)
+}
+
+// ---- 메모(사업별 Keep식) ----
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoCreate {
+    pub business_id: i64,
+    pub title: String,
+    pub body: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoUpdate {
+    pub id: i64,
+    pub title: String,
+    pub body: String,
+}
+
+#[tauri::command]
+pub fn memo_list(state: State<AppState>, business_id: i64) -> Result<Vec<Memo>> {
+    let conn = state.db.lock().unwrap();
+    repo::memo::list_by_business(&conn, business_id)
+}
+
+#[tauri::command]
+pub fn memo_create(state: State<AppState>, input: MemoCreate) -> Result<Memo> {
+    let conn = state.db.lock().unwrap();
+    repo::memo::create(&conn, input.business_id, &input.title, &input.body)
+}
+
+#[tauri::command]
+pub fn memo_update(state: State<AppState>, input: MemoUpdate) -> Result<Memo> {
+    let conn = state.db.lock().unwrap();
+    repo::memo::update(&conn, input.id, &input.title, &input.body)
+}
+
+#[tauri::command]
+pub fn memo_set_color(state: State<AppState>, id: i64, color: Option<String>) -> Result<Memo> {
+    let conn = state.db.lock().unwrap();
+    repo::memo::set_color(&conn, id, color.as_deref())
+}
+
+#[tauri::command]
+pub fn memo_set_pinned(state: State<AppState>, id: i64, pinned: bool) -> Result<Memo> {
+    let conn = state.db.lock().unwrap();
+    repo::memo::set_pinned(&conn, id, pinned)
+}
+
+#[tauri::command]
+pub fn memo_archive(state: State<AppState>, id: i64) -> Result<()> {
+    let conn = state.db.lock().unwrap();
+    repo::memo::archive(&conn, id)
 }
 
 #[derive(Deserialize)]
@@ -606,6 +710,7 @@ pub fn ssh_disconnect(term: State<crate::terminal::TerminalManager>, id: i64) ->
 /// SFTP 디렉터리 나열 (키 기반 인증).
 #[tauri::command]
 pub fn sftp_list(
+    app: tauri::AppHandle,
     state: State<AppState>,
     id: i64,
     path: String,
@@ -614,7 +719,48 @@ pub fn sftp_list(
         let conn = state.db.lock().unwrap();
         repo::server::get(&conn, id)?
     };
-    crate::sftp::list(&server, &path)
+    let kh = crate::hostkey::known_hosts_path(&app).map(|p| p.to_string_lossy().to_string());
+    crate::sftp::list(&server, &path, kh.as_deref())
+}
+
+// ---- SSH 호스트 키 신뢰 (지문 확인 후 등록) ----
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HostScanResult {
+    pub fingerprint: String,
+    pub key_lines: String,
+}
+
+/// 해당 서버 호스트가 이미 신뢰(known_hosts 등록)되어 있는지.
+#[tauri::command]
+pub fn ssh_host_status(app: tauri::AppHandle, state: State<AppState>, id: i64) -> Result<bool> {
+    let server = {
+        let conn = state.db.lock().unwrap();
+        repo::server::get(&conn, id)?
+    };
+    let kh = crate::hostkey::known_hosts_path(&app)
+        .ok_or_else(|| crate::error::AppError::Invalid("앱 데이터 경로 오류".into()))?;
+    Ok(crate::hostkey::is_known(&kh, &server.host, server.port))
+}
+
+/// ssh-keyscan 으로 호스트 공개키·지문을 가져온다(아직 신뢰하지 않음). 사용자 확인용.
+#[tauri::command]
+pub fn ssh_scan_host(state: State<AppState>, id: i64) -> Result<HostScanResult> {
+    let server = {
+        let conn = state.db.lock().unwrap();
+        repo::server::get(&conn, id)?
+    };
+    let (fingerprint, key_lines) = crate::hostkey::scan(&server.host, server.port)?;
+    Ok(HostScanResult { fingerprint, key_lines })
+}
+
+/// 사용자가 지문을 확인·수락한 호스트 키를 앱 known_hosts 에 등록.
+#[tauri::command]
+pub fn ssh_trust_host(app: tauri::AppHandle, key_lines: String) -> Result<()> {
+    let kh = crate::hostkey::known_hosts_path(&app)
+        .ok_or_else(|| crate::error::AppError::Invalid("앱 데이터 경로 오류".into()))?;
+    crate::hostkey::trust(&kh, &key_lines)
 }
 
 // ---- 템플릿 ----
@@ -755,6 +901,35 @@ pub fn trash_purge(state: State<AppState>, kind: String, id: i64) -> Result<()> 
 
 /// 전체 데이터를 JSON으로 내보낸다. path 미지정 시 앱 데이터 폴더의 backup.json.
 /// 저장한 경로를 반환.
+///
+/// 보안(CWE-22/73): 외부에서 임의 경로가 들어와도 앱 데이터 폴더 밖을 읽고/쓰지 못하도록
+/// 제한한다. 정상 흐름은 path=None(앱 데이터의 backup.json)이며, path가 주어지면 앱 데이터
+/// 폴더 하위인지 검증한다.
+fn resolve_backup_path(app: &tauri::AppHandle, path: Option<String>) -> Result<std::path::PathBuf> {
+    use crate::error::AppError;
+    use tauri::Manager;
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| AppError::Invalid(format!("앱 데이터 경로 오류: {e}")))?;
+    std::fs::create_dir_all(&dir).ok();
+    let base = std::fs::canonicalize(&dir).unwrap_or(dir);
+    match path {
+        None => Ok(base.join("backup.json")),
+        Some(p) => {
+            let target = std::path::PathBuf::from(&p);
+            let parent = target.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(&base);
+            let parent_canon = std::fs::canonicalize(parent)
+                .map_err(|_| AppError::Invalid("백업 경로가 유효하지 않습니다".into()))?;
+            if !parent_canon.starts_with(&base) {
+                return Err(AppError::Invalid("백업 경로는 앱 데이터 폴더 안이어야 합니다".into()));
+            }
+            let name = target.file_name().ok_or_else(|| AppError::Invalid("백업 파일명이 필요합니다".into()))?;
+            Ok(parent_canon.join(name))
+        }
+    }
+}
+
 #[tauri::command]
 pub fn export_json(
     app: tauri::AppHandle,
@@ -762,19 +937,8 @@ pub fn export_json(
     path: Option<String>,
 ) -> Result<String> {
     use crate::error::AppError;
-    use tauri::Manager;
 
-    let target = match path {
-        Some(p) => std::path::PathBuf::from(p),
-        None => {
-            let dir = app
-                .path()
-                .app_data_dir()
-                .map_err(|e| AppError::Invalid(format!("앱 데이터 경로 오류: {e}")))?;
-            std::fs::create_dir_all(&dir).ok();
-            dir.join("backup.json")
-        }
-    };
+    let target = resolve_backup_path(&app, path)?;
 
     let data = {
         let conn = state.db.lock().unwrap();
@@ -795,18 +959,8 @@ pub fn import_json(
     path: Option<String>,
 ) -> Result<()> {
     use crate::error::AppError;
-    use tauri::Manager;
 
-    let target = match path {
-        Some(p) => std::path::PathBuf::from(p),
-        None => {
-            let dir = app
-                .path()
-                .app_data_dir()
-                .map_err(|e| AppError::Invalid(format!("앱 데이터 경로 오류: {e}")))?;
-            dir.join("backup.json")
-        }
-    };
+    let target = resolve_backup_path(&app, path)?;
     let text = std::fs::read_to_string(&target)
         .map_err(|e| AppError::Invalid(format!("파일 읽기 실패: {e}")))?;
     let value: serde_json::Value =

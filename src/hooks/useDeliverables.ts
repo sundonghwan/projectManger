@@ -30,11 +30,11 @@ export function useDeliverables(
   }, [reload]);
 
   const upload = useCallback(
-    async (paths: string[]) => {
+    async (paths: string[], folderId?: number | null) => {
       if (businessId == null || paths.length === 0) return;
       setUploading(true);
       try {
-        const created = await api.deliverable.upload(businessId, projectId, paths);
+        const created = await api.deliverable.upload(businessId, projectId, paths, folderId ?? null);
         await reload();
         onChanged?.();
         if (created.length < paths.length) {
@@ -47,6 +47,19 @@ export function useDeliverables(
       }
     },
     [businessId, projectId, reload, onChanged],
+  );
+
+  const move = useCallback(
+    async (id: number, folderId: number | null) => {
+      try {
+        await api.deliverable.move(id, folderId);
+        await reload();
+        onChanged?.();
+      } catch (e) {
+        setError(String(e));
+      }
+    },
+    [reload, onChanged],
   );
 
   const rename = useCallback(
@@ -99,5 +112,5 @@ export function useDeliverables(
     [reload, onChanged],
   );
 
-  return { deliverables, error, uploading, reload, upload, rename, setStatus, open, archive };
+  return { deliverables, error, uploading, reload, upload, rename, setStatus, open, archive, move };
 }

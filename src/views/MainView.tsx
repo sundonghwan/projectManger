@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api } from "../api/client";
-import type { Business, Project, TrashItem } from "../domain/types";
+import type { Business, Folder, Project, TrashItem } from "../domain/types";
 import { TrashPanel } from "./TrashPanel";
 import { businessColor } from "../ui/colors";
 import { Icon } from "../ui/icons/Icon";
@@ -13,6 +13,7 @@ import { TaskList } from "./TaskList";
 import { DocumentsView } from "./DocumentsView";
 import { TaskEditor } from "./TaskEditor";
 import { DeliverablesView } from "./DeliverablesView";
+import { MemosView } from "./MemosView";
 import { ServerView } from "./ServerView";
 import { TimelineView } from "./TimelineView";
 import { AutomationModal } from "./AutomationModal";
@@ -24,6 +25,7 @@ export type ViewKind =
   | "timeline"
   | "doc"
   | "deliverables"
+  | "memo"
   | "ssh";
 
 const TABS: { key: ViewKind; label: string }[] = [
@@ -33,6 +35,7 @@ const TABS: { key: ViewKind; label: string }[] = [
   { key: "timeline", label: "타임라인" },
   { key: "doc", label: "문서" },
   { key: "deliverables", label: "산출물" },
+  { key: "memo", label: "메모" },
   { key: "ssh", label: "터미널" },
 ];
 
@@ -43,6 +46,7 @@ const VIEW_LABEL: Record<ViewKind, string> = {
   timeline: "타임라인",
   doc: "문서",
   deliverables: "산출물",
+  memo: "메모",
   ssh: "SSH 터미널",
 };
 
@@ -58,6 +62,10 @@ export interface MainViewProps {
   /** 검색 등에서 문서 뷰 진입 시 자동으로 열 문서 id */
   openDocId?: number | null;
   onDocOpened?: () => void;
+  /** 현재 사업의 분류 폴더(문서+산출물) */
+  folders?: Folder[];
+  /** 사이드바에서 선택된 폴더 id (없으면 진입 노드=전체) */
+  selectedFolderId?: number | null;
 }
 
 export function MainView({
@@ -71,6 +79,8 @@ export function MainView({
   onDataChanged,
   openDocId,
   onDocOpened,
+  folders = [],
+  selectedFolderId = null,
 }: MainViewProps) {
   const {
     tasks,
@@ -252,6 +262,8 @@ export function MainView({
             onChanged={onDataChanged}
             initialOpenDocId={openDocId}
             onOpened={onDocOpened}
+            folders={folders.filter((f) => f.kind === "document")}
+            selectedFolderId={view === "doc" ? selectedFolderId : null}
           />
         ) : view === "deliverables" ? (
           <DeliverablesView
@@ -259,12 +271,21 @@ export function MainView({
             businessId={business.id}
             projectId={project?.id ?? null}
             onChanged={onDataChanged}
+            folders={folders.filter((f) => f.kind === "deliverable")}
+            selectedFolderId={view === "deliverables" ? selectedFolderId : null}
           />
-        ) : view === "ssh" ? (
-          <ServerView key={business.id} businessId={business.id} projectId={project?.id ?? null} />
-        ) : (
+        ) : view === "memo" ? (
+          <MemosView key={business.id} businessId={business.id} onChanged={onDataChanged} />
+        ) : view === "ssh" ? null : (
           <div style={{ padding: "24px 28px", color: "var(--text2)" }}>
             <strong style={{ color: "var(--text)" }}>{VIEW_LABEL[view]}</strong> — 다음 단계에서 지원
+          </div>
+        )}
+
+        {/* SSH 뷰는 탭을 옮겨도 세션·터미널 스크롤백이 유지되도록 언마운트하지 않고 숨김 처리한다. */}
+        {business && (
+          <div style={{ height: "100%", display: view === "ssh" ? "block" : "none" }}>
+            <ServerView key={business.id} businessId={business.id} projectId={project?.id ?? null} />
           </div>
         )}
       </div>

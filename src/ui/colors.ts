@@ -1,5 +1,23 @@
 // 유형/상태/우선순위 → 색상·라벨 매핑. docs/06-디자인시스템 토큰과 일치.
-import type { BusinessType, DeliverableStatus, Priority, TaskStatus } from "../domain/types";
+import type { BusinessType, DeliverableStatus, MemoColor, Priority, TaskStatus } from "../domain/types";
+
+/** 메모 색상 선택 목록 (default = 기본 카드색) */
+export const MEMO_COLORS: MemoColor[] = [
+  "default",
+  "red",
+  "orange",
+  "yellow",
+  "green",
+  "teal",
+  "blue",
+  "purple",
+  "gray",
+];
+
+/** 메모 카드 배경 CSS 값. default/null 은 기본 카드색. */
+export function memoBg(color?: MemoColor | null): string {
+  return color && color !== "default" ? `var(--memo-${color})` : "var(--card)";
+}
 
 export const TYPE_COLOR: Record<BusinessType, string> = {
   si: "#3b82f6",

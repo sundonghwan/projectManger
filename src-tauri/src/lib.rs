@@ -2,6 +2,7 @@ mod commands;
 mod db;
 mod error;
 mod export;
+mod hostkey;
 mod models;
 mod repo;
 mod secrets;
@@ -45,6 +46,7 @@ pub fn run() {
             commands::task_archive,
             commands::document_list,
             commands::document_create,
+            commands::document_move,
             commands::document_rename,
             commands::document_archive,
             commands::document_get,
@@ -66,6 +68,17 @@ pub fn run() {
             commands::deliverable_archive,
             commands::deliverable_upload,
             commands::deliverable_rename,
+            commands::deliverable_move,
+            commands::folder_list,
+            commands::folder_create,
+            commands::folder_rename,
+            commands::folder_delete,
+            commands::memo_list,
+            commands::memo_create,
+            commands::memo_update,
+            commands::memo_set_color,
+            commands::memo_set_pinned,
+            commands::memo_archive,
             commands::server_list,
             commands::server_create,
             commands::server_update,
@@ -80,6 +93,9 @@ pub fn run() {
             commands::ssh_write,
             commands::ssh_resize,
             commands::ssh_disconnect,
+            commands::ssh_host_status,
+            commands::ssh_scan_host,
+            commands::ssh_trust_host,
             commands::sftp_list,
             commands::template_list,
             commands::template_create,

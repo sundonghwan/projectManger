@@ -11,7 +11,11 @@ import type {
   DeliverableStatus,
   Document,
   EntityStatus,
+  Folder,
+  FolderKind,
   Label,
+  Memo,
+  MemoColor,
   Priority,
   AuthType,
   Project,
@@ -98,6 +102,9 @@ export const api = {
     create: (input: DocumentCreateInput) => invoke<Document>("document_create", { input }),
     get: (id: number) => invoke<Document>("document_get", { id }),
     rename: (id: number, title: string) => invoke<Document>("document_rename", { id, title }),
+    /** 문서를 폴더로 이동(folderId=null 이면 미분류). */
+    move: (id: number, folderId: number | null) =>
+      invoke<Document>("document_move", { id, folderId: folderId ?? null }),
     /** 본문(마크다운) 저장. */
     setBody: (id: number, body: string) => invoke<void>("document_set_body", { id, body }),
     archive: (id: number) => invoke<void>("document_archive", { id }),
@@ -126,20 +133,45 @@ export const api = {
   },
   deliverable: {
     list: (businessId: number) => invoke<Deliverable[]>("deliverable_list", { businessId }),
-    /** 다중 파일 업로드 — 앱 데이터 폴더로 복사 후 생성된 산출물 목록 반환. */
-    upload: (businessId: number, projectId: number | null, paths: string[]) =>
+    /** 다중 파일 업로드 — 앱 데이터 폴더로 복사 후 생성된 산출물 목록 반환. folderId 지정 시 해당 폴더에 배치. */
+    upload: (businessId: number, projectId: number | null, paths: string[], folderId?: number | null) =>
       invoke<Deliverable[]>("deliverable_upload", {
         businessId,
         projectId: projectId ?? null,
+        folderId: folderId ?? null,
         paths,
       }),
     rename: (id: number, title: string) =>
       invoke<Deliverable>("deliverable_rename", { id, title }),
     setStatus: (id: number, status: DeliverableStatus) =>
       invoke<Deliverable>("deliverable_set_status", { id, status }),
+    /** 산출물을 폴더로 이동(folderId=null 이면 미분류). */
+    move: (id: number, folderId: number | null) =>
+      invoke<Deliverable>("deliverable_move", { id, folderId: folderId ?? null }),
     /** 복사 보관된 파일을 OS 기본 앱으로 연다. */
     open: (path: string) => openPath(path),
     archive: (id: number) => invoke<void>("deliverable_archive", { id }),
+  },
+  memo: {
+    list: (businessId: number) => invoke<Memo[]>("memo_list", { businessId }),
+    create: (businessId: number, title: string, body: string) =>
+      invoke<Memo>("memo_create", { input: { businessId, title, body } }),
+    update: (id: number, title: string, body: string) =>
+      invoke<Memo>("memo_update", { input: { id, title, body } }),
+    setColor: (id: number, color: MemoColor | null) =>
+      invoke<Memo>("memo_set_color", { id, color: color ?? null }),
+    setPinned: (id: number, pinned: boolean) => invoke<Memo>("memo_set_pinned", { id, pinned }),
+    archive: (id: number) => invoke<void>("memo_archive", { id }),
+  },
+  folder: {
+    /** 사업의 모든(문서·산출물) 폴더. 프론트가 kind/parentId 로 분기. */
+    list: (businessId: number) => invoke<Folder[]>("folder_list", { businessId }),
+    create: (input: { businessId: number; kind: FolderKind; parentId?: number | null; name: string }) =>
+      invoke<Folder>("folder_create", {
+        input: { businessId: input.businessId, kind: input.kind, parentId: input.parentId ?? null, name: input.name },
+      }),
+    rename: (id: number, name: string) => invoke<Folder>("folder_rename", { id, name }),
+    remove: (id: number) => invoke<void>("folder_delete", { id }),
   },
   server: {
     list: (businessId: number) => invoke<ServerConnection[]>("server_list", { businessId }),
@@ -179,6 +211,12 @@ export const api = {
     resize: (id: number, rows: number, cols: number) =>
       invoke<void>("ssh_resize", { id, rows, cols }),
     disconnect: (id: number) => invoke<void>("ssh_disconnect", { id }),
+    /** 이 호스트가 이미 신뢰(known_hosts 등록)되어 있는지. */
+    hostStatus: (id: number) => invoke<boolean>("ssh_host_status", { id }),
+    /** ssh-keyscan 으로 호스트 공개키·지문을 가져온다(아직 신뢰 X). */
+    scanHost: (id: number) => invoke<{ fingerprint: string; keyLines: string }>("ssh_scan_host", { id }),
+    /** 사용자가 지문 확인 후 수락한 호스트 키를 앱 known_hosts 에 등록. */
+    trustHost: (keyLines: string) => invoke<void>("ssh_trust_host", { keyLines }),
   },
   sftp: {
     list: (id: number, path: string) => invoke<SftpEntry[]>("sftp_list", { id, path }),
@@ -219,6 +257,7 @@ export const api = {
 export interface DocumentCreateInput {
   businessId: number;
   projectId?: number | null;
+  folderId?: number | null;
   title: string;
 }
 export interface BlockCreateInput {

@@ -116,7 +116,7 @@ mod tests {
         let b = business::create(&c, "알파 사업", "si", None).unwrap();
         let p = project::create(&c, b.id, "알파 프로젝트").unwrap();
         task::create(&c, b.id, Some(p.id), "알파 태스크", 2).unwrap();
-        document::create(&c, b.id, None, "알파 문서").unwrap();
+        document::create(&c, b.id, None, None, "알파 문서").unwrap();
 
         let hits = search(&c, "알파").unwrap();
         let kinds: Vec<&str> = hits.iter().map(|h| h.kind.as_str()).collect();
@@ -131,7 +131,7 @@ mod tests {
     fn finds_document_by_body() {
         let c = db::open_in_memory().unwrap();
         let b = business::create(&c, "사업", "si", None).unwrap();
-        let d = document::create(&c, b.id, None, "회의록").unwrap();
+        let d = document::create(&c, b.id, None, None, "회의록").unwrap();
         document::set_body(&c, d.id, "# 안건\n예산 3억 검토").unwrap();
         let hits = search(&c, "예산").unwrap();
         assert_eq!(hits.len(), 1);
@@ -143,7 +143,7 @@ mod tests {
     fn finds_deliverable_by_title() {
         let c = db::open_in_memory().unwrap();
         let b = business::create(&c, "사업", "si", None).unwrap();
-        crate::repo::deliverable::create_file(&c, b.id, None, "설계서.pdf", "설계서.pdf", 10).unwrap();
+        crate::repo::deliverable::create_file(&c, b.id, None, None, "설계서.pdf", "설계서.pdf", 10).unwrap();
         let hits = search(&c, "설계").unwrap();
         assert!(hits.iter().any(|h| h.kind == "deliverable" && h.title == "설계서.pdf"));
     }

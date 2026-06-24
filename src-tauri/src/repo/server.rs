@@ -4,6 +4,32 @@ use rusqlite::{params, Connection, Row};
 
 const AUTH_TYPES: [&str; 3] = ["key", "password", "agent"];
 
+/// SSH 인자 주입(CWE-88) 방지: host/username 이 '-'로 시작하면 ssh/sftp 가 옵션으로
+/// 해석(-oProxyCommand=… 류)하여 임의 명령 실행으로 이어질 수 있다. '@'·공백·제어문자도 거부.
+fn validate_ssh_field(value: &str, field: &str) -> Result<()> {
+    let t = value.trim();
+    if t.starts_with('-') {
+        return Err(AppError::Invalid(format!("{field}는 '-'로 시작할 수 없습니다")));
+    }
+    if t.chars().any(|c| c.is_control() || c == '@' || c == ' ' || c == '\t') {
+        return Err(AppError::Invalid(format!(
+            "{field}에 허용되지 않는 문자가 있습니다(@·공백·제어문자)"
+        )));
+    }
+    Ok(())
+}
+
+/// 키 파일 경로는 공백/@ 를 포함할 수 있으나, '-' 로 시작하면 ssh 옵션으로 오인되므로 거부.
+fn validate_key_path(key_path: Option<&str>) -> Result<()> {
+    if let Some(k) = key_path {
+        let t = k.trim();
+        if t.starts_with('-') {
+            return Err(AppError::Invalid("키 파일 경로는 '-'로 시작할 수 없습니다".into()));
+        }
+    }
+    Ok(())
+}
+
 fn map_row(row: &Row) -> rusqlite::Result<ServerConnection> {
     Ok(ServerConnection {
         id: row.get("id")?,
@@ -60,6 +86,9 @@ pub fn create(
     if !AUTH_TYPES.contains(&auth_type) {
         return Err(AppError::Invalid(format!("알 수 없는 인증 방식: {auth_type}")));
     }
+    validate_ssh_field(host, "호스트")?;
+    validate_ssh_field(username, "사용자")?;
+    validate_key_path(key_path)?;
     conn.execute(
         "INSERT INTO server_connection (business_id, project_id, name, host, port, username, auth_type, key_path) \
          VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
@@ -79,9 +108,15 @@ pub fn update(
     auth_type: &str,
     key_path: Option<&str>,
 ) -> Result<ServerConnection> {
+    if name.trim().is_empty() || host.trim().is_empty() || username.trim().is_empty() {
+        return Err(AppError::Invalid("이름·호스트·사용자는 필수입니다".into()));
+    }
     if !AUTH_TYPES.contains(&auth_type) {
         return Err(AppError::Invalid(format!("알 수 없는 인증 방식: {auth_type}")));
     }
+    validate_ssh_field(host, "호스트")?;
+    validate_ssh_field(username, "사용자")?;
+    validate_key_path(key_path)?;
     let n = conn.execute(
         "UPDATE server_connection SET name=?2, host=?3, port=?4, username=?5, auth_type=?6, key_path=?7, \
          updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?1",
@@ -151,6 +186,30 @@ mod tests {
         let (c, biz) = setup();
         assert!(create(&c, biz, None, "", "h", 22, "u", "key", None).is_err());
         assert!(create(&c, biz, None, "n", "h", 22, "u", "bogus", None).is_err());
+    }
+
+    #[test]
+    fn create_rejects_ssh_arg_injection() {
+        let (c, biz) = setup();
+        // username 이 '-'로 시작 → ssh 옵션 주입(-oProxyCommand=…) 차단
+        assert!(create(&c, biz, None, "n", "h", 22, "-oProxyCommand=touch /tmp/x", "key", None).is_err());
+        // host 가 '-'로 시작
+        assert!(create(&c, biz, None, "n", "-Ldanger", 22, "u", "key", None).is_err());
+        // 공백/@ 포함
+        assert!(create(&c, biz, None, "n", "h", 22, "u name", "key", None).is_err());
+        assert!(create(&c, biz, None, "n", "h@evil", 22, "u", "key", None).is_err());
+        // 키 경로 '-' 접두
+        assert!(create(&c, biz, None, "n", "h", 22, "u", "key", Some("-i/evil")).is_err());
+        // 정상 값은 통과
+        assert!(create(&c, biz, None, "n", "example.com", 22, "deploy", "key", Some("/home/u/.ssh/id_ed25519")).is_ok());
+    }
+
+    #[test]
+    fn update_rejects_ssh_arg_injection() {
+        let (c, biz) = setup();
+        let s = create(&c, biz, None, "n", "h", 22, "u", "key", None).unwrap();
+        assert!(update(&c, s.id, "n", "h", 22, "-oProxyCommand=x", "key", None).is_err());
+        assert!(update(&c, s.id, "n", "-bad", 22, "u", "key", None).is_err());
     }
 
     #[test]

@@ -8,6 +8,8 @@ const MIGRATIONS: &[&str] = &[
     include_str!("../migrations/0002_templates_recurring.sql"),
     include_str!("../migrations/0003_deliverable_files.sql"),
     include_str!("../migrations/0004_document_body.sql"),
+    include_str!("../migrations/0005_folders.sql"),
+    include_str!("../migrations/0006_memo.sql"),
 ];
 
 /// 아직 적용되지 않은 마이그레이션을 순서대로 실행. 두 번 호출해도 안전(멱등).

@@ -120,12 +120,41 @@ pub struct TaskLabel {
     pub color: Option<String>,
 }
 
+/// 사업별 메모(Keep식). 색상·고정·보관.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Memo {
+    pub id: i64,
+    pub business_id: i64,
+    pub title: String,
+    pub body: String,
+    pub color: Option<String>,
+    pub pinned: i64,
+    pub sort_order: f64,
+    pub archived_at: Option<String>,
+    pub created_at: String,
+}
+
+/// 산출물·문서 분류 폴더. 공용 테이블 + kind 구분자(최대 2단계).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Folder {
+    pub id: i64,
+    pub business_id: i64,
+    pub kind: String, // document | deliverable
+    pub parent_id: Option<i64>,
+    pub name: String,
+    pub sort_order: f64,
+    pub archived_at: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Document {
     pub id: i64,
     pub business_id: i64,
     pub project_id: Option<i64>,
+    pub folder_id: Option<i64>,
     pub title: String,
     pub icon: Option<String>,
     pub body: String,
@@ -151,6 +180,7 @@ pub struct Deliverable {
     pub id: i64,
     pub business_id: i64,
     pub project_id: Option<i64>,
+    pub folder_id: Option<i64>,
     pub title: String,
     pub kind: String,
     pub document_id: Option<i64>,

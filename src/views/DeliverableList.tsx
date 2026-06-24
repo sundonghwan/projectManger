@@ -1,16 +1,23 @@
 import { useRef, useState, type CSSProperties } from "react";
-import type { Deliverable, DeliverableStatus } from "../domain/types";
+import type { Deliverable, DeliverableStatus, Folder } from "../domain/types";
 import { DELIVERABLE_STATUS_COLOR, DELIVERABLE_STATUS_LABEL } from "../ui/colors";
 import { formatBytes } from "../domain/format";
+import { folderOptions } from "../domain/folderOptions";
 import { Icon } from "../ui/icons/Icon";
 
 export interface DeliverableListProps {
   deliverables: Deliverable[];
   error: string | null;
   uploading?: boolean;
+  /** 이동 드롭다운에 쓸 폴더 목록(이 사업·산출물). 없으면 폴더 열 미노출. */
+  folders?: Folder[];
+  /** 현재 보고 있는 폴더 id (표시용) */
+  currentFolderId?: number | null;
   onUpload: () => void;
   onSetStatus: (id: number, status: DeliverableStatus) => void;
   onRename: (id: number, title: string) => void;
+  /** 폴더 이동 (folderId=null 이면 미분류). 제공 시 폴더 열을 노출한다. */
+  onMove?: (id: number, folderId: number | null) => void;
   onOpen: (d: Deliverable) => void;
   onArchive: (id: number) => void;
 }
@@ -18,10 +25,15 @@ export interface DeliverableListProps {
 const STATUSES: DeliverableStatus[] = ["draft", "review", "done"];
 
 export function DeliverableList(props: DeliverableListProps) {
-  const { deliverables, error, uploading, onUpload, onSetStatus, onRename, onOpen, onArchive } = props;
+  const { deliverables, error, uploading, folders = [], onUpload, onSetStatus, onRename, onMove, onOpen, onArchive } = props;
   const [editingId, setEditingId] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
   const renameDone = useRef(false); // Enter→blur 중복 커밋 방지
+
+  const showFolders = !!onMove; // 폴더 이동 핸들러가 있을 때만 폴더 열 노출
+  const opts = folderOptions(folders);
+  const cols = showFolders ? "78px 1fr 84px 150px 92px 84px" : "78px 1fr 90px 100px 92px";
+  const grid = { ...rowGrid, gridTemplateColumns: cols };
 
   const startEdit = (d: Deliverable) => {
     renameDone.current = false;
@@ -52,10 +64,11 @@ export function DeliverableList(props: DeliverableListProps) {
         </div>
       )}
 
-      <div style={{ ...rowGrid, ...headerStyle }}>
+      <div style={{ ...grid, ...headerStyle }}>
         <span>상태</span>
         <span>파일명</span>
         <span>크기</span>
+        {showFolders && <span>폴더</span>}
         <span>업로드일</span>
         <span style={{ textAlign: "right" }}>동작</span>
       </div>
@@ -67,7 +80,7 @@ export function DeliverableList(props: DeliverableListProps) {
       ) : (
         <div style={{ flex: 1, overflow: "auto", minHeight: 0 }}>
           {deliverables.map((d) => (
-            <div key={d.id} data-testid={`deliv-${d.id}`} style={{ ...rowGrid, ...bodyRow }}>
+            <div key={d.id} data-testid={`deliv-${d.id}`} style={{ ...grid, ...bodyRow }}>
               <span onClick={(e) => e.stopPropagation()}>
                 <select
                   aria-label={`${d.title} 상태`}
@@ -120,6 +133,25 @@ export function DeliverableList(props: DeliverableListProps) {
               <span style={{ fontSize: 12, color: "var(--text2)", fontFamily: "var(--font-mono)" }}>
                 {formatBytes(d.fileSize)}
               </span>
+
+              {showFolders && (
+                <span onClick={(e) => e.stopPropagation()}>
+                  <select
+                    aria-label={`${d.title} 폴더`}
+                    value={d.folderId ?? ""}
+                    onChange={(e) => onMove!(d.id, e.target.value === "" ? null : Number(e.target.value))}
+                    style={folderSelect}
+                  >
+                    <option value="">미분류</option>
+                    {opts.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.depth > 0 ? " " : ""}{o.label}
+                      </option>
+                    ))}
+                  </select>
+                </span>
+              )}
+
               <span style={{ fontSize: 12, color: "var(--text3)" }}>{d.createdAt.slice(0, 10)}</span>
 
               <span style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
@@ -155,6 +187,15 @@ const rowGrid: CSSProperties = {
   alignItems: "center",
   gap: 8,
   padding: "0 20px",
+};
+const folderSelect: CSSProperties = {
+  width: "100%",
+  fontSize: 11.5,
+  border: "1px solid var(--border)",
+  borderRadius: 4,
+  padding: "2px 4px",
+  background: "var(--bg)",
+  color: "var(--text2)",
 };
 const headerStyle: CSSProperties = {
   height: 32,

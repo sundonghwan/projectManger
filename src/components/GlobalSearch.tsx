@@ -13,6 +13,7 @@ const KIND_ICON: Record<SearchKind, IconName> = {
   task: "check-square",
   document: "document",
   deliverable: "deliverable",
+  memo: "memo",
 };
 const KIND_LABEL: Record<SearchKind, string> = {
   business: "사업",
@@ -20,6 +21,7 @@ const KIND_LABEL: Record<SearchKind, string> = {
   task: "태스크",
   document: "문서",
   deliverable: "산출물",
+  memo: "메모",
 };
 
 export function GlobalSearch({ onSearch, onPick }: GlobalSearchProps) {
