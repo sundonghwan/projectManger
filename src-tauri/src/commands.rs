@@ -1,10 +1,15 @@
 use crate::error::Result;
-use crate::models::{
-    Block, Business, CommandSnippet, Deliverable, DeliverableVersion, Document, Folder, Label,
-    Memo, Project, RecurringTask, SearchHit, ServerConnection, Task, TaskLabel, Template, TrashItem,
-};
+use crate::models::{CommandSnippet, ServerConnection};
 use crate::secrets;
 use crate::repo;
+use crate::store::model::{
+    Block, Business, Deliverable, DeliverableVersion, Document, Folder, Label, Memo, Project,
+    RecurringTask, Task, Template,
+};
+use crate::store::ops;
+use crate::store::ops::label::TaskLabelView;
+use crate::store::ops::search::SearchHit;
+use crate::store::ops::trash::TrashItem;
 use rusqlite::Connection;
 use serde::Deserialize;
 use std::sync::Mutex;
@@ -28,7 +33,7 @@ pub struct BusinessCreate {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BusinessUpdate {
-    pub id: i64,
+    pub id: String,
     pub name: String,
     #[serde(rename = "type")]
     pub type_: String,
@@ -39,22 +44,22 @@ pub struct BusinessUpdate {
 
 #[tauri::command]
 pub fn business_list(state: State<AppState>) -> Result<Vec<Business>> {
-    let conn = state.db.lock().unwrap();
-    repo::business::list(&conn)
+    let store = state.store.lock().unwrap();
+    ops::business::list(&store)
 }
 
 #[tauri::command]
 pub fn business_create(state: State<AppState>, input: BusinessCreate) -> Result<Business> {
-    let conn = state.db.lock().unwrap();
-    repo::business::create(&conn, &input.name, &input.type_, input.color.as_deref())
+    let mut store = state.store.lock().unwrap();
+    ops::business::create(&mut store, &input.name, &input.type_, input.color.as_deref())
 }
 
 #[tauri::command]
 pub fn business_update(state: State<AppState>, input: BusinessUpdate) -> Result<Business> {
-    let conn = state.db.lock().unwrap();
-    repo::business::update(
-        &conn,
-        input.id,
+    let mut store = state.store.lock().unwrap();
+    ops::business::update(
+        &mut store,
+        &input.id,
         &input.name,
         &input.type_,
         &input.status,
@@ -64,28 +69,28 @@ pub fn business_update(state: State<AppState>, input: BusinessUpdate) -> Result<
 }
 
 #[tauri::command]
-pub fn business_rename(state: State<AppState>, id: i64, name: String) -> Result<Business> {
-    let conn = state.db.lock().unwrap();
-    repo::business::rename(&conn, id, &name)
+pub fn business_rename(state: State<AppState>, id: String, name: String) -> Result<Business> {
+    let mut store = state.store.lock().unwrap();
+    ops::business::rename(&mut store, &id, &name)
 }
 
 #[tauri::command]
-pub fn business_archive(state: State<AppState>, id: i64) -> Result<()> {
-    let conn = state.db.lock().unwrap();
-    repo::business::archive(&conn, id)
+pub fn business_archive(state: State<AppState>, id: String) -> Result<()> {
+    let mut store = state.store.lock().unwrap();
+    ops::business::archive(&mut store, &id)
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectCreate {
-    pub business_id: i64,
+    pub business_id: String,
     pub name: String,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectUpdate {
-    pub id: i64,
+    pub id: String,
     pub name: String,
     pub status: String,
     pub description: Option<String>,
@@ -93,23 +98,23 @@ pub struct ProjectUpdate {
 }
 
 #[tauri::command]
-pub fn project_list(state: State<AppState>, business_id: i64) -> Result<Vec<Project>> {
-    let conn = state.db.lock().unwrap();
-    repo::project::list_by_business(&conn, business_id)
+pub fn project_list(state: State<AppState>, business_id: String) -> Result<Vec<Project>> {
+    let store = state.store.lock().unwrap();
+    ops::project::list_by_business(&store, &business_id)
 }
 
 #[tauri::command]
 pub fn project_create(state: State<AppState>, input: ProjectCreate) -> Result<Project> {
-    let conn = state.db.lock().unwrap();
-    repo::project::create(&conn, input.business_id, &input.name)
+    let mut store = state.store.lock().unwrap();
+    ops::project::create(&mut store, &input.business_id, &input.name)
 }
 
 #[tauri::command]
 pub fn project_update(state: State<AppState>, input: ProjectUpdate) -> Result<Project> {
-    let conn = state.db.lock().unwrap();
-    repo::project::update(
-        &conn,
-        input.id,
+    let mut store = state.store.lock().unwrap();
+    ops::project::update(
+        &mut store,
+        &input.id,
         &input.name,
         &input.status,
         input.description.as_deref(),
@@ -118,22 +123,22 @@ pub fn project_update(state: State<AppState>, input: ProjectUpdate) -> Result<Pr
 }
 
 #[tauri::command]
-pub fn project_rename(state: State<AppState>, id: i64, name: String) -> Result<Project> {
-    let conn = state.db.lock().unwrap();
-    repo::project::rename(&conn, id, &name)
+pub fn project_rename(state: State<AppState>, id: String, name: String) -> Result<Project> {
+    let mut store = state.store.lock().unwrap();
+    ops::project::rename(&mut store, &id, &name)
 }
 
 #[tauri::command]
-pub fn project_archive(state: State<AppState>, id: i64) -> Result<()> {
-    let conn = state.db.lock().unwrap();
-    repo::project::archive(&conn, id)
+pub fn project_archive(state: State<AppState>, id: String) -> Result<()> {
+    let mut store = state.store.lock().unwrap();
+    ops::project::archive(&mut store, &id)
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskCreate {
-    pub business_id: i64,
-    pub project_id: Option<i64>,
+    pub business_id: String,
+    pub project_id: Option<String>,
     pub title: String,
     #[serde(default = "default_priority")]
     pub priority: i64,
@@ -145,7 +150,7 @@ fn default_priority() -> i64 {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskUpdate {
-    pub id: i64,
+    pub id: String,
     pub title: String,
     pub priority: i64,
     pub due_date: Option<String>,
@@ -155,7 +160,7 @@ pub struct TaskUpdate {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskMove {
-    pub id: i64,
+    pub id: String,
     pub status: String,
     pub sort_order: f64,
 }
@@ -163,25 +168,25 @@ pub struct TaskMove {
 #[tauri::command]
 pub fn task_list(
     state: State<AppState>,
-    business_id: i64,
-    project_id: Option<i64>,
+    business_id: String,
+    project_id: Option<String>,
 ) -> Result<Vec<Task>> {
-    let conn = state.db.lock().unwrap();
-    repo::task::list(&conn, business_id, project_id)
+    let store = state.store.lock().unwrap();
+    ops::task::list(&store, &business_id, project_id.as_deref())
 }
 
 #[tauri::command]
 pub fn task_create(state: State<AppState>, input: TaskCreate) -> Result<Task> {
-    let conn = state.db.lock().unwrap();
-    repo::task::create(&conn, input.business_id, input.project_id, &input.title, input.priority)
+    let mut store = state.store.lock().unwrap();
+    ops::task::create(&mut store, &input.business_id, input.project_id.as_deref(), &input.title, input.priority)
 }
 
 #[tauri::command]
 pub fn task_update(state: State<AppState>, input: TaskUpdate) -> Result<Task> {
-    let conn = state.db.lock().unwrap();
-    repo::task::update(
-        &conn,
-        input.id,
+    let mut store = state.store.lock().unwrap();
+    ops::task::update(
+        &mut store,
+        &input.id,
         &input.title,
         input.priority,
         input.due_date.as_deref(),
@@ -191,29 +196,29 @@ pub fn task_update(state: State<AppState>, input: TaskUpdate) -> Result<Task> {
 
 #[tauri::command]
 pub fn task_move(state: State<AppState>, input: TaskMove) -> Result<Task> {
-    let conn = state.db.lock().unwrap();
-    repo::task::move_task(&conn, input.id, &input.status, input.sort_order)
+    let mut store = state.store.lock().unwrap();
+    ops::task::move_task(&mut store, &input.id, &input.status, input.sort_order)
 }
 
 #[tauri::command]
-pub fn task_archive(state: State<AppState>, id: i64) -> Result<()> {
-    let conn = state.db.lock().unwrap();
-    repo::task::archive(&conn, id)
+pub fn task_archive(state: State<AppState>, id: String) -> Result<()> {
+    let mut store = state.store.lock().unwrap();
+    ops::task::archive(&mut store, &id)
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DocumentCreate {
-    pub business_id: i64,
-    pub project_id: Option<i64>,
-    pub folder_id: Option<i64>,
+    pub business_id: String,
+    pub project_id: Option<String>,
+    pub folder_id: Option<String>,
     pub title: String,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockCreate {
-    pub document_id: i64,
+    pub document_id: String,
     #[serde(rename = "type")]
     pub type_: String,
     pub content: String,
@@ -223,76 +228,76 @@ pub struct BlockCreate {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockUpdate {
-    pub id: i64,
+    pub id: String,
     #[serde(rename = "type")]
     pub type_: String,
     pub content: String,
 }
 
 #[tauri::command]
-pub fn document_list(state: State<AppState>, business_id: i64) -> Result<Vec<Document>> {
-    let conn = state.db.lock().unwrap();
-    repo::document::list_by_business(&conn, business_id)
+pub fn document_list(state: State<AppState>, business_id: String) -> Result<Vec<Document>> {
+    let store = state.store.lock().unwrap();
+    ops::document::list_by_business(&store, &business_id)
 }
 
 #[tauri::command]
 pub fn document_create(state: State<AppState>, input: DocumentCreate) -> Result<Document> {
-    let conn = state.db.lock().unwrap();
-    repo::document::create(&conn, input.business_id, input.project_id, input.folder_id, &input.title)
+    let mut store = state.store.lock().unwrap();
+    ops::document::create(&mut store, &input.business_id, input.project_id.as_deref(), input.folder_id.as_deref(), &input.title)
 }
 
 #[tauri::command]
-pub fn document_move(state: State<AppState>, id: i64, folder_id: Option<i64>) -> Result<Document> {
-    let conn = state.db.lock().unwrap();
-    repo::document::set_folder(&conn, id, folder_id)
+pub fn document_move(state: State<AppState>, id: String, folder_id: Option<String>) -> Result<Document> {
+    let mut store = state.store.lock().unwrap();
+    ops::document::set_folder(&mut store, &id, folder_id.as_deref())
 }
 
 #[tauri::command]
-pub fn document_rename(state: State<AppState>, id: i64, title: String) -> Result<Document> {
-    let conn = state.db.lock().unwrap();
-    repo::document::rename(&conn, id, &title)
+pub fn document_rename(state: State<AppState>, id: String, title: String) -> Result<Document> {
+    let mut store = state.store.lock().unwrap();
+    ops::document::rename(&mut store, &id, &title)
 }
 
 #[tauri::command]
-pub fn document_archive(state: State<AppState>, id: i64) -> Result<()> {
-    let conn = state.db.lock().unwrap();
-    repo::document::archive(&conn, id)
+pub fn document_archive(state: State<AppState>, id: String) -> Result<()> {
+    let mut store = state.store.lock().unwrap();
+    ops::document::archive(&mut store, &id)
 }
 
 #[tauri::command]
-pub fn document_get(state: State<AppState>, id: i64) -> Result<Document> {
-    let conn = state.db.lock().unwrap();
-    repo::document::get(&conn, id)
+pub fn document_get(state: State<AppState>, id: String) -> Result<Document> {
+    let store = state.store.lock().unwrap();
+    ops::document::get(&store, &id)
 }
 
 #[tauri::command]
-pub fn document_set_body(state: State<AppState>, id: i64, body: String) -> Result<()> {
-    let conn = state.db.lock().unwrap();
-    repo::document::set_body(&conn, id, &body)
+pub fn document_set_body(state: State<AppState>, id: String, body: String) -> Result<()> {
+    let mut store = state.store.lock().unwrap();
+    ops::document::set_body(&mut store, &id, &body)
 }
 
 #[tauri::command]
-pub fn block_list(state: State<AppState>, document_id: i64) -> Result<Vec<Block>> {
-    let conn = state.db.lock().unwrap();
-    repo::document::list_blocks(&conn, document_id)
+pub fn block_list(state: State<AppState>, document_id: String) -> Result<Vec<Block>> {
+    let store = state.store.lock().unwrap();
+    ops::document::list_blocks(&store, &document_id)
 }
 
 #[tauri::command]
 pub fn block_create(state: State<AppState>, input: BlockCreate) -> Result<Block> {
-    let conn = state.db.lock().unwrap();
-    repo::document::create_block(&conn, input.document_id, &input.type_, &input.content, input.sort_order)
+    let mut store = state.store.lock().unwrap();
+    ops::document::create_block(&mut store, &input.document_id, &input.type_, &input.content, input.sort_order)
 }
 
 #[tauri::command]
 pub fn block_update(state: State<AppState>, input: BlockUpdate) -> Result<Block> {
-    let conn = state.db.lock().unwrap();
-    repo::document::update_block(&conn, input.id, &input.type_, &input.content)
+    let mut store = state.store.lock().unwrap();
+    ops::document::update_block(&mut store, &input.id, &input.type_, &input.content)
 }
 
 #[tauri::command]
-pub fn block_delete(state: State<AppState>, id: i64) -> Result<()> {
-    let conn = state.db.lock().unwrap();
-    repo::document::delete_block(&conn, id)
+pub fn block_delete(state: State<AppState>, id: String) -> Result<()> {
+    let mut store = state.store.lock().unwrap();
+    ops::document::delete_block(&mut store, &id)
 }
 
 #[derive(Deserialize)]
@@ -305,46 +310,46 @@ pub struct LabelCreate {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LabelAssign {
-    pub task_id: i64,
-    pub label_id: i64,
+    pub task_id: String,
+    pub label_id: String,
 }
 
 #[tauri::command]
 pub fn label_list(state: State<AppState>) -> Result<Vec<Label>> {
-    let conn = state.db.lock().unwrap();
-    repo::label::list(&conn)
+    let store = state.store.lock().unwrap();
+    ops::label::list(&store)
 }
 
 #[tauri::command]
 pub fn label_create(state: State<AppState>, input: LabelCreate) -> Result<Label> {
-    let conn = state.db.lock().unwrap();
-    repo::label::create(&conn, &input.name, input.color.as_deref())
+    let mut store = state.store.lock().unwrap();
+    ops::label::create(&mut store, &input.name, input.color.as_deref())
 }
 
 #[tauri::command]
 pub fn label_assign(state: State<AppState>, input: LabelAssign) -> Result<()> {
-    let conn = state.db.lock().unwrap();
-    repo::label::assign(&conn, input.task_id, input.label_id)
+    let mut store = state.store.lock().unwrap();
+    ops::label::assign(&mut store, &input.task_id, &input.label_id)
 }
 
 #[tauri::command]
 pub fn label_unassign(state: State<AppState>, input: LabelAssign) -> Result<()> {
-    let conn = state.db.lock().unwrap();
-    repo::label::unassign(&conn, input.task_id, input.label_id)
+    let mut store = state.store.lock().unwrap();
+    ops::label::unassign(&mut store, &input.task_id, &input.label_id)
 }
 
 #[tauri::command]
-pub fn task_label_map(state: State<AppState>, business_id: i64) -> Result<Vec<TaskLabel>> {
-    let conn = state.db.lock().unwrap();
-    repo::label::map_for_business(&conn, business_id)
+pub fn task_label_map(state: State<AppState>, business_id: String) -> Result<Vec<TaskLabelView>> {
+    let store = state.store.lock().unwrap();
+    ops::label::map_for_business(&store, &business_id)
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeliverableCreate {
-    pub business_id: i64,
-    pub project_id: Option<i64>,
-    pub folder_id: Option<i64>,
+    pub business_id: String,
+    pub project_id: Option<String>,
+    pub folder_id: Option<String>,
     pub title: String,
     pub kind: String,
 }
@@ -352,51 +357,51 @@ pub struct DeliverableCreate {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeliverableVersionAdd {
-    pub id: i64,
+    pub id: String,
     pub note: Option<String>,
     pub file_path: Option<String>,
 }
 
 #[tauri::command]
-pub fn deliverable_list(state: State<AppState>, business_id: i64) -> Result<Vec<Deliverable>> {
-    let conn = state.db.lock().unwrap();
-    repo::deliverable::list_by_business(&conn, business_id)
+pub fn deliverable_list(state: State<AppState>, business_id: String) -> Result<Vec<Deliverable>> {
+    let store = state.store.lock().unwrap();
+    ops::deliverable::list_by_business(&store, &business_id)
 }
 
 #[tauri::command]
 pub fn deliverable_create(state: State<AppState>, input: DeliverableCreate) -> Result<Deliverable> {
-    let conn = state.db.lock().unwrap();
-    repo::deliverable::create(&conn, input.business_id, input.project_id, input.folder_id, &input.title, &input.kind)
+    let mut store = state.store.lock().unwrap();
+    ops::deliverable::create(&mut store, &input.business_id, input.project_id.as_deref(), input.folder_id.as_deref(), &input.title, &input.kind)
 }
 
 #[tauri::command]
-pub fn deliverable_move(state: State<AppState>, id: i64, folder_id: Option<i64>) -> Result<Deliverable> {
-    let conn = state.db.lock().unwrap();
-    repo::deliverable::set_folder(&conn, id, folder_id)
+pub fn deliverable_move(state: State<AppState>, id: String, folder_id: Option<String>) -> Result<Deliverable> {
+    let mut store = state.store.lock().unwrap();
+    ops::deliverable::set_folder(&mut store, &id, folder_id.as_deref())
 }
 
 #[tauri::command]
-pub fn deliverable_set_status(state: State<AppState>, id: i64, status: String) -> Result<Deliverable> {
-    let conn = state.db.lock().unwrap();
-    repo::deliverable::update_status(&conn, id, &status)
+pub fn deliverable_set_status(state: State<AppState>, id: String, status: String) -> Result<Deliverable> {
+    let mut store = state.store.lock().unwrap();
+    ops::deliverable::update_status(&mut store, &id, &status)
 }
 
 #[tauri::command]
 pub fn deliverable_add_version(state: State<AppState>, input: DeliverableVersionAdd) -> Result<Deliverable> {
-    let conn = state.db.lock().unwrap();
-    repo::deliverable::add_version(&conn, input.id, input.note.as_deref(), input.file_path.as_deref())
+    let mut store = state.store.lock().unwrap();
+    ops::deliverable::add_version(&mut store, &input.id, input.note.as_deref(), input.file_path.as_deref())
 }
 
 #[tauri::command]
-pub fn deliverable_versions(state: State<AppState>, deliverable_id: i64) -> Result<Vec<DeliverableVersion>> {
-    let conn = state.db.lock().unwrap();
-    repo::deliverable::list_versions(&conn, deliverable_id)
+pub fn deliverable_versions(state: State<AppState>, deliverable_id: String) -> Result<Vec<DeliverableVersion>> {
+    let store = state.store.lock().unwrap();
+    ops::deliverable::list_versions(&store, &deliverable_id)
 }
 
 #[tauri::command]
-pub fn deliverable_archive(state: State<AppState>, id: i64) -> Result<()> {
-    let conn = state.db.lock().unwrap();
-    repo::deliverable::archive(&conn, id)
+pub fn deliverable_archive(state: State<AppState>, id: String) -> Result<()> {
+    let mut store = state.store.lock().unwrap();
+    ops::deliverable::archive(&mut store, &id)
 }
 
 /// 파일 업로드(다중). 프론트가 다이얼로그로 고른 경로들을 받아 앱 데이터 폴더로 복사하고
@@ -405,9 +410,9 @@ pub fn deliverable_archive(state: State<AppState>, id: i64) -> Result<()> {
 pub fn deliverable_upload(
     app: tauri::AppHandle,
     state: State<AppState>,
-    business_id: i64,
-    project_id: Option<i64>,
-    folder_id: Option<i64>,
+    business_id: String,
+    project_id: Option<String>,
+    folder_id: Option<String>,
     paths: Vec<String>,
 ) -> Result<Vec<Deliverable>> {
     use tauri::Manager;
@@ -415,7 +420,7 @@ pub fn deliverable_upload(
         .path()
         .app_data_dir()
         .map_err(|_| crate::error::AppError::Invalid("앱 데이터 폴더를 찾을 수 없음".into()))?;
-    let conn = state.db.lock().unwrap();
+    let mut store = state.store.lock().unwrap();
     let mut created = Vec::new();
     for path in paths {
         let src = std::path::Path::new(&path);
@@ -427,37 +432,42 @@ pub fn deliverable_upload(
             Ok(m) if m.is_file() => m.len() as i64,
             _ => continue,
         };
-        // 1) 행 먼저 생성해 id 확보
-        let d = match repo::deliverable::create_file(&conn, business_id, project_id, folder_id, &filename, &filename, size) {
+        let d = match ops::deliverable::create_file(
+            &mut store,
+            &business_id,
+            project_id.as_deref(),
+            folder_id.as_deref(),
+            &filename,
+            &filename,
+            size,
+        ) {
             Ok(d) => d,
             Err(_) => continue,
         };
-        // 2) <appData>/deliverables/<id>/<filename> 로 복사
-        let dest_dir = data_dir.join("deliverables").join(d.id.to_string());
+        let dest_dir = data_dir.join("deliverables").join(&d.id);
         if std::fs::create_dir_all(&dest_dir).is_err() {
-            let _ = repo::deliverable::delete(&conn, d.id);
+            let _ = ops::deliverable::delete(&mut store, &d.id);
             continue;
         }
         let dest = dest_dir.join(&filename);
         if std::fs::copy(src, &dest).is_err() {
-            let _ = repo::deliverable::delete(&conn, d.id);
+            let _ = ops::deliverable::delete(&mut store, &d.id);
             let _ = std::fs::remove_dir(&dest_dir);
             continue;
         }
-        // 3) 복사본 경로 기록
         let dest_str = dest.to_string_lossy().to_string();
-        if repo::deliverable::set_file_path(&conn, d.id, &dest_str).is_err() {
+        if ops::deliverable::set_file_path(&mut store, &d.id, &dest_str).is_err() {
             continue;
         }
-        created.push(repo::deliverable::get(&conn, d.id)?);
+        created.push(ops::deliverable::get(&store, &d.id)?);
     }
     Ok(created)
 }
 
 #[tauri::command]
-pub fn deliverable_rename(state: State<AppState>, id: i64, title: String) -> Result<Deliverable> {
-    let conn = state.db.lock().unwrap();
-    repo::deliverable::rename(&conn, id, &title)
+pub fn deliverable_rename(state: State<AppState>, id: String, title: String) -> Result<Deliverable> {
+    let mut store = state.store.lock().unwrap();
+    ops::deliverable::rename(&mut store, &id, &title)
 }
 
 // ---- 폴더(산출물·문서 분류) ----
@@ -465,34 +475,34 @@ pub fn deliverable_rename(state: State<AppState>, id: i64, title: String) -> Res
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FolderCreate {
-    pub business_id: i64,
+    pub business_id: String,
     pub kind: String, // document | deliverable
-    pub parent_id: Option<i64>,
+    pub parent_id: Option<String>,
     pub name: String,
 }
 
 #[tauri::command]
-pub fn folder_list(state: State<AppState>, business_id: i64) -> Result<Vec<Folder>> {
-    let conn = state.db.lock().unwrap();
-    repo::folder::list_by_business(&conn, business_id)
+pub fn folder_list(state: State<AppState>, business_id: String) -> Result<Vec<Folder>> {
+    let store = state.store.lock().unwrap();
+    ops::folder::list_by_business(&store, &business_id)
 }
 
 #[tauri::command]
 pub fn folder_create(state: State<AppState>, input: FolderCreate) -> Result<Folder> {
-    let conn = state.db.lock().unwrap();
-    repo::folder::create(&conn, input.business_id, &input.kind, input.parent_id, &input.name)
+    let mut store = state.store.lock().unwrap();
+    ops::folder::create(&mut store, &input.business_id, &input.kind, input.parent_id.as_deref(), &input.name)
 }
 
 #[tauri::command]
-pub fn folder_rename(state: State<AppState>, id: i64, name: String) -> Result<Folder> {
-    let conn = state.db.lock().unwrap();
-    repo::folder::rename(&conn, id, &name)
+pub fn folder_rename(state: State<AppState>, id: String, name: String) -> Result<Folder> {
+    let mut store = state.store.lock().unwrap();
+    ops::folder::rename(&mut store, &id, &name)
 }
 
 #[tauri::command]
-pub fn folder_delete(state: State<AppState>, id: i64) -> Result<()> {
-    let conn = state.db.lock().unwrap();
-    repo::folder::delete(&conn, id)
+pub fn folder_delete(state: State<AppState>, id: String) -> Result<()> {
+    let mut store = state.store.lock().unwrap();
+    ops::folder::delete(&mut store, &id)
 }
 
 // ---- 메모(사업별 Keep식) ----
@@ -500,7 +510,7 @@ pub fn folder_delete(state: State<AppState>, id: i64) -> Result<()> {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MemoCreate {
-    pub business_id: i64,
+    pub business_id: String,
     pub title: String,
     pub body: String,
 }
@@ -508,45 +518,45 @@ pub struct MemoCreate {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MemoUpdate {
-    pub id: i64,
+    pub id: String,
     pub title: String,
     pub body: String,
 }
 
 #[tauri::command]
-pub fn memo_list(state: State<AppState>, business_id: i64) -> Result<Vec<Memo>> {
-    let conn = state.db.lock().unwrap();
-    repo::memo::list_by_business(&conn, business_id)
+pub fn memo_list(state: State<AppState>, business_id: String) -> Result<Vec<Memo>> {
+    let store = state.store.lock().unwrap();
+    ops::memo::list_by_business(&store, &business_id)
 }
 
 #[tauri::command]
 pub fn memo_create(state: State<AppState>, input: MemoCreate) -> Result<Memo> {
-    let conn = state.db.lock().unwrap();
-    repo::memo::create(&conn, input.business_id, &input.title, &input.body)
+    let mut store = state.store.lock().unwrap();
+    ops::memo::create(&mut store, &input.business_id, &input.title, &input.body)
 }
 
 #[tauri::command]
 pub fn memo_update(state: State<AppState>, input: MemoUpdate) -> Result<Memo> {
-    let conn = state.db.lock().unwrap();
-    repo::memo::update(&conn, input.id, &input.title, &input.body)
+    let mut store = state.store.lock().unwrap();
+    ops::memo::update(&mut store, &input.id, &input.title, &input.body)
 }
 
 #[tauri::command]
-pub fn memo_set_color(state: State<AppState>, id: i64, color: Option<String>) -> Result<Memo> {
-    let conn = state.db.lock().unwrap();
-    repo::memo::set_color(&conn, id, color.as_deref())
+pub fn memo_set_color(state: State<AppState>, id: String, color: Option<String>) -> Result<Memo> {
+    let mut store = state.store.lock().unwrap();
+    ops::memo::set_color(&mut store, &id, color.as_deref())
 }
 
 #[tauri::command]
-pub fn memo_set_pinned(state: State<AppState>, id: i64, pinned: bool) -> Result<Memo> {
-    let conn = state.db.lock().unwrap();
-    repo::memo::set_pinned(&conn, id, pinned)
+pub fn memo_set_pinned(state: State<AppState>, id: String, pinned: bool) -> Result<Memo> {
+    let mut store = state.store.lock().unwrap();
+    ops::memo::set_pinned(&mut store, &id, pinned)
 }
 
 #[tauri::command]
-pub fn memo_archive(state: State<AppState>, id: i64) -> Result<()> {
-    let conn = state.db.lock().unwrap();
-    repo::memo::archive(&conn, id)
+pub fn memo_archive(state: State<AppState>, id: String) -> Result<()> {
+    let mut store = state.store.lock().unwrap();
+    ops::memo::archive(&mut store, &id)
 }
 
 #[derive(Deserialize)]
@@ -776,37 +786,37 @@ pub struct TemplateCreate {
 
 #[tauri::command]
 pub fn template_list(state: State<AppState>) -> Result<Vec<Template>> {
-    let conn = state.db.lock().unwrap();
-    repo::template::list(&conn)
+    let store = state.store.lock().unwrap();
+    ops::template::list(&store)
 }
 
 #[tauri::command]
 pub fn template_create(state: State<AppState>, input: TemplateCreate) -> Result<Template> {
-    let conn = state.db.lock().unwrap();
-    repo::template::create(&conn, &input.name, &input.kind, &input.payload)
+    let mut store = state.store.lock().unwrap();
+    ops::template::create(&mut store, &input.name, &input.kind, &input.payload)
 }
 
 #[tauri::command]
-pub fn template_delete(state: State<AppState>, id: i64) -> Result<()> {
-    let conn = state.db.lock().unwrap();
-    repo::template::delete(&conn, id)
+pub fn template_delete(state: State<AppState>, id: String) -> Result<()> {
+    let mut store = state.store.lock().unwrap();
+    ops::template::delete(&mut store, &id)
 }
 
 #[tauri::command]
-pub fn template_apply_project(state: State<AppState>, template_id: i64, business_id: i64) -> Result<i64> {
-    let conn = state.db.lock().unwrap();
-    repo::template::apply_project(&conn, template_id, business_id)
+pub fn template_apply_project(state: State<AppState>, template_id: String, business_id: String) -> Result<String> {
+    let mut store = state.store.lock().unwrap();
+    ops::template::apply_project(&mut store, &template_id, &business_id)
 }
 
 #[tauri::command]
 pub fn template_apply_document(
     state: State<AppState>,
-    template_id: i64,
-    business_id: i64,
-    project_id: Option<i64>,
-) -> Result<i64> {
-    let conn = state.db.lock().unwrap();
-    repo::template::apply_document(&conn, template_id, business_id, project_id)
+    template_id: String,
+    business_id: String,
+    project_id: Option<String>,
+) -> Result<String> {
+    let mut store = state.store.lock().unwrap();
+    ops::template::apply_document(&mut store, &template_id, &business_id, project_id.as_deref())
 }
 
 // ---- 반복 태스크 ----
@@ -814,8 +824,8 @@ pub fn template_apply_document(
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RecurringCreate {
-    pub business_id: i64,
-    pub project_id: Option<i64>,
+    pub business_id: String,
+    pub project_id: Option<String>,
     pub title: String,
     pub priority: i64,
     pub interval_days: i64,
@@ -823,18 +833,18 @@ pub struct RecurringCreate {
 }
 
 #[tauri::command]
-pub fn recurring_list(state: State<AppState>, business_id: i64) -> Result<Vec<RecurringTask>> {
-    let conn = state.db.lock().unwrap();
-    repo::recurring::list_by_business(&conn, business_id)
+pub fn recurring_list(state: State<AppState>, business_id: String) -> Result<Vec<RecurringTask>> {
+    let store = state.store.lock().unwrap();
+    ops::recurring::list_by_business(&store, &business_id)
 }
 
 #[tauri::command]
 pub fn recurring_create(state: State<AppState>, input: RecurringCreate) -> Result<RecurringTask> {
-    let conn = state.db.lock().unwrap();
-    repo::recurring::create(
-        &conn,
-        input.business_id,
-        input.project_id,
+    let mut store = state.store.lock().unwrap();
+    ops::recurring::create(
+        &mut store,
+        &input.business_id,
+        input.project_id.as_deref(),
         &input.title,
         input.priority,
         input.interval_days,
@@ -843,56 +853,55 @@ pub fn recurring_create(state: State<AppState>, input: RecurringCreate) -> Resul
 }
 
 #[tauri::command]
-pub fn recurring_set_active(state: State<AppState>, id: i64, active: bool) -> Result<()> {
-    let conn = state.db.lock().unwrap();
-    repo::recurring::set_active(&conn, id, active)
+pub fn recurring_set_active(state: State<AppState>, id: String, active: bool) -> Result<()> {
+    let mut store = state.store.lock().unwrap();
+    ops::recurring::set_active(&mut store, &id, active)
 }
 
 #[tauri::command]
-pub fn recurring_delete(state: State<AppState>, id: i64) -> Result<()> {
-    let conn = state.db.lock().unwrap();
-    repo::recurring::delete(&conn, id)
+pub fn recurring_delete(state: State<AppState>, id: String) -> Result<()> {
+    let mut store = state.store.lock().unwrap();
+    ops::recurring::delete(&mut store, &id)
 }
 
 /// today(YYYY-MM-DD) 기준 도래한 반복 태스크 생성. 생성 수 반환.
 #[tauri::command]
 pub fn recurring_generate(state: State<AppState>, today: String) -> Result<usize> {
-    let conn = state.db.lock().unwrap();
-    repo::recurring::generate_due(&conn, &today)
+    let mut store = state.store.lock().unwrap();
+    ops::recurring::generate_due(&mut store, &today)
 }
 
 #[tauri::command]
 pub fn search(state: State<AppState>, query: String) -> Result<Vec<SearchHit>> {
-    let conn = state.db.lock().unwrap();
-    repo::search::search(&conn, &query)
+    let store = state.store.lock().unwrap();
+    ops::search::search(&store, &query)
 }
 
 #[tauri::command]
 pub fn trash_list(state: State<AppState>) -> Result<Vec<TrashItem>> {
-    let conn = state.db.lock().unwrap();
-    repo::trash::list_archived(&conn)
+    let store = state.store.lock().unwrap();
+    ops::trash::list_archived(&store)
 }
 
 #[tauri::command]
-pub fn trash_restore(state: State<AppState>, kind: String, id: i64) -> Result<()> {
-    let conn = state.db.lock().unwrap();
-    repo::trash::restore(&conn, &kind, id)
+pub fn trash_restore(state: State<AppState>, kind: String, id: String) -> Result<()> {
+    let mut store = state.store.lock().unwrap();
+    ops::trash::restore(&mut store, &kind, &id)
 }
 
 #[tauri::command]
-pub fn trash_purge(state: State<AppState>, kind: String, id: i64) -> Result<()> {
-    let conn = state.db.lock().unwrap();
+pub fn trash_purge(state: State<AppState>, kind: String, id: String) -> Result<()> {
+    let mut store = state.store.lock().unwrap();
     // 산출물은 영구삭제 시 복사 보관된 물리 파일도 함께 제거한다.
     let file_path = if kind == "deliverable" {
-        repo::deliverable::file_path_of(&conn, id).ok().flatten()
+        ops::deliverable::file_path_of(&store, &id).ok().flatten()
     } else {
         None
     };
-    repo::trash::purge(&conn, &kind, id)?;
+    ops::trash::purge(&mut store, &kind, &id)?;
     if let Some(path) = file_path {
         let p = std::path::Path::new(&path);
         let _ = std::fs::remove_file(p);
-        // <appData>/deliverables/<id>/ 폴더도 비었으면 정리
         if let Some(parent) = p.parent() {
             let _ = std::fs::remove_dir(parent);
         }
