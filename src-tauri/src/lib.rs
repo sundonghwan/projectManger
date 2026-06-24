@@ -23,8 +23,12 @@ pub fn run() {
             std::fs::create_dir_all(&dir).ok();
             let db_path = dir.join("projectmanger.sqlite");
             let conn = db::open_at(&db_path).expect("DB 초기화 실패");
+            // vault 데이터용 파일 Store(임시 위치: appData/.projectManger; 1c에서 사용자 선택 vault로 교체)
+            let store_root = dir.join(".projectManger");
+            let store = store::Store::open(store_root).expect("Store 초기화 실패");
             app.manage(commands::AppState {
                 db: Mutex::new(conn),
+                store: Mutex::new(store),
             });
             app.manage(terminal::TerminalManager::default());
             Ok(())

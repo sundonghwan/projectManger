@@ -10,9 +10,10 @@ use serde::Deserialize;
 use std::sync::Mutex;
 use tauri::State;
 
-/// 앱 전역 상태 — SQLite 연결을 Mutex로 보호.
+/// 앱 전역 상태 — SSH/백업용 SQLite 연결과, vault 데이터용 파일 Store.
 pub struct AppState {
     pub db: Mutex<Connection>,
+    pub store: Mutex<crate::store::Store>,
 }
 
 #[derive(Deserialize)]
