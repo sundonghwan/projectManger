@@ -9,14 +9,21 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Emitter};
 
 /// ssh 실행 인자 구성 (순수 함수 — 테스트 대상).
-pub fn build_ssh_args(server: &ServerConnection) -> Vec<String> {
+/// 보안(CWE-295): 호스트 키를 엄격 검증(`StrictHostKeyChecking=yes`)하고, 앱 전용
+/// known_hosts 파일을 사용한다. 처음 보는 호스트는 상위 계층(지문 확인 UI)에서 먼저
+/// 신뢰 등록한 뒤 접속하므로, 여기서 `yes` 로 두어도 정상 접속된다.
+pub fn build_ssh_args(server: &ServerConnection, known_hosts: Option<&str>) -> Vec<String> {
     let mut args = vec![
         "-tt".to_string(),
         "-p".to_string(),
         server.port.to_string(),
         "-o".to_string(),
-        "StrictHostKeyChecking=accept-new".to_string(),
+        "StrictHostKeyChecking=yes".to_string(),
     ];
+    if let Some(kh) = known_hosts {
+        args.push("-o".to_string());
+        args.push(format!("UserKnownHostsFile={kh}"));
+    }
     if let Some(key) = &server.key_path {
         if !key.trim().is_empty() {
             args.push("-i".to_string());
@@ -43,8 +50,9 @@ pub fn connect(app: &AppHandle, manager: &TerminalManager, server: &ServerConnec
         .openpty(PtySize { rows: 24, cols: 80, pixel_width: 0, pixel_height: 0 })
         .map_err(|e| AppError::Invalid(format!("PTY 생성 실패: {e}")))?;
 
+    let known_hosts = crate::hostkey::known_hosts_path(app).map(|p| p.to_string_lossy().to_string());
     let mut cmd = CommandBuilder::new("ssh");
-    for a in build_ssh_args(server) {
+    for a in build_ssh_args(server, known_hosts.as_deref()) {
         cmd.arg(a);
     }
 
@@ -135,7 +143,7 @@ mod tests {
 
     #[test]
     fn ssh_args_include_port_user_host_and_key() {
-        let args = build_ssh_args(&server());
+        let args = build_ssh_args(&server(), None);
         assert!(args.contains(&"-p".to_string()));
         assert!(args.contains(&"2222".to_string()));
         assert!(args.contains(&"deploy@example.com".to_string()));
@@ -147,7 +155,15 @@ mod tests {
     fn ssh_args_omit_key_when_absent() {
         let mut s = server();
         s.key_path = None;
-        let args = build_ssh_args(&s);
+        let args = build_ssh_args(&s, None);
         assert!(!args.contains(&"-i".to_string()));
+    }
+
+    #[test]
+    fn ssh_args_strict_checking_and_known_hosts() {
+        let args = build_ssh_args(&server(), Some("/tmp/kh"));
+        assert!(args.contains(&"StrictHostKeyChecking=yes".to_string()));
+        assert!(args.contains(&"UserKnownHostsFile=/tmp/kh".to_string()));
+        assert!(!args.contains(&"StrictHostKeyChecking=accept-new".to_string()));
     }
 }

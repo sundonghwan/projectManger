@@ -656,6 +656,7 @@ pub fn ssh_disconnect(term: State<crate::terminal::TerminalManager>, id: i64) ->
 /// SFTP 디렉터리 나열 (키 기반 인증).
 #[tauri::command]
 pub fn sftp_list(
+    app: tauri::AppHandle,
     state: State<AppState>,
     id: i64,
     path: String,
@@ -664,7 +665,48 @@ pub fn sftp_list(
         let conn = state.db.lock().unwrap();
         repo::server::get(&conn, id)?
     };
-    crate::sftp::list(&server, &path)
+    let kh = crate::hostkey::known_hosts_path(&app).map(|p| p.to_string_lossy().to_string());
+    crate::sftp::list(&server, &path, kh.as_deref())
+}
+
+// ---- SSH 호스트 키 신뢰 (지문 확인 후 등록) ----
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HostScanResult {
+    pub fingerprint: String,
+    pub key_lines: String,
+}
+
+/// 해당 서버 호스트가 이미 신뢰(known_hosts 등록)되어 있는지.
+#[tauri::command]
+pub fn ssh_host_status(app: tauri::AppHandle, state: State<AppState>, id: i64) -> Result<bool> {
+    let server = {
+        let conn = state.db.lock().unwrap();
+        repo::server::get(&conn, id)?
+    };
+    let kh = crate::hostkey::known_hosts_path(&app)
+        .ok_or_else(|| crate::error::AppError::Invalid("앱 데이터 경로 오류".into()))?;
+    Ok(crate::hostkey::is_known(&kh, &server.host, server.port))
+}
+
+/// ssh-keyscan 으로 호스트 공개키·지문을 가져온다(아직 신뢰하지 않음). 사용자 확인용.
+#[tauri::command]
+pub fn ssh_scan_host(state: State<AppState>, id: i64) -> Result<HostScanResult> {
+    let server = {
+        let conn = state.db.lock().unwrap();
+        repo::server::get(&conn, id)?
+    };
+    let (fingerprint, key_lines) = crate::hostkey::scan(&server.host, server.port)?;
+    Ok(HostScanResult { fingerprint, key_lines })
+}
+
+/// 사용자가 지문을 확인·수락한 호스트 키를 앱 known_hosts 에 등록.
+#[tauri::command]
+pub fn ssh_trust_host(app: tauri::AppHandle, key_lines: String) -> Result<()> {
+    let kh = crate::hostkey::known_hosts_path(&app)
+        .ok_or_else(|| crate::error::AppError::Invalid("앱 데이터 경로 오류".into()))?;
+    crate::hostkey::trust(&kh, &key_lines)
 }
 
 // ---- 템플릿 ----

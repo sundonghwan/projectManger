@@ -198,6 +198,12 @@ export const api = {
     resize: (id: number, rows: number, cols: number) =>
       invoke<void>("ssh_resize", { id, rows, cols }),
     disconnect: (id: number) => invoke<void>("ssh_disconnect", { id }),
+    /** 이 호스트가 이미 신뢰(known_hosts 등록)되어 있는지. */
+    hostStatus: (id: number) => invoke<boolean>("ssh_host_status", { id }),
+    /** ssh-keyscan 으로 호스트 공개키·지문을 가져온다(아직 신뢰 X). */
+    scanHost: (id: number) => invoke<{ fingerprint: string; keyLines: string }>("ssh_scan_host", { id }),
+    /** 사용자가 지문 확인 후 수락한 호스트 키를 앱 known_hosts 에 등록. */
+    trustHost: (keyLines: string) => invoke<void>("ssh_trust_host", { keyLines }),
   },
   sftp: {
     list: (id: number, path: string) => invoke<SftpEntry[]>("sftp_list", { id, path }),

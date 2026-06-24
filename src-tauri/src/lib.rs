@@ -2,6 +2,7 @@ mod commands;
 mod db;
 mod error;
 mod export;
+mod hostkey;
 mod models;
 mod repo;
 mod secrets;
@@ -86,6 +87,9 @@ pub fn run() {
             commands::ssh_write,
             commands::ssh_resize,
             commands::ssh_disconnect,
+            commands::ssh_host_status,
+            commands::ssh_scan_host,
+            commands::ssh_trust_host,
             commands::sftp_list,
             commands::template_list,
             commands::template_create,

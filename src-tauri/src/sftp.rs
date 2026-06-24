@@ -42,17 +42,21 @@ pub fn parse_listing(out: &str) -> Vec<SftpEntry> {
     out.lines().filter_map(parse_ls_line).collect()
 }
 
-pub fn build_sftp_args(server: &ServerConnection) -> Vec<String> {
+pub fn build_sftp_args(server: &ServerConnection, known_hosts: Option<&str>) -> Vec<String> {
     let mut args = vec![
         "-b".to_string(),
         "-".to_string(),
         "-P".to_string(),
         server.port.to_string(),
         "-o".to_string(),
-        "StrictHostKeyChecking=accept-new".to_string(),
+        "StrictHostKeyChecking=yes".to_string(),
         "-o".to_string(),
         "BatchMode=yes".to_string(),
     ];
+    if let Some(kh) = known_hosts {
+        args.push("-o".to_string());
+        args.push(format!("UserKnownHostsFile={kh}"));
+    }
     if let Some(k) = &server.key_path {
         if !k.trim().is_empty() {
             args.push("-i".to_string());
@@ -79,11 +83,11 @@ pub fn sanitize_remote_path(path: &str) -> String {
 }
 
 /// 원격 디렉터리 나열. (키 기반 인증 필요 — 실 서버 대상 검증 요)
-pub fn list(server: &ServerConnection, path: &str) -> Result<Vec<SftpEntry>> {
+pub fn list(server: &ServerConnection, path: &str, known_hosts: Option<&str>) -> Result<Vec<SftpEntry>> {
     let safe = sanitize_remote_path(path);
 
     let mut child = Command::new("sftp")
-        .args(build_sftp_args(server))
+        .args(build_sftp_args(server, known_hosts))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -176,8 +180,10 @@ mod tests {
 
     #[test]
     fn sftp_args_have_batch_port_key() {
-        let a = build_sftp_args(&server());
+        let a = build_sftp_args(&server(), Some("/tmp/kh"));
         assert!(a.contains(&"BatchMode=yes".to_string()));
+        assert!(a.contains(&"StrictHostKeyChecking=yes".to_string()));
+        assert!(a.contains(&"UserKnownHostsFile=/tmp/kh".to_string()));
         assert!(a.contains(&"2222".to_string()));
         assert!(a.contains(&"u@h".to_string()));
         assert!(a.contains(&"/k".to_string()));
