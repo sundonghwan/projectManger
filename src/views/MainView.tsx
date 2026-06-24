@@ -270,11 +270,16 @@ export function MainView({
             folders={folders.filter((f) => f.kind === "deliverable")}
             selectedFolderId={view === "deliverables" ? selectedFolderId : null}
           />
-        ) : view === "ssh" ? (
-          <ServerView key={business.id} businessId={business.id} projectId={project?.id ?? null} />
-        ) : (
+        ) : view === "ssh" ? null : (
           <div style={{ padding: "24px 28px", color: "var(--text2)" }}>
             <strong style={{ color: "var(--text)" }}>{VIEW_LABEL[view]}</strong> — 다음 단계에서 지원
+          </div>
+        )}
+
+        {/* SSH 뷰는 탭을 옮겨도 세션·터미널 스크롤백이 유지되도록 언마운트하지 않고 숨김 처리한다. */}
+        {business && (
+          <div style={{ height: "100%", display: view === "ssh" ? "block" : "none" }}>
+            <ServerView key={business.id} businessId={business.id} projectId={project?.id ?? null} />
           </div>
         )}
       </div>

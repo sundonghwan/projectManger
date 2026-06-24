@@ -21,7 +21,8 @@ export type IconName =
   | "alert"
   | "plus"
   | "server"
-  | "lock";
+  | "lock"
+  | "filter";
 
 /** name → SVG 내부 요소. <svg> 래퍼는 Icon 컴포넌트가 제공한다. */
 export const ICON_PATHS: Record<IconName, ReactNode> = {
@@ -139,6 +140,11 @@ export const ICON_PATHS: Record<IconName, ReactNode> = {
     <>
       <rect x="5" y="11" width="14" height="9" rx="2" />
       <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </>
+  ),
+  filter: (
+    <>
+      <path d="M4 5h16l-6 7v6l-4 2v-8L4 5Z" />
     </>
   ),
 };

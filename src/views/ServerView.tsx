@@ -29,6 +29,7 @@ export function ServerView({ businessId, projectId }: ServerViewProps) {
         <ServerPanel
           servers={s.servers}
           onCreate={(d) => void s.create(d)}
+          onUpdate={(d) => void s.update(d)}
           onArchive={(id) => void s.archive(id)}
           onSetSecret={(id, secret) => void s.setSecret(id, secret)}
           onConnect={(srv) => {

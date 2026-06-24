@@ -8,6 +8,7 @@ import type { SearchHit } from "./domain/types";
 import { businessColor } from "./ui/colors";
 import { MainView, type ViewKind } from "./views/MainView";
 import { useTheme } from "./hooks/useTheme";
+import { Icon } from "./ui/icons/Icon";
 
 export default function App() {
   const [businesses, setBusinesses] = useState<Business[]>([]);
@@ -21,6 +22,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const { theme, toggle: toggleTheme } = useTheme();
   const [typeFilter, setTypeFilter] = useState<Set<BusinessType>>(new Set());
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const onToggleType = useCallback((t: BusinessType) => {
     setTypeFilter((prev) => {
@@ -309,20 +311,57 @@ export default function App() {
 
   return (
     <div style={{ display: "flex", height: "100%", overflow: "hidden" }}>
-      <Sidebar
-        rows={tree}
-        selectedId={selectedId}
-        header={<GlobalSearch onSearch={(q) => api.search(q)} onPick={navigateTo} />}
-        typeFilter={typeFilter}
-        onToggleType={onToggleType}
-        colorFor={colorFor}
-        onSelect={onSelect}
-        onToggle={onToggle}
-        onAddBusiness={onAddBusiness}
-        onAddChild={onAddChild}
-        onRename={onRename}
-        onArchive={onArchive}
-      />
+      {sidebarCollapsed ? (
+        <div
+          style={{
+            width: 40,
+            flexShrink: 0,
+            height: "100%",
+            background: "var(--sidebar)",
+            borderRight: "1px solid var(--border)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            paddingTop: 8,
+          }}
+        >
+          <button
+            onClick={() => setSidebarCollapsed(false)}
+            aria-label="사이드바 펼치기"
+            title="사이드바 펼치기"
+            style={{
+              width: 28,
+              height: 28,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              border: "1px solid var(--border)",
+              background: "var(--bg)",
+              color: "var(--text2)",
+              borderRadius: "var(--radius-md)",
+              cursor: "pointer",
+            }}
+          >
+            <Icon name="chevron-right" size={16} />
+          </button>
+        </div>
+      ) : (
+        <Sidebar
+          rows={tree}
+          selectedId={selectedId}
+          header={<GlobalSearch onSearch={(q) => api.search(q)} onPick={navigateTo} />}
+          typeFilter={typeFilter}
+          onToggleType={onToggleType}
+          colorFor={colorFor}
+          onSelect={onSelect}
+          onToggle={onToggle}
+          onAddBusiness={onAddBusiness}
+          onAddChild={onAddChild}
+          onRename={onRename}
+          onArchive={onArchive}
+          onCollapse={() => setSidebarCollapsed(true)}
+        />
+      )}
       <MainView
         business={selectedBusiness}
         project={selectedProject}

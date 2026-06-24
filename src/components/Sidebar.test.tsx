@@ -126,9 +126,12 @@ describe("Sidebar", () => {
     expect(projItem).toHaveAttribute("aria-selected", "true");
   });
 
-  it("유형 필터 칩 클릭 시 onToggleType 호출", async () => {
+  it("유형 필터 아이콘 → 팝오버 칩 클릭 시 onToggleType 호출", async () => {
     const onToggleType = vi.fn();
     setup({ onToggleType, typeFilter: new Set() });
+    // 필터 칩은 평소 숨겨져 있고, 아이콘 버튼을 눌러야 팝오버가 열린다.
+    expect(screen.queryByRole("button", { name: /내부개발/ })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "유형 필터" }));
     await userEvent.click(screen.getByRole("button", { name: /내부개발/ }));
     expect(onToggleType).toHaveBeenCalledWith("internal");
   });

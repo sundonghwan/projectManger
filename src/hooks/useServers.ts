@@ -37,6 +37,19 @@ export function useServers(businessId: number | null, projectId: number | null) 
     [businessId, projectId, reload],
   );
 
+  const update = useCallback(
+    async (data: ServerFormData & { id: number }) => {
+      try {
+        const { id, ...rest } = data;
+        await api.server.update({ id, ...rest });
+        await reload();
+      } catch (e) {
+        setError(String(e));
+      }
+    },
+    [reload],
+  );
+
   const archive = useCallback(
     async (id: number) => {
       try {
@@ -61,5 +74,5 @@ export function useServers(businessId: number | null, projectId: number | null) 
     [reload],
   );
 
-  return { servers, error, create, archive, setSecret };
+  return { servers, error, create, update, archive, setSecret };
 }

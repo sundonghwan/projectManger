@@ -27,6 +27,8 @@ export interface SidebarProps {
   onRename?: (row: TreeRow, name: string) => void;
   /** 보관(소프트 삭제) — 사업/프로젝트/문서/산출물 */
   onArchive?: (row: TreeRow) => void;
+  /** 사이드바 접기 — 제공 시 상단에 접기 버튼 노출 */
+  onCollapse?: () => void;
 }
 
 // 문서·산출물은 트리에선 단일 진입 노드이므로 이름변경·보관 대상이 아니다(각 목록에서 처리).
@@ -55,12 +57,15 @@ export function Sidebar(props: SidebarProps) {
     onAddChild,
     onRename,
     onArchive,
+    onCollapse,
     header,
     typeFilter,
     onToggleType,
   } = props;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [filterOpen, setFilterOpen] = useState(false);
+  const activeFilterCount = typeFilter?.size ?? 0;
   // 추가 메뉴: 사업 유형 선택 또는 노드 하위 종류 선택
   const [menu, setMenu] = useState<
     | { x: number; y: number; ctx: { kind: "business" } | { kind: "child"; row: TreeRow } }
@@ -105,13 +110,83 @@ export function Sidebar(props: SidebarProps) {
         flexDirection: "column",
       }}
     >
+      {onCollapse && (
+        <div style={{ display: "flex", justifyContent: "flex-end", padding: "6px 8px 0" }}>
+          <button onClick={onCollapse} aria-label="사이드바 접기" title="사이드바 접기" style={collapseBtn}>
+            <Icon name="chevron-right" size={15} style={{ transform: "rotate(180deg)" }} />
+          </button>
+        </div>
+      )}
       {header}
 
-      <div style={{ padding: "4px 8px 6px" }}>
-        <button onClick={(e) => openMenu(e, { kind: "business" })} style={addBusinessStyle} aria-label="사업 추가">
+      <div style={{ padding: "4px 8px 6px", display: "flex", gap: 6, alignItems: "center" }}>
+        <button onClick={(e) => openMenu(e, { kind: "business" })} style={{ ...addBusinessStyle, flex: 1 }} aria-label="사업 추가">
           <Icon name="plus" size={16} />
           <span>사업 추가</span>
         </button>
+        {onToggleType && (
+          <div style={{ position: "relative" }}>
+            <button
+              onClick={() => setFilterOpen((o) => !o)}
+              aria-label="유형 필터"
+              aria-pressed={activeFilterCount > 0}
+              title="유형 필터"
+              style={{ ...filterBtnStyle, color: activeFilterCount > 0 ? "var(--accent)" : "var(--text2)" }}
+            >
+              <Icon name="filter" size={15} />
+              {activeFilterCount > 0 && <span style={filterDot} />}
+            </button>
+            {filterOpen && (
+              <>
+                <div style={filterBackdrop} onClick={() => setFilterOpen(false)} />
+                <div style={filterPopover} role="dialog" aria-label="유형 필터">
+                  <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text2)", flex: 1 }}>유형 필터</span>
+                    {activeFilterCount > 0 && (
+                      <button
+                        onClick={() => {
+                          (Object.keys(TYPE_LABEL) as BusinessType[]).forEach((t) => {
+                            if (typeFilter?.has(t)) onToggleType(t);
+                          });
+                        }}
+                        style={{ fontSize: 11, color: "var(--text3)", background: "transparent", border: "none", cursor: "pointer" }}
+                      >
+                        초기화
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {(Object.keys(TYPE_LABEL) as BusinessType[]).map((t) => {
+                      const active = typeFilter?.has(t) ?? false;
+                      return (
+                        <button
+                          key={t}
+                          onClick={() => onToggleType(t)}
+                          aria-pressed={active}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 5,
+                            fontSize: 12,
+                            padding: "3px 9px",
+                            borderRadius: 20,
+                            border: `1px solid ${active ? TYPE_COLOR[t] : "var(--border)"}`,
+                            background: active ? TYPE_COLOR[t] + "22" : "transparent",
+                            color: active ? TYPE_COLOR[t] : "var(--text2)",
+                            cursor: "pointer",
+                          }}
+                        >
+                          <span style={{ width: 7, height: 7, borderRadius: "50%", background: TYPE_COLOR[t] }} />
+                          {TYPE_LABEL[t]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", padding: "0 8px 8px" }}>
@@ -230,41 +305,6 @@ export function Sidebar(props: SidebarProps) {
         })}
       </div>
 
-      {onToggleType && (
-        <div style={filterSection}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text2)", marginBottom: 8 }}>
-            유형 필터
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {(Object.keys(TYPE_LABEL) as BusinessType[]).map((t) => {
-              const active = typeFilter?.has(t) ?? false;
-              return (
-                <button
-                  key={t}
-                  onClick={() => onToggleType(t)}
-                  aria-pressed={active}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 5,
-                    fontSize: 12,
-                    padding: "3px 9px",
-                    borderRadius: 20,
-                    border: `1px solid ${active ? TYPE_COLOR[t] : "var(--border)"}`,
-                    background: active ? TYPE_COLOR[t] + "22" : "transparent",
-                    color: active ? TYPE_COLOR[t] : "var(--text2)",
-                    cursor: "pointer",
-                  }}
-                >
-                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: TYPE_COLOR[t] }} />
-                  {TYPE_LABEL[t]}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {menu && (
         <CreatePopover
           x={menu.x}
@@ -282,12 +322,55 @@ export function Sidebar(props: SidebarProps) {
   );
 }
 
-const filterSection: CSSProperties = {
-  flex: "none",
-  borderTop: "1px solid var(--border)",
-  padding: "10px 14px 12px",
+const filterBtnStyle: CSSProperties = {
+  position: "relative",
+  width: 30,
+  height: 30,
+  flexShrink: 0,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  border: "1px solid var(--border)",
+  background: "var(--bg)",
+  borderRadius: "var(--radius-md)",
+  cursor: "pointer",
+};
+const filterDot: CSSProperties = {
+  position: "absolute",
+  top: 4,
+  right: 4,
+  width: 6,
+  height: 6,
+  borderRadius: "50%",
+  background: "var(--accent)",
+};
+const filterBackdrop: CSSProperties = { position: "fixed", inset: 0, zIndex: 150 };
+const filterPopover: CSSProperties = {
+  position: "absolute",
+  top: "calc(100% + 6px)",
+  right: 0,
+  zIndex: 160,
+  width: 210,
+  background: "var(--card)",
+  border: "1px solid var(--border)",
+  borderRadius: "var(--radius-md)",
+  boxShadow: "var(--shadow-popover)",
+  padding: 10,
 };
 
+const collapseBtn: CSSProperties = {
+  width: 26,
+  height: 24,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  border: "1px solid var(--border)",
+  background: "var(--bg)",
+  color: "var(--text2)",
+  borderRadius: "var(--radius-sm)",
+  cursor: "pointer",
+  padding: 0,
+};
 const addBusinessStyle: CSSProperties = {
   height: 30,
   width: "100%",
