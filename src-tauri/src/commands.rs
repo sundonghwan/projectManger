@@ -906,3 +906,33 @@ pub fn trash_purge(state: State<AppState>, kind: String, id: String) -> Result<(
     Ok(())
 }
 
+/// 현재 설정된 vault 폴더(없으면 None = 기본 위치).
+#[tauri::command]
+pub fn vault_path(app: tauri::AppHandle) -> Result<Option<String>> {
+    use tauri::Manager;
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| crate::error::AppError::Invalid(format!("앱 데이터 경로 오류: {e}")))?;
+    Ok(crate::config::read_vault_path(&dir))
+}
+
+/// vault 폴더를 지정하고 Store를 그 위치(`<path>/.projectManger`)로 다시 연다.
+#[tauri::command]
+pub fn vault_set(app: tauri::AppHandle, state: State<AppState>, path: String) -> Result<()> {
+    use tauri::Manager;
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| crate::error::AppError::Invalid(format!("앱 데이터 경로 오류: {e}")))?;
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return Err(crate::error::AppError::Invalid("vault 경로가 비어 있습니다".into()));
+    }
+    crate::config::write_vault_path(&dir, Some(trimmed))?;
+    let new_root = crate::config::store_root(&dir);
+    let new_store = crate::store::Store::open(new_root)?;
+    *state.store.lock().unwrap() = new_store;
+    Ok(())
+}
+
