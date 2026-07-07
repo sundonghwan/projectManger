@@ -1,5 +1,5 @@
 import type { CSSProperties, DragEvent } from "react";
-import type { KanbanColumn } from "../domain/kanban";
+import { KANBAN_STATUSES, type KanbanColumn } from "../domain/kanban";
 import type { Label, TaskStatus } from "../domain/types";
 import { computeSortOrder } from "../domain/sortOrder";
 import { TASK_STATUS_COLOR, TASK_STATUS_LABEL, priorityColor, priorityLabel } from "../ui/colors";
@@ -21,6 +21,13 @@ export function Kanban({ columns, onMove, onAddTask, labelsByTask = {}, onCardCl
     const last = col.tasks[col.tasks.length - 1];
     const sortOrder = computeSortOrder(last ? last.sortOrder : null, null);
     onMove(id, col.status, sortOrder);
+  };
+
+  const moveToStatus = (taskId: string, status: TaskStatus) => {
+    const target = columns.find((col) => col.status === status);
+    const last = target?.tasks[target.tasks.length - 1];
+    const sortOrder = computeSortOrder(last ? last.sortOrder : null, null);
+    onMove(taskId, status, sortOrder);
   };
 
   return (
@@ -83,6 +90,23 @@ export function Kanban({ columns, onMove, onAddTask, labelsByTask = {}, onCardCl
                     </span>
                   )}
                   <span style={{ flex: 1 }} />
+                  <select
+                    aria-label={`${t.title} 상태`}
+                    value={t.status}
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onChange={(e) => {
+                      const next = e.target.value as TaskStatus;
+                      if (next !== t.status) moveToStatus(t.id, next);
+                    }}
+                    style={statusSelect}
+                  >
+                    {KANBAN_STATUSES.map((status) => (
+                      <option key={status} value={status}>
+                        {TASK_STATUS_LABEL[status]}
+                      </option>
+                    ))}
+                  </select>
                   {t.dueDate && (
                     <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text2)" }}>
                       {t.dueDate}
@@ -136,4 +160,14 @@ const cardStyle: CSSProperties = {
   padding: "10px 11px",
   cursor: "grab",
   boxShadow: "0 1px 2px rgba(0,0,0,.04)",
+};
+const statusSelect: CSSProperties = {
+  border: "1px solid var(--border)",
+  borderRadius: 5,
+  background: "var(--input)",
+  color: "var(--text2)",
+  fontSize: 11,
+  fontWeight: 600,
+  padding: "2px 5px",
+  cursor: "pointer",
 };

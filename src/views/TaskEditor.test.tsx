@@ -71,4 +71,12 @@ describe("TaskEditor", () => {
     await userEvent.click(screen.getByLabelText("닫기"));
     expect(h.onClose).toHaveBeenCalled();
   });
+
+  it("배경 클릭만으로는 편집 중인 내용을 닫지 않는다", async () => {
+    const h = setup();
+    await userEvent.type(screen.getByLabelText("제목"), " 추가 입력");
+    await userEvent.click(screen.getByTestId("task-editor-overlay"));
+    expect(h.onClose).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("제목")).toHaveValue("로그인 API 추가 입력");
+  });
 });

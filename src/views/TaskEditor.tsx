@@ -47,7 +47,7 @@ export function TaskEditor({ task, labels, onSave, onAddLabel, onRemoveLabel, on
   };
 
   return (
-    <div style={overlay} onClick={onClose} data-testid="task-editor-overlay">
+    <div style={overlay} data-testid="task-editor-overlay">
       <div style={modal} role="dialog" aria-label="태스크 편집" onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", alignItems: "center", marginBottom: 14 }}>
           <span style={{ fontSize: 15, fontWeight: 600, flex: 1 }}>태스크 편집</span>

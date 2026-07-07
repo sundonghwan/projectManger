@@ -25,10 +25,10 @@ function setup(tasks: Task[], over: Partial<Parameters<typeof Kanban>[0]> = {}) 
 describe("Kanban", () => {
   it("4개 컬럼과 카운트를 렌더한다", () => {
     setup([task({ id: "1", status: "todo" }), task({ id: "2", status: "doing" })]);
-    expect(screen.getByText("Todo")).toBeInTheDocument();
-    expect(screen.getByText("Doing")).toBeInTheDocument();
-    expect(screen.getByText("Review")).toBeInTheDocument();
-    expect(screen.getByText("Done")).toBeInTheDocument();
+    expect(screen.getByTestId("col-todo")).toBeInTheDocument();
+    expect(screen.getByTestId("col-doing")).toBeInTheDocument();
+    expect(screen.getByTestId("col-review")).toBeInTheDocument();
+    expect(screen.getByTestId("col-done")).toBeInTheDocument();
   });
 
   it("카드를 해당 컬럼에 표시", () => {
@@ -53,5 +53,11 @@ describe("Kanban", () => {
     fireEvent.dragStart(card, { dataTransfer: dt });
     fireEvent.drop(doneCol, { dataTransfer: dt });
     expect(onMove).toHaveBeenCalledWith("1", "done", expect.any(Number));
+  });
+
+  it("카드의 상태 선택으로 다른 상태로 이동할 수 있다", async () => {
+    const { onMove } = setup([task({ id: "1", status: "todo", sortOrder: 1 })]);
+    await userEvent.selectOptions(screen.getByLabelText("태스크 1 상태"), "review");
+    expect(onMove).toHaveBeenCalledWith("1", "review", expect.any(Number));
   });
 });
