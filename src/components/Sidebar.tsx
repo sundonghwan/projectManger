@@ -1,8 +1,9 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
 import type { BusinessTypeOption } from "../domain/businessTypes";
 import type { TreeRow } from "../domain/tree";
-import type { BusinessType } from "../domain/types";
+import type { Business, BusinessType } from "../domain/types";
 import { Icon, type IconName } from "../ui/icons/Icon";
+import { BusinessEditorPopover, type BusinessEditorInput } from "./BusinessEditorPopover";
 import { CreatePopover, type AddKind } from "./CreatePopover";
 
 export type { AddKind };
@@ -14,6 +15,8 @@ export interface SidebarProps {
   header?: ReactNode;
   /** 현재 사업 목록에서 파생한 동적 사업 유형 목록 */
   businessTypeOptions: BusinessTypeOption[];
+  /** 편집 폼에 원본 사업 필드를 채우기 위한 현재 사업 목록 */
+  businesses?: Business[];
   /** 유형 필터: 선택된 유형 집합(비어 있으면 전체) */
   typeFilter?: Set<BusinessType>;
   onToggleType?: (type: BusinessType) => void;
@@ -23,6 +26,8 @@ export interface SidebarProps {
   onToggle: (row: TreeRow) => void;
   /** 사용자가 고른 유형·이름으로 새 사업 생성 */
   onAddBusiness: (type: BusinessType, name: string) => void;
+  /** 사이드바 사업 편집 저장 */
+  onUpdateBusiness?: (input: BusinessEditorInput) => void;
   /** 사용자가 고른 종류·이름으로 하위 항목 생성 */
   onAddChild: (row: TreeRow, kind: AddKind, name: string) => void;
   /** 더블클릭 인라인 이름변경 (사업/프로젝트/문서) */
@@ -62,13 +67,17 @@ export function Sidebar(props: SidebarProps) {
     onCollapse,
     header,
     businessTypeOptions,
+    businesses = [],
     typeFilter,
     onToggleType,
+    onUpdateBusiness,
   } = props;
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingBusinessId, setEditingBusinessId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
   const activeFilterCount = typeFilter?.size ?? 0;
+  const editingBusiness = businesses.find((business) => business.id === editingBusinessId) ?? null;
   // 추가 메뉴: 사업 유형 선택 또는 노드 하위 종류 선택
   const [menu, setMenu] = useState<
     | { x: number; y: number; ctx: { kind: "business" } | { kind: "child"; row: TreeRow } }
@@ -288,6 +297,19 @@ export function Sidebar(props: SidebarProps) {
                   <Icon name="plus" size={14} />
                 </button>
               )}
+              {row.type === "business" && onUpdateBusiness && (
+                <button
+                  aria-label={`${row.label} 수정`}
+                  title="사업 수정"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditingBusinessId(row.entityId);
+                  }}
+                  style={archiveStyle}
+                >
+                  <Icon name="settings" size={13} />
+                </button>
+              )}
               {onArchive && ARCHIVABLE.has(row.type) && (
                 <button
                   aria-label={`${row.label} 보관`}
@@ -318,6 +340,17 @@ export function Sidebar(props: SidebarProps) {
             menu.ctx.kind === "child" && onAddChild(menu.ctx.row, kind, name)
           }
           onClose={() => setMenu(null)}
+        />
+      )}
+      {editingBusiness && onUpdateBusiness && (
+        <BusinessEditorPopover
+          business={editingBusiness}
+          businessTypeOptions={businessTypeOptions}
+          onSave={(input) => {
+            onUpdateBusiness(input);
+            setEditingBusinessId(null);
+          }}
+          onClose={() => setEditingBusinessId(null)}
         />
       )}
     </aside>

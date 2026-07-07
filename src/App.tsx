@@ -4,6 +4,7 @@ import { businessTypeOptions, normalizeBusinessType } from "./domain/businessTyp
 import { buildTree, rowId, type TreeRow } from "./domain/tree";
 import type { Business, BusinessType, Folder, FolderKind, Project } from "./domain/types";
 import { Sidebar, type AddKind } from "./components/Sidebar";
+import type { BusinessEditorInput } from "./components/BusinessEditorPopover";
 import { GlobalSearch } from "./components/GlobalSearch";
 import type { SearchHit } from "./domain/types";
 import { businessColor } from "./ui/colors";
@@ -134,6 +135,18 @@ export default function App() {
       }
     },
     [loadBusinesses, loadProjects],
+  );
+
+  const onUpdateBusiness = useCallback(
+    async (input: BusinessEditorInput) => {
+      try {
+        await api.business.update(input);
+        await loadBusinesses();
+      } catch (e) {
+        setError(String(e));
+      }
+    },
+    [loadBusinesses],
   );
 
   const onAddChild = useCallback(
@@ -357,12 +370,14 @@ export default function App() {
           selectedId={selectedId}
           header={<GlobalSearch onSearch={(q) => api.search(q)} onPick={navigateTo} />}
           businessTypeOptions={typeOptions}
+          businesses={businesses}
           typeFilter={typeFilter}
           onToggleType={onToggleType}
           colorFor={colorFor}
           onSelect={onSelect}
           onToggle={onToggle}
           onAddBusiness={onAddBusiness}
+          onUpdateBusiness={onUpdateBusiness}
           onAddChild={onAddChild}
           onRename={onRename}
           onArchive={onArchive}

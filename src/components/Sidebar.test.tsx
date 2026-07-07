@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Sidebar, type SidebarProps } from "./Sidebar";
+import type { Business } from "../domain/types";
 import type { TreeRow } from "../domain/tree";
 
 const bizRow: TreeRow = {
@@ -31,6 +32,16 @@ const projRow: TreeRow = {
   hasChildren: false,
   expanded: false,
 };
+const business: Business = {
+  id: "1",
+  name: "SI사업 A",
+  type: "철도",
+  color: "#3b82f6",
+  description: null,
+  status: "active",
+  sortOrder: 1,
+  archivedAt: null,
+};
 
 function setup(overrides: Partial<SidebarProps> = {}) {
   const props: SidebarProps = {
@@ -41,10 +52,12 @@ function setup(overrides: Partial<SidebarProps> = {}) {
       { type: "플랫폼", label: "플랫폼", color: "#16a34a", count: 1 },
     ],
     colorFor: () => "#3b82f6",
+    businesses: [business],
     onSelect: vi.fn(),
     onToggle: vi.fn(),
     onAddBusiness: vi.fn(),
     onAddChild: vi.fn(),
+    onUpdateBusiness: vi.fn(),
     onArchive: vi.fn(),
     ...overrides,
   };
@@ -64,6 +77,22 @@ describe("Sidebar", () => {
     await userEvent.click(screen.getByRole("button", { name: "SI사업 A 보관" }));
     expect(props.onArchive).toHaveBeenCalledWith(bizRow);
     expect(screen.queryByRole("button", { name: "대시보드 보관" })).not.toBeInTheDocument();
+  });
+
+  it("사업 수정 버튼 → 편집 저장 시 onUpdateBusiness", async () => {
+    const { props } = setup();
+    await userEvent.click(screen.getByRole("button", { name: "SI사업 A 수정" }));
+    await userEvent.clear(screen.getByLabelText("사업 유형"));
+    await userEvent.type(screen.getByLabelText("사업 유형"), "  플랫폼  ");
+    await userEvent.click(screen.getByRole("button", { name: "저장" }));
+
+    expect(props.onUpdateBusiness).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "1",
+        name: "SI사업 A",
+        type: "플랫폼",
+      }),
+    );
   });
 
   it("빈 목록이면 안내 문구를 보여준다", () => {
