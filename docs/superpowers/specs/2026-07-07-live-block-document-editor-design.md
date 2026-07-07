@@ -187,10 +187,10 @@ document_set_editor_body(id, body, editor_body, editor_body_format, collaboratio
 Image upload should use a document-scoped asset command:
 
 ```rust
-document_asset_upload(document_id, path) -> DocumentAsset
+document_asset_upload(document_id, file_name, bytes) -> DocumentAsset
 ```
 
-The command copies the source file into the Work Vault store root under a document asset directory, then returns a URL/path that the Tauri webview can render.
+The command writes uploaded image bytes into the Work Vault store root under a document asset directory, then returns a URL/path that the Tauri webview can render. It must not depend on browser `File.path`, because BlockNote upload callbacks receive browser `File` objects and local source paths are not reliable across webview contexts.
 
 Suggested storage layout:
 
@@ -210,7 +210,7 @@ Minimum acceptable collaboration implementation:
 - local provider or isolated provider adapter implemented behind `documentCollaboration.ts`
 - UI status that can distinguish local editing from connected collaboration when a provider is available
 
-Full network collaboration requires a provider. Candidate providers include `y-websocket`, Hocuspocus, Liveblocks, PartyKit, or another self-hosted server. The implementation must keep this provider swappable.
+For this implementation, use a Yjs provider adapter and wire it with `y-webrtc` as the first working provider. This gives Work Vault a real collaborative editing path for users in the same document room while keeping the provider boundary swappable for a later self-hosted `y-websocket`, Hocuspocus, Liveblocks, PartyKit, or other production provider.
 
 ## Slash Command Scope
 
