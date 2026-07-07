@@ -201,6 +201,9 @@ pub struct Document {
     pub title: String,
     pub icon: Option<String>,
     pub body: String,
+    pub editor_body: Option<String>,
+    pub editor_body_format: Option<String>,
+    pub collaboration_state: Option<String>,
     pub blocks: Vec<Block>,
     pub sort_order: f64,
     pub archived_at: Option<String>,
@@ -399,7 +402,8 @@ mod tests {
         let d = Document {
             id: "d1".into(), business_id: "b1".into(), project_id: None,
             folder_id: Some("f1".into()), title: "문서".into(), icon: None,
-            body: "본문".into(),
+            body: "본문".into(), editor_body: None, editor_body_format: None,
+            collaboration_state: None,
             blocks: vec![Block {
                 id: "blk1".into(), parent_block_id: None,
                 r#type: "paragraph".into(), content: "{}".into(), sort_order: 1.0,

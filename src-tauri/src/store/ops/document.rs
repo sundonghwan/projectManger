@@ -5,6 +5,8 @@ use crate::store::ops::folder;
 use crate::store::ops::util::cmp_sort;
 use crate::store::Store;
 
+const EDITOR_FORMAT_BLOCKNOTE_JSON: &str = "blocknote-json";
+
 pub fn list_by_business(store: &Store, business_id: &str) -> Result<Vec<Document>> {
     let mut out: Vec<Document> = store
         .documents
@@ -60,6 +62,9 @@ pub fn create(
         title: title.to_string(),
         icon: None,
         body: String::new(),
+        editor_body: None,
+        editor_body_format: None,
+        collaboration_state: None,
         blocks: Vec::new(),
         sort_order,
         archived_at: None,
@@ -94,6 +99,30 @@ pub fn rename(store: &mut Store, id: &str, title: &str) -> Result<Document> {
 pub fn set_body(store: &mut Store, id: &str, body: &str) -> Result<()> {
     let mut d = get(store, id)?;
     d.body = body.to_string();
+    d.updated_at = now();
+    store.documents.put(d)?;
+    Ok(())
+}
+
+pub fn set_editor_body(
+    store: &mut Store,
+    id: &str,
+    body: &str,
+    editor_body: Option<&str>,
+    editor_body_format: Option<&str>,
+    collaboration_state: Option<&str>,
+) -> Result<()> {
+    if let Some(format) = editor_body_format {
+        if format != EDITOR_FORMAT_BLOCKNOTE_JSON {
+            return Err(AppError::Invalid("지원하지 않는 문서 에디터 형식입니다".into()));
+        }
+    }
+
+    let mut d = get(store, id)?;
+    d.body = body.to_string();
+    d.editor_body = editor_body.map(|value| value.to_string());
+    d.editor_body_format = editor_body_format.map(|value| value.to_string());
+    d.collaboration_state = collaboration_state.map(|value| value.to_string());
     d.updated_at = now();
     store.documents.put(d)?;
     Ok(())
@@ -208,6 +237,38 @@ mod tests {
         assert_eq!(d1.project_id, None);
         assert_eq!(d2.project_id.as_deref(), Some(proj.as_str()));
         assert_eq!(list_by_business(&s, &biz).unwrap().len(), 2);
+    }
+
+    #[test]
+    fn set_editor_body_updates_markdown_and_editor_metadata() {
+        let (mut s, biz, _) = setup();
+        let d = create(&mut s, &biz, None, None, "문서").unwrap();
+
+        set_editor_body(
+            &mut s,
+            &d.id,
+            "# 공유용",
+            Some(r#"[{"type":"paragraph","content":"공유용"}]"#),
+            Some("blocknote-json"),
+            Some("snapshot"),
+        )
+        .unwrap();
+
+        let updated = get(&s, &d.id).unwrap();
+        assert_eq!(updated.body, "# 공유용");
+        assert_eq!(updated.editor_body.as_deref(), Some(r#"[{"type":"paragraph","content":"공유용"}]"#));
+        assert_eq!(updated.editor_body_format.as_deref(), Some("blocknote-json"));
+        assert_eq!(updated.collaboration_state.as_deref(), Some("snapshot"));
+    }
+
+    #[test]
+    fn set_editor_body_rejects_unknown_format() {
+        let (mut s, biz, _) = setup();
+        let d = create(&mut s, &biz, None, None, "문서").unwrap();
+
+        let result = set_editor_body(&mut s, &d.id, "body", Some("{}"), Some("html"), None);
+
+        assert!(result.is_err());
     }
 
     #[test]

@@ -176,6 +176,7 @@ mod tests {
             s.documents.put(Document {
                 id: "d1".into(), business_id: "b1".into(), project_id: None, folder_id: None,
                 title: "D".into(), icon: None, body: "".into(),
+                editor_body: None, editor_body_format: None, collaboration_state: None,
                 blocks: vec![Block { id: "blk".into(), parent_block_id: None,
                     r#type: "paragraph".into(), content: "{}".into(), sort_order: 0.0 }],
                 sort_order: 0.0, archived_at: None, created_at: now(), updated_at: now(),
