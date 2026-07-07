@@ -1,7 +1,7 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
+import type { BusinessTypeOption } from "../domain/businessTypes";
 import type { TreeRow } from "../domain/tree";
 import type { BusinessType } from "../domain/types";
-import { TYPE_COLOR, TYPE_LABEL } from "../ui/colors";
 import { Icon, type IconName } from "../ui/icons/Icon";
 import { CreatePopover, type AddKind } from "./CreatePopover";
 
@@ -12,6 +12,8 @@ export interface SidebarProps {
   selectedId: string | null;
   /** 트리 위에 렌더할 헤더 슬롯 (예: 전역 검색) */
   header?: ReactNode;
+  /** 현재 사업 목록에서 파생한 동적 사업 유형 목록 */
+  businessTypeOptions: BusinessTypeOption[];
   /** 유형 필터: 선택된 유형 집합(비어 있으면 전체) */
   typeFilter?: Set<BusinessType>;
   onToggleType?: (type: BusinessType) => void;
@@ -59,6 +61,7 @@ export function Sidebar(props: SidebarProps) {
     onArchive,
     onCollapse,
     header,
+    businessTypeOptions,
     typeFilter,
     onToggleType,
   } = props;
@@ -145,9 +148,7 @@ export function Sidebar(props: SidebarProps) {
                     {activeFilterCount > 0 && (
                       <button
                         onClick={() => {
-                          (Object.keys(TYPE_LABEL) as BusinessType[]).forEach((t) => {
-                            if (typeFilter?.has(t)) onToggleType(t);
-                          });
+                          typeFilter?.forEach((t) => onToggleType(t));
                         }}
                         style={{ fontSize: 11, color: "var(--text3)", background: "transparent", border: "none", cursor: "pointer" }}
                       >
@@ -156,12 +157,12 @@ export function Sidebar(props: SidebarProps) {
                     )}
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {(Object.keys(TYPE_LABEL) as BusinessType[]).map((t) => {
-                      const active = typeFilter?.has(t) ?? false;
+                    {businessTypeOptions.map((option) => {
+                      const active = typeFilter?.has(option.type) ?? false;
                       return (
                         <button
-                          key={t}
-                          onClick={() => onToggleType(t)}
+                          key={option.type}
+                          onClick={() => onToggleType(option.type)}
                           aria-pressed={active}
                           style={{
                             display: "flex",
@@ -170,14 +171,14 @@ export function Sidebar(props: SidebarProps) {
                             fontSize: 12,
                             padding: "3px 9px",
                             borderRadius: 20,
-                            border: `1px solid ${active ? TYPE_COLOR[t] : "var(--border)"}`,
-                            background: active ? TYPE_COLOR[t] + "22" : "transparent",
-                            color: active ? TYPE_COLOR[t] : "var(--text2)",
+                            border: `1px solid ${active ? option.color : "var(--border)"}`,
+                            background: active ? option.color + "22" : "transparent",
+                            color: active ? option.color : "var(--text2)",
                             cursor: "pointer",
                           }}
                         >
-                          <span style={{ width: 7, height: 7, borderRadius: "50%", background: TYPE_COLOR[t] }} />
-                          {TYPE_LABEL[t]}
+                          <span style={{ width: 7, height: 7, borderRadius: "50%", background: option.color }} />
+                          {option.label}
                         </button>
                       );
                     })}
@@ -310,6 +311,7 @@ export function Sidebar(props: SidebarProps) {
           x={menu.x}
           y={menu.y}
           variant={menu.ctx.kind === "business" ? "business" : "child"}
+          businessTypeOptions={businessTypeOptions}
           allowedKinds={allowedKinds}
           onCreateBusiness={(type, name) => onAddBusiness(type, name)}
           onCreateChild={(kind, name) =>

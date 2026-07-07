@@ -36,6 +36,10 @@ function setup(overrides: Partial<SidebarProps> = {}) {
   const props: SidebarProps = {
     rows: [bizRow, dashRow, projRow],
     selectedId: "business:1",
+    businessTypeOptions: [
+      { type: "철도", label: "철도", color: "#2563eb", count: 2 },
+      { type: "플랫폼", label: "플랫폼", color: "#16a34a", count: 1 },
+    ],
     colorFor: () => "#3b82f6",
     onSelect: vi.fn(),
     onToggle: vi.fn(),
@@ -89,13 +93,22 @@ describe("Sidebar", () => {
     expect(props.onSelect).not.toHaveBeenCalled();
   });
 
-  it("사업 추가 → 유형 선택 + 이름 입력 후 onAddBusiness(type, name)", async () => {
+  it("사업 추가 → 자유 입력 사업 유형 + 이름 입력 후 onAddBusiness(type, name)", async () => {
     const { props } = setup();
     await userEvent.click(screen.getByRole("button", { name: "사업 추가" }));
-    await userEvent.click(screen.getByRole("button", { name: /내부개발/ }));
+    await userEvent.type(screen.getByLabelText("사업 유형"), "  철도  ");
     await userEvent.type(screen.getByLabelText("이름"), "신규 사업");
     await userEvent.click(screen.getByRole("button", { name: "만들기" }));
-    expect(props.onAddBusiness).toHaveBeenCalledWith("internal", "신규 사업");
+    expect(props.onAddBusiness).toHaveBeenCalledWith("철도", "신규 사업");
+  });
+
+  it("사업 추가 팝오버는 동적 사업 유형 칩을 제안한다", async () => {
+    const { props } = setup();
+    await userEvent.click(screen.getByRole("button", { name: "사업 추가" }));
+    await userEvent.click(screen.getByRole("button", { name: /플랫폼/ }));
+    await userEvent.type(screen.getByLabelText("이름"), "신규 플랫폼");
+    await userEvent.click(screen.getByRole("button", { name: "만들기" }));
+    expect(props.onAddBusiness).toHaveBeenCalledWith("플랫폼", "신규 플랫폼");
   });
 
   it("사업 [+] → 프로젝트 생성, 문서·산출물 옵션은 없다", async () => {
@@ -126,14 +139,25 @@ describe("Sidebar", () => {
     expect(projItem).toHaveAttribute("aria-selected", "true");
   });
 
-  it("유형 필터 아이콘 → 팝오버 칩 클릭 시 onToggleType 호출", async () => {
+  it("유형 필터 아이콘 → 동적 팝오버 칩 클릭 시 onToggleType 호출", async () => {
     const onToggleType = vi.fn();
     setup({ onToggleType, typeFilter: new Set() });
     // 필터 칩은 평소 숨겨져 있고, 아이콘 버튼을 눌러야 팝오버가 열린다.
-    expect(screen.queryByRole("button", { name: /내부개발/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /철도/ })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "유형 필터" }));
-    await userEvent.click(screen.getByRole("button", { name: /내부개발/ }));
-    expect(onToggleType).toHaveBeenCalledWith("internal");
+    await userEvent.click(screen.getByRole("button", { name: /철도/ }));
+    expect(onToggleType).toHaveBeenCalledWith("철도");
+  });
+
+  it("유형 필터 초기화는 선택된 동적 유형을 모두 토글한다", async () => {
+    const onToggleType = vi.fn();
+    setup({ onToggleType, typeFilter: new Set(["철도", "플랫폼"]) });
+
+    await userEvent.click(screen.getByRole("button", { name: "유형 필터" }));
+    await userEvent.click(screen.getByRole("button", { name: "초기화" }));
+
+    expect(onToggleType).toHaveBeenCalledWith("철도");
+    expect(onToggleType).toHaveBeenCalledWith("플랫폼");
   });
 
   it("라벨 더블클릭 후 Enter로 이름변경 → onRename 호출", async () => {

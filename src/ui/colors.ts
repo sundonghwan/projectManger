@@ -1,5 +1,6 @@
 // 유형/상태/우선순위 → 색상·라벨 매핑. docs/06-디자인시스템 토큰과 일치.
 import type { BusinessType, DeliverableStatus, MemoColor, Priority, TaskStatus } from "../domain/types";
+import { businessTypeFallbackColor } from "../domain/businessTypes";
 
 /** 메모 색상 선택 목록 (default = 기본 카드색) */
 export const MEMO_COLORS: MemoColor[] = [
@@ -19,14 +20,14 @@ export function memoBg(color?: MemoColor | null): string {
   return color && color !== "default" ? `var(--memo-${color})` : "var(--card)";
 }
 
-export const TYPE_COLOR: Record<BusinessType, string> = {
+export const TYPE_COLOR: Record<string, string> = {
   si: "#3b82f6",
   internal: "#22c55e",
   ops: "#f97316",
   etc: "#94a3b8",
 };
 
-export const TYPE_LABEL: Record<BusinessType, string> = {
+export const TYPE_LABEL: Record<string, string> = {
   si: "SI",
   internal: "내부개발",
   ops: "운영",
@@ -79,5 +80,7 @@ export const priorityLabel = (p: Priority): string => PRIORITY_LABEL[p];
 
 /** 사업의 표시 색상: 커스텀 color 우선, 없으면 유형 컬러 */
 export function businessColor(type: BusinessType, color?: string | null): string {
-  return color ?? TYPE_COLOR[type];
+  const customColor = color?.trim();
+  if (customColor) return customColor;
+  return TYPE_COLOR[type] ?? businessTypeFallbackColor(type);
 }
