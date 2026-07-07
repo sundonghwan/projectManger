@@ -1,6 +1,7 @@
 # ===== 비공개 기획/설계 문서 (로컬 전용 — 공개 리포에 푸시하지 않음) =====
 docs/
 *.dc.html
+.worktrees/
 
 # ===== Node / Frontend =====
 node_modules/
