@@ -18,6 +18,7 @@ export interface ServerPanelProps {
   onUpdate?: (data: ServerFormData & { id: string }) => void;
   onArchive: (id: string) => void;
   onSetSecret: (id: string, secret: string) => void;
+  onClearSecret?: (id: string) => void;
   onConnect: (server: ServerConnection) => void;
   onBrowse?: (server: ServerConnection) => void;
 }
@@ -26,9 +27,10 @@ const AUTH_LABEL: Record<AuthType, string> = { key: "키 기반", password: "비
 
 const EMPTY: ServerFormData = { name: "", host: "", port: 22, username: "", authType: "key", keyPath: null };
 
-export function ServerPanel({ servers, onCreate, onUpdate, onArchive, onSetSecret, onConnect, onBrowse }: ServerPanelProps) {
+export function ServerPanel({ servers, onCreate, onUpdate, onArchive, onSetSecret, onClearSecret, onConnect, onBrowse }: ServerPanelProps) {
   const [form, setForm] = useState<ServerFormData>(EMPTY);
   const [secretInputs, setSecretInputs] = useState<Record<string, string>>({});
+  const [editingSecretIds, setEditingSecretIds] = useState<Record<string, boolean>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<ServerFormData>(EMPTY);
 
@@ -132,28 +134,34 @@ export function ServerPanel({ servers, onCreate, onUpdate, onArchive, onSetSecre
               <button onClick={() => onArchive(s.id)} style={dangerBtn} aria-label={`${s.name} 보관`}>보관</button>
             </div>
             {s.authType !== "agent" && (
-              <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 8 }}>
-                <input
-                  aria-label={`${s.name} 비밀값`}
-                  type="password"
-                  placeholder={s.authType === "password" ? "비밀번호" : "패스프레이즈"}
-                  value={secretInputs[s.id] ?? ""}
-                  onChange={(e) => setSecretInputs({ ...secretInputs, [s.id]: e.target.value })}
-                  style={{ ...input, flex: 1, minWidth: 0 }}
-                />
-                <button
-                  onClick={() => {
-                    const v = secretInputs[s.id];
-                    if (v) {
-                      onSetSecret(s.id, v);
-                      setSecretInputs({ ...secretInputs, [s.id]: "" });
-                    }
-                  }}
-                  style={secondaryBtn}
-                >
-                  시크릿 저장
-                </button>
-              </div>
+              <SecretEditor
+                server={s}
+                value={secretInputs[s.id] ?? ""}
+                editing={Boolean(editingSecretIds[s.id]) || !s.secretRef}
+                onEdit={() => setEditingSecretIds({ ...editingSecretIds, [s.id]: true })}
+                onCancel={() => {
+                  setEditingSecretIds({ ...editingSecretIds, [s.id]: false });
+                  setSecretInputs({ ...secretInputs, [s.id]: "" });
+                }}
+                onChange={(value) => setSecretInputs({ ...secretInputs, [s.id]: value })}
+                onSave={() => {
+                  const v = secretInputs[s.id];
+                  if (v) {
+                    onSetSecret(s.id, v);
+                    setSecretInputs({ ...secretInputs, [s.id]: "" });
+                    setEditingSecretIds({ ...editingSecretIds, [s.id]: false });
+                  }
+                }}
+                onClear={
+                  onClearSecret
+                    ? () => {
+                        onClearSecret(s.id);
+                        setSecretInputs({ ...secretInputs, [s.id]: "" });
+                        setEditingSecretIds({ ...editingSecretIds, [s.id]: false });
+                      }
+                    : undefined
+                }
+              />
             )}
               </>
             )}
@@ -164,6 +172,60 @@ export function ServerPanel({ servers, onCreate, onUpdate, onArchive, onSetSecre
         <Icon name="alert" size={13} />
         <span>비밀번호·패스프레이즈는 OS 키체인에 저장되며 DB에는 참조만 기록됩니다.</span>
       </div>
+    </div>
+  );
+}
+
+interface SecretEditorProps {
+  server: ServerConnection;
+  value: string;
+  editing: boolean;
+  onEdit: () => void;
+  onCancel: () => void;
+  onChange: (value: string) => void;
+  onSave: () => void;
+  onClear?: () => void;
+}
+
+function secretLabel(authType: AuthType): string {
+  return authType === "password" ? "비밀번호" : "패스프레이즈";
+}
+
+function SecretEditor({ server, value, editing, onEdit, onCancel, onChange, onSave, onClear }: SecretEditorProps) {
+  const label = secretLabel(server.authType as AuthType);
+  if (!editing) {
+    return (
+      <div style={secretRow}>
+        <span style={secretHint}>{label}가 OS 키체인에 저장되어 있습니다.</span>
+        <button onClick={onEdit} style={secondaryBtn} aria-label={`${server.name} ${label} 변경`}>
+          {label} 변경
+        </button>
+        {onClear && (
+          <button onClick={onClear} style={dangerBtn} aria-label={`${server.name} ${label} 삭제`}>
+            삭제
+          </button>
+        )}
+      </div>
+    );
+  }
+  return (
+    <div style={secretRow}>
+      <input
+        aria-label={`${server.name} 비밀값`}
+        type="password"
+        placeholder={label}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={{ ...input, flex: 1, minWidth: 0 }}
+      />
+      <button onClick={onSave} style={secondaryBtn}>
+        {server.secretRef ? `${label} 변경 저장` : "시크릿 저장"}
+      </button>
+      {server.secretRef && (
+        <button onClick={onCancel} style={secondaryBtn}>
+          취소
+        </button>
+      )}
     </div>
   );
 }
@@ -180,6 +242,8 @@ const input: CSSProperties = {
   fontFamily: "inherit",
 };
 const authBadge: CSSProperties = { fontSize: 11, fontWeight: 600, color: "var(--text2)", background: "var(--hover)", borderRadius: 4, padding: "2px 7px" };
+const secretRow: CSSProperties = { display: "flex", gap: 6, alignItems: "center", marginTop: 8, flexWrap: "wrap" };
+const secretHint: CSSProperties = { flex: 1, minWidth: 160, fontSize: 12, color: "var(--text2)" };
 const primaryBtn: CSSProperties = { border: "none", background: "var(--accent)", color: "#fff", borderRadius: "var(--radius-md)", padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 };
 const secondaryBtn: CSSProperties = { border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text)", borderRadius: "var(--radius-md)", padding: "6px 10px", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 };
 const dangerBtn: CSSProperties = { border: "1px solid var(--border)", background: "var(--bg)", color: "var(--st-danger)", borderRadius: "var(--radius-md)", padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 };

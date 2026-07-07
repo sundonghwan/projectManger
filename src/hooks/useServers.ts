@@ -74,5 +74,17 @@ export function useServers(businessId: string | null, projectId: string | null) 
     [reload],
   );
 
-  return { servers, error, create, update, archive, setSecret };
+  const clearSecret = useCallback(
+    async (id: string) => {
+      try {
+        await api.server.clearSecret(id);
+        await reload();
+      } catch (e) {
+        setError(String(e));
+      }
+    },
+    [reload],
+  );
+
+  return { servers, error, create, update, archive, setSecret, clearSecret };
 }

@@ -18,8 +18,10 @@ const server = (over: Partial<ServerConnection> = {}): ServerConnection => ({
 function setup(servers: ServerConnection[] = [server()]) {
   const h = {
     onCreate: vi.fn(),
+    onUpdate: vi.fn(),
     onArchive: vi.fn(),
     onSetSecret: vi.fn(),
+    onClearSecret: vi.fn(),
     onConnect: vi.fn(),
   };
   render(<ServerPanel servers={servers} {...h} />);
@@ -60,6 +62,25 @@ describe("ServerPanel", () => {
     await userEvent.type(screen.getByLabelText("스테이징 비밀값"), "pw123");
     await userEvent.click(screen.getByRole("button", { name: "시크릿 저장" }));
     expect(h.onSetSecret).toHaveBeenCalledWith("1", "pw123");
+  });
+
+  it("저장된 비밀번호는 변경 버튼을 누른 뒤 새 값 저장", async () => {
+    const h = setup([server({ secretRef: "ssh/conn-1" })]);
+
+    expect(screen.queryByLabelText("스테이징 비밀값")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "스테이징 비밀번호 변경" }));
+    await userEvent.type(screen.getByLabelText("스테이징 비밀값"), "new-pw");
+    await userEvent.click(screen.getByRole("button", { name: "비밀번호 변경 저장" }));
+
+    expect(h.onSetSecret).toHaveBeenCalledWith("1", "new-pw");
+  });
+
+  it("저장된 비밀번호 삭제는 onClearSecret", async () => {
+    const h = setup([server({ secretRef: "ssh/conn-1" })]);
+
+    await userEvent.click(screen.getByRole("button", { name: "스테이징 비밀번호 삭제" }));
+
+    expect(h.onClearSecret).toHaveBeenCalledWith("1");
   });
 
   it("보관 버튼은 onArchive", async () => {

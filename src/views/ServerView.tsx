@@ -83,6 +83,7 @@ export function ServerView({ businessId, projectId }: ServerViewProps) {
           onUpdate={(d) => void s.update(d)}
           onArchive={(id) => void s.archive(id)}
           onSetSecret={(id, secret) => void s.setSecret(id, secret)}
+          onClearSecret={(id) => void s.clearSecret(id)}
           onConnect={(srv) =>
             void gate(srv, () => {
               setBrowsing(null);

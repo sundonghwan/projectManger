@@ -160,3 +160,17 @@ body {
 .md-preview table { border-collapse: collapse; margin: 12px 0; }
 .md-preview th, .md-preview td { border: 1px solid var(--border); padding: 6px 10px; }
 .md-preview img { max-width: 100%; }
+
+/* xterm viewport keeps scrollback, but the desktop terminal surface should not show a draggable scrollbar. */
+.ssh-terminal-host .xterm {
+  height: 100%;
+}
+
+.ssh-terminal-host .xterm-viewport {
+  scrollbar-width: none;
+}
+
+.ssh-terminal-host .xterm-viewport::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
