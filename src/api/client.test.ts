@@ -69,3 +69,32 @@ describe("api.deliverable", () => {
     expect(invoke).toHaveBeenCalledWith("deliverable_open", { id: "deliv-1" });
   });
 });
+
+describe("api.document editor body", () => {
+  it("saves markdown and block editor metadata together", async () => {
+    await api.document.setEditorBody("doc-1", {
+      body: "# 공유용",
+      editorBody: '[{"type":"paragraph","content":"공유용"}]',
+      editorBodyFormat: "blocknote-json",
+      collaborationState: "snapshot",
+    });
+
+    expect(invoke).toHaveBeenCalledWith("document_set_editor_body", {
+      id: "doc-1",
+      body: "# 공유용",
+      editorBody: '[{"type":"paragraph","content":"공유용"}]',
+      editorBodyFormat: "blocknote-json",
+      collaborationState: "snapshot",
+    });
+  });
+
+  it("uploads a document asset", async () => {
+    await api.document.uploadAsset("doc-1", "image.png", [1, 2, 3]);
+
+    expect(invoke).toHaveBeenCalledWith("document_asset_upload", {
+      documentId: "doc-1",
+      fileName: "image.png",
+      bytes: [1, 2, 3],
+    });
+  });
+});

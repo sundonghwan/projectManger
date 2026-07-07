@@ -110,9 +110,22 @@ export interface Document {
   title: string;
   icon?: string | null;
   body: string;
+  editorBody?: string | null;
+  editorBodyFormat?: DocumentEditorBodyFormat | null;
+  collaborationState?: string | null;
   sortOrder: number;
   archivedAt?: Timestamp | null;
   createdAt: Timestamp;
+}
+
+export type DocumentEditorBodyFormat = "blocknote-json";
+
+export interface DocumentAsset {
+  id: string;
+  documentId: string;
+  fileName: string;
+  filePath: string;
+  url: string;
 }
 
 export interface Label {
