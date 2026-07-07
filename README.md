@@ -54,10 +54,6 @@ src-tauri/src/
   sftp.rs                # SFTP 목록
   hostkey.rs             # SSH host key 확인/신뢰
   secrets.rs             # OS 키체인 연동
-
-docs/superpowers/
-  specs/                 # 설계 스펙
-  plans/                 # 구현 계획/재개 노트
 ```
 
 ## 개발
@@ -116,14 +112,8 @@ Host key verification failed.
 
 터미널 세션은 `TERM=xterm-256color`로 실행합니다. 원격에서 Codex 같은 interactive TUI를 실행할 때 `TERM is set to "dumb"` 경고가 보이면, 현재 코드가 반영된 Tauri 앱을 다시 실행했는지 확인합니다.
 
-## 현재 제한과 후속 작업
+## 현재 제한 사항
 
 - 실시간 폴더 감시와 프론트 자동 refetch는 아직 구현되지 않았습니다. 앱 재시작 또는 vault 재오픈 시 외부 변경을 다시 로드합니다.
-- 충돌 복사본은 로드 시 메모리에서 LWW로 해소하지만, 진 쪽 파일을 즉시 디스크에서 정리하는 정규화 단계는 별도 후속 작업입니다.
+- 충돌 복사본은 로드 시 메모리에서 LWW로 해소하지만, 진 쪽 파일을 즉시 디스크에서 정리하지는 않습니다.
 - 서버 연결/스니펫/시크릿은 의도적으로 동기화하지 않습니다. 다른 기기에서 SSH 정보를 공유하려면 별도 설계가 필요합니다.
-
-## 참고 문서
-
-- 파일 vault 설계: `docs/superpowers/specs/2026-06-24-file-vault-storage-design.md`
-- Plan 2 폴더 감시 설계: `docs/superpowers/specs/2026-06-29-folder-watch-sync-design.md`
-- 파일 vault 재개 노트: `docs/superpowers/plans/RESUME-file-vault.md`
