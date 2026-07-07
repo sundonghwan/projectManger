@@ -4,29 +4,47 @@ import userEvent from "@testing-library/user-event";
 import { CreatePopover } from "./CreatePopover";
 
 describe("CreatePopover - 사업", () => {
-  it("유형 선택 + 이름 입력 후 만들기 → onCreateBusiness(type, name)", async () => {
+  it("자유 입력 사업 유형 + 이름 입력 후 만들기 → onCreateBusiness(type, name)", async () => {
     const onCreateBusiness = vi.fn();
     const onClose = vi.fn();
     render(
       <CreatePopover x={0} y={0} variant="business" onCreateBusiness={onCreateBusiness} onClose={onClose} />,
     );
-    await userEvent.click(screen.getByRole("button", { name: /운영/ }));
+    await userEvent.type(screen.getByLabelText("사업 유형"), "  철도  ");
     await userEvent.type(screen.getByLabelText("이름"), "분석 사업");
     await userEvent.click(screen.getByRole("button", { name: "만들기" }));
-    expect(onCreateBusiness).toHaveBeenCalledWith("ops", "분석 사업");
+    expect(onCreateBusiness).toHaveBeenCalledWith("철도", "분석 사업");
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("이름이 비면 만들기 비활성", () => {
+  it("이름 또는 사업 유형이 비면 만들기 비활성", async () => {
     render(<CreatePopover x={0} y={0} variant="business" onCreateBusiness={vi.fn()} onClose={vi.fn()} />);
-    expect(screen.getByRole("button", { name: "만들기" })).toBeDisabled();
+    const createButton = screen.getByRole("button", { name: "만들기" });
+    expect(createButton).toBeDisabled();
+    await userEvent.type(screen.getByLabelText("사업 유형"), "플랫폼");
+    expect(createButton).toBeDisabled();
+    await userEvent.type(screen.getByLabelText("이름"), "포털");
+    expect(createButton).toBeEnabled();
   });
 
-  it("Enter로 제출", async () => {
+  it("동적 사업 유형 칩 선택 후 Enter로 제출", async () => {
     const onCreateBusiness = vi.fn();
-    render(<CreatePopover x={0} y={0} variant="business" onCreateBusiness={onCreateBusiness} onClose={vi.fn()} />);
-    await userEvent.type(screen.getByLabelText("이름"), "SI 사업{Enter}");
-    expect(onCreateBusiness).toHaveBeenCalledWith("etc", "SI 사업");
+    render(
+      <CreatePopover
+        x={0}
+        y={0}
+        variant="business"
+        businessTypeOptions={[
+          { type: "철도", label: "철도", color: "#2563eb", count: 2 },
+          { type: "플랫폼", label: "플랫폼", color: "#16a34a", count: 1 },
+        ]}
+        onCreateBusiness={onCreateBusiness}
+        onClose={vi.fn()}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "플랫폼" }));
+    await userEvent.type(screen.getByLabelText("이름"), "포털 사업{Enter}");
+    expect(onCreateBusiness).toHaveBeenCalledWith("플랫폼", "포털 사업");
   });
 });
 
