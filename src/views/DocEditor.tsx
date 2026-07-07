@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { Component, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { Document } from "../domain/types";
 import type { DocumentEditorBodyInput } from "../api/client";
 import { api } from "../api/client";
@@ -96,22 +96,47 @@ export function DocEditor({ document }: DocEditorProps) {
 
       <div style={{ flex: 1, minHeight: 0 }}>
         {loaded && source ? (
-          <BlockDocumentEditor
-            key={`${loaded.id}:${source.kind}:${source.markdown}`}
-            documentId={loaded.id}
-            initialBlocks={source.kind === "blocks" ? source.blocks : null}
-            initialMarkdown={source.markdown}
-            collaborationState={loaded.collaborationState}
-            onChange={(value) => onChange(prepareEditorSavePayload(value))}
-            onBlur={flush}
-            onWarning={setError}
-          />
+          <DocumentEditorErrorBoundary key={loaded.id}>
+            <BlockDocumentEditor
+              key={`${loaded.id}:${source.kind}:${source.markdown}`}
+              documentId={loaded.id}
+              initialBlocks={source.kind === "blocks" ? source.blocks : null}
+              initialMarkdown={source.markdown}
+              collaborationState={loaded.collaborationState}
+              onChange={(value) => onChange(prepareEditorSavePayload(value))}
+              onBlur={flush}
+              onWarning={setError}
+            />
+          </DocumentEditorErrorBoundary>
         ) : (
           <div style={loadingBox}>문서를 여는 중...</div>
         )}
       </div>
     </div>
   );
+}
+
+class DocumentEditorErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
+  state = { error: null };
+
+  static getDerivedStateFromError(error: unknown) {
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={editorCrashBox}>
+          <Icon name="alert" size={16} />
+          <div>
+            <div style={{ fontWeight: 700, color: "var(--text)" }}>문서 편집기를 열지 못했습니다.</div>
+            <div style={{ marginTop: 4, color: "var(--text2)" }}>{this.state.error}</div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 const topbar: CSSProperties = {
@@ -137,4 +162,15 @@ const errorBar: CSSProperties = {
   background: "rgba(239,68,68,.1)",
   color: "#ef4444",
   fontSize: 12,
+};
+const editorCrashBox: CSSProperties = {
+  display: "flex",
+  gap: 8,
+  margin: 24,
+  padding: "12px 14px",
+  border: "1px solid rgba(239,68,68,.25)",
+  borderRadius: "var(--radius-md)",
+  background: "rgba(239,68,68,.08)",
+  color: "#ef4444",
+  fontSize: 13,
 };

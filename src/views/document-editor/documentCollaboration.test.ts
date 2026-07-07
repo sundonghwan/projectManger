@@ -28,4 +28,19 @@ describe("documentCollaboration", () => {
     expect(collaboration.provider).not.toBeNull();
     collaboration.destroy();
   });
+
+  it("falls back to a disconnected local document when the WebRTC provider is unavailable", () => {
+    const collaboration = createDocumentCollaboration({
+      documentId: "doc-1",
+      providerMode: "webrtc",
+      createProvider: () => {
+        throw new Error("WebRTC unavailable");
+      },
+    });
+
+    expect(collaboration.status).toBe("disconnected");
+    expect(collaboration.provider).toBeNull();
+    expect(collaboration.fragment).toBeTruthy();
+    collaboration.destroy();
+  });
 });

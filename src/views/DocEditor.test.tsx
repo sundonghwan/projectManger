@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Document } from "../domain/types";
 
@@ -21,20 +21,25 @@ vi.mock("./document-editor/BlockDocumentEditor", () => ({
     initialMarkdown: string;
     onChange: (payload: { markdown: string; blocks: unknown[]; collaborationState?: string | null }) => void;
     onBlur: () => void;
-  }) => (
-    <textarea
-      aria-label="라이브 문서 본문"
-      defaultValue={initialMarkdown}
-      onChange={(event) =>
-        onChange({
-          markdown: event.currentTarget.value,
-          blocks: [{ type: "paragraph", content: event.currentTarget.value }],
-          collaborationState: null,
-        })
-      }
-      onBlur={onBlur}
-    />
-  ),
+  }) => {
+    if (initialMarkdown === "# crash") {
+      throw new Error("editor boot failed");
+    }
+    return (
+      <textarea
+        aria-label="라이브 문서 본문"
+        defaultValue={initialMarkdown}
+        onChange={(event) =>
+          onChange({
+            markdown: event.currentTarget.value,
+            blocks: [{ type: "paragraph", content: event.currentTarget.value }],
+            collaborationState: null,
+          })
+        }
+        onBlur={onBlur}
+      />
+    );
+  },
 }));
 
 import { DocEditor } from "./DocEditor";
@@ -67,12 +72,15 @@ describe("DocEditor (live block editor)", () => {
     await userEvent.type(editor, " 끝");
     editor.blur();
 
-    expect(api.document.setEditorBody).toHaveBeenCalledWith("1", {
-      body: "# 안녕\n본문 끝",
-      editorBody: JSON.stringify([{ type: "paragraph", content: "# 안녕\n본문 끝" }]),
-      editorBodyFormat: "blocknote-json",
-      collaborationState: null,
-    });
+    await waitFor(() =>
+      expect(api.document.setEditorBody).toHaveBeenCalledWith("1", {
+        body: "# 안녕\n본문 끝",
+        editorBody: JSON.stringify([{ type: "paragraph", content: "# 안녕\n본문 끝" }]),
+        editorBodyFormat: "blocknote-json",
+        collaborationState: null,
+      }),
+    );
+    expect(await screen.findByText("저장됨")).toBeInTheDocument();
   });
 
   it("깨진 editorBody는 Markdown 본문으로 열고 경고를 표시", async () => {
@@ -87,5 +95,16 @@ describe("DocEditor (live block editor)", () => {
     const editor = (await screen.findByLabelText("라이브 문서 본문")) as HTMLTextAreaElement;
     expect(editor.value).toBe("# 복구");
     expect(screen.getByText(/블록 문서를 읽지 못해/)).toBeInTheDocument();
+  });
+
+  it("에디터 렌더 오류가 앱 흰 화면으로 번지지 않도록 오류 메시지를 표시", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(api.document.get).mockResolvedValueOnce({ body: "# crash" } as never);
+
+    render(<DocEditor document={{ ...doc, body: "" }} />);
+
+    expect(await screen.findByText(/문서 편집기를 열지 못했습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/editor boot failed/)).toBeInTheDocument();
+    consoleError.mockRestore();
   });
 });
