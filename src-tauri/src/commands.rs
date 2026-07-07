@@ -9,7 +9,7 @@ use crate::store::ops::label::TaskLabelView;
 use crate::store::ops::search::SearchHit;
 use crate::store::ops::trash::TrashItem;
 use crate::store::Store;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use tauri::State;
@@ -214,6 +214,16 @@ pub struct DocumentCreate {
     pub title: String,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentAsset {
+    pub id: String,
+    pub document_id: String,
+    pub file_name: String,
+    pub file_path: String,
+    pub url: String,
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockCreate {
@@ -273,6 +283,67 @@ pub fn document_get(state: State<AppState>, id: String) -> Result<Document> {
 pub fn document_set_body(state: State<AppState>, id: String, body: String) -> Result<()> {
     let mut store = state.store.lock().unwrap();
     ops::document::set_body(&mut store, &id, &body)
+}
+
+#[tauri::command]
+pub fn document_set_editor_body(
+    state: State<AppState>,
+    id: String,
+    body: String,
+    editor_body: String,
+    editor_body_format: String,
+    collaboration_state: Option<String>,
+) -> Result<()> {
+    let mut store = state.store.lock().unwrap();
+    ops::document::set_editor_body(
+        &mut store,
+        &id,
+        &body,
+        Some(&editor_body),
+        Some(&editor_body_format),
+        collaboration_state.as_deref(),
+    )
+}
+
+#[tauri::command]
+pub fn document_asset_upload(
+    state: State<AppState>,
+    document_id: String,
+    file_name: String,
+    bytes: Vec<u8>,
+) -> Result<DocumentAsset> {
+    let store = state.store.lock().unwrap();
+    let document = ops::document::get(&store, &document_id)?;
+    let file_name = Path::new(&file_name)
+        .file_name()
+        .and_then(|value| value.to_str())
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| AppError::Invalid("이미지 파일 이름을 확인할 수 없습니다".into()))?
+        .to_string();
+
+    if !is_supported_document_image(&file_name) {
+        return Err(AppError::Invalid("지원하지 않는 이미지 형식입니다".into()));
+    }
+    if bytes.is_empty() {
+        return Err(AppError::Invalid("빈 이미지 파일은 업로드할 수 없습니다".into()));
+    }
+
+    let asset_id = crate::store::ids::new_id();
+    let dest_dir = document_asset_files_root(&store.root, &document.id).join(&asset_id);
+    std::fs::create_dir_all(&dest_dir)
+        .map_err(|_| AppError::Invalid("문서 이미지 폴더를 만들 수 없습니다".into()))?;
+    let dest = dest_dir.join(&file_name);
+    std::fs::write(&dest, bytes)
+        .map_err(|_| AppError::Invalid("문서 이미지를 저장할 수 없습니다".into()))?;
+
+    let file_path = dest.to_string_lossy().to_string();
+    Ok(DocumentAsset {
+        id: asset_id,
+        document_id,
+        file_name,
+        url: file_path.clone(),
+        file_path,
+    })
 }
 
 #[tauri::command]
@@ -405,6 +476,19 @@ pub fn deliverable_archive(state: State<AppState>, id: String) -> Result<()> {
 
 fn deliverable_files_root(store_root: &Path) -> PathBuf {
     store_root.join("files").join("deliverables")
+}
+
+fn document_asset_files_root(store_root: &Path, document_id: &str) -> PathBuf {
+    store_root.join("files").join("documents").join(document_id).join("assets")
+}
+
+fn is_supported_document_image(file_name: &str) -> bool {
+    let lower = file_name.to_ascii_lowercase();
+    lower.ends_with(".png")
+        || lower.ends_with(".jpg")
+        || lower.ends_with(".jpeg")
+        || lower.ends_with(".gif")
+        || lower.ends_with(".webp")
 }
 
 fn legacy_deliverable_files_root(app_data_dir: &Path) -> PathBuf {
@@ -1115,6 +1199,26 @@ mod tests {
             super::deliverable_files_root(&store_root),
             store_root.join("files").join("deliverables")
         );
+    }
+
+    #[test]
+    fn document_asset_files_root_lives_under_store_root() {
+        let store_root = tmp_dir("cmd_document_asset_root").join(".projectManger");
+
+        assert_eq!(
+            super::document_asset_files_root(&store_root, "doc-1"),
+            store_root.join("files").join("documents").join("doc-1").join("assets")
+        );
+    }
+
+    #[test]
+    fn is_supported_document_image_accepts_common_images() {
+        assert!(super::is_supported_document_image("a.png"));
+        assert!(super::is_supported_document_image("a.jpg"));
+        assert!(super::is_supported_document_image("a.jpeg"));
+        assert!(super::is_supported_document_image("a.gif"));
+        assert!(super::is_supported_document_image("a.webp"));
+        assert!(!super::is_supported_document_image("a.pdf"));
     }
 
     #[test]
