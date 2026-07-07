@@ -31,7 +31,7 @@ mod tests {
     }
 
     // LWW 불변식 잠금: now() 포맷이 고정폭이라 사전식(문자열) 정렬 == 시간 정렬이어야 한다.
-    // 이 불변식이 깨지면 충돌 해소(최신 updatedAt 승리)가 잘못된다(Plan 2 의존).
+    // 이 불변식이 깨지면 동기화 충돌 해소(최신 updatedAt 승리)가 잘못된다.
     #[test]
     fn now_format_is_fixed_width_lexicographically_chronological() {
         use chrono::{NaiveDateTime, TimeZone, Utc};
