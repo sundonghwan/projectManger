@@ -1,4 +1,4 @@
-import { useRef, useState, type CSSProperties } from "react";
+import { useRef, useState, type CSSProperties, type DragEvent } from "react";
 import type { Deliverable, DeliverableStatus, Folder } from "../domain/types";
 import { DELIVERABLE_STATUS_COLOR, DELIVERABLE_STATUS_LABEL } from "../ui/colors";
 import { formatBytes } from "../domain/format";
@@ -14,6 +14,7 @@ export interface DeliverableListProps {
   /** 현재 보고 있는 폴더 id (표시용) */
   currentFolderId?: string | null;
   onUpload: () => void;
+  onDropFiles?: (paths: string[]) => void;
   onSetStatus: (id: string, status: DeliverableStatus) => void;
   onRename: (id: string, title: string) => void;
   /** 폴더 이동 (folderId=null 이면 미분류). 제공 시 폴더 열을 노출한다. */
@@ -25,9 +26,10 @@ export interface DeliverableListProps {
 const STATUSES: DeliverableStatus[] = ["draft", "review", "done"];
 
 export function DeliverableList(props: DeliverableListProps) {
-  const { deliverables, error, uploading, folders = [], onUpload, onSetStatus, onRename, onMove, onOpen, onArchive } = props;
+  const { deliverables, error, uploading, folders = [], onUpload, onDropFiles, onSetStatus, onRename, onMove, onOpen, onArchive } = props;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [dragging, setDragging] = useState(false);
   const renameDone = useRef(false); // Enter→blur 중복 커밋 방지
 
   const showFolders = !!onMove; // 폴더 이동 핸들러가 있을 때만 폴더 열 노출
@@ -47,9 +49,40 @@ export function DeliverableList(props: DeliverableListProps) {
     if (name && name !== d.title) onRename(d.id, name);
     setEditingId(null);
   };
+  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
+    if (!onDropFiles) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+    setDragging(true);
+  };
+  const handleDragLeave = () => {
+    if (!onDropFiles) return;
+    setDragging(false);
+  };
+  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
+    if (!onDropFiles) return;
+    e.preventDefault();
+    setDragging(false);
+
+    const paths = Array.from(e.dataTransfer.files)
+      .map((file) => (file as File & { path?: string }).path)
+      .filter((path): path is string => !!path);
+    if (paths.length > 0) onDropFiles(paths);
+  };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+    <div
+      data-testid="deliverable-drop-zone"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, position: "relative" }}
+    >
+      {dragging && (
+        <div style={dropOverlay}>
+          여기에 파일을 놓아 업로드
+        </div>
+      )}
       <div style={{ display: "flex", alignItems: "center", padding: "12px 20px" }}>
         <span style={{ fontSize: 15, fontWeight: 600, flex: 1 }}>산출물</span>
         <button onClick={onUpload} disabled={uploading} style={{ ...uploadBtn, opacity: uploading ? 0.6 : 1 }}>
@@ -255,4 +288,19 @@ const errorBar: CSSProperties = {
   background: "rgba(239,68,68,.1)",
   color: "#ef4444",
   fontSize: 12,
+};
+const dropOverlay: CSSProperties = {
+  position: "absolute",
+  inset: 8,
+  zIndex: 2,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  border: "1px dashed var(--accent)",
+  borderRadius: "var(--radius-md)",
+  background: "rgba(15, 23, 42, 0.08)",
+  color: "var(--accent)",
+  fontSize: 13,
+  fontWeight: 600,
+  pointerEvents: "none",
 };

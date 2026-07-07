@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DeliverableList } from "./DeliverableList";
 import type { Deliverable } from "../domain/types";
@@ -85,5 +85,29 @@ describe("DeliverableList", () => {
   it("파일 경로 없으면 열기 비활성화", () => {
     setup({ deliverables: [deliv("1", { filePath: null })] });
     expect(screen.getByRole("button", { name: "보고서1.pdf 열기" })).toBeDisabled();
+  });
+
+  it("드롭한 파일 경로를 onDropFiles에 전달", () => {
+    const onDropFiles = vi.fn();
+    setup({ onDropFiles });
+    const first = new File(["a"], "a.pdf", { type: "application/pdf" }) as File & { path?: string };
+    first.path = "/tmp/a.pdf";
+    const missingPath = new File(["b"], "b.pdf", { type: "application/pdf" });
+    const second = new File(["c"], "c.pdf", { type: "application/pdf" }) as File & { path?: string };
+    second.path = "/tmp/c.pdf";
+
+    fireEvent.drop(screen.getByTestId("deliverable-drop-zone"), {
+      dataTransfer: { files: [first, missingPath, second] },
+    });
+
+    expect(onDropFiles).toHaveBeenCalledWith(["/tmp/a.pdf", "/tmp/c.pdf"]);
+  });
+
+  it("드래그 오버 중 드롭 안내 오버레이를 표시", () => {
+    setup({ onDropFiles: vi.fn() });
+
+    fireEvent.dragOver(screen.getByTestId("deliverable-drop-zone"));
+
+    expect(screen.getByText("여기에 파일을 놓아 업로드")).toBeInTheDocument();
   });
 });
