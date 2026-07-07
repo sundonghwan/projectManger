@@ -74,4 +74,29 @@ describe("Kanban", () => {
     fireEvent.drop(target, { dataTransfer: dt });
     expect(onMove).toHaveBeenCalledWith("3", "todo", 4);
   });
+
+  it("다른 컬럼의 카드 위로 드롭하면 대상 컬럼 상태로 이동한다", () => {
+    const { onMove } = setup([
+      task({ id: "1", status: "todo", sortOrder: 1 }),
+      task({ id: "2", status: "doing", sortOrder: 3 }),
+    ]);
+    const dragged = screen.getByTestId("card-1");
+    const target = screen.getByTestId("card-2");
+    const dt = { getData: () => "1", setData: vi.fn() };
+    fireEvent.dragStart(dragged, { dataTransfer: dt });
+    fireEvent.drop(target, { dataTransfer: dt });
+    expect(onMove).toHaveBeenCalledWith("1", "doing", expect.any(Number));
+  });
+
+  it("drop 이벤트에서 dataTransfer 값이 비어도 내부 drag id로 상태를 이동한다", () => {
+    const { onMove } = setup([
+      task({ id: "1", status: "todo", sortOrder: 1 }),
+      task({ id: "2", status: "doing", sortOrder: 3 }),
+    ]);
+    const dragged = screen.getByTestId("card-1");
+    const target = screen.getByTestId("card-2");
+    fireEvent.dragStart(dragged, { dataTransfer: { setData: vi.fn(), getData: vi.fn() } });
+    fireEvent.drop(target, { dataTransfer: { getData: () => "" } });
+    expect(onMove).toHaveBeenCalledWith("1", "doing", expect.any(Number));
+  });
 });

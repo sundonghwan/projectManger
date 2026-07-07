@@ -1,4 +1,4 @@
-import type { CSSProperties, DragEvent } from "react";
+import { useRef, type CSSProperties, type DragEvent } from "react";
 import { KANBAN_STATUSES, type KanbanColumn } from "../domain/kanban";
 import type { Label, TaskStatus } from "../domain/types";
 import { computeSortOrder } from "../domain/sortOrder";
@@ -14,6 +14,9 @@ export interface KanbanProps {
 }
 
 export function Kanban({ columns, onMove, onAddTask, labelsByTask = {}, onCardClick }: KanbanProps) {
+  const draggingTaskIdRef = useRef<string | null>(null);
+  const droppedTaskId = (e: DragEvent): string => e.dataTransfer.getData("text/plain") || draggingTaskIdRef.current || "";
+
   const moveBetween = (taskId: string, col: KanbanColumn, targetTaskId: string, position: "before" | "after") => {
     if (taskId === targetTaskId) return;
     const tasks = col.tasks.filter((t) => t.id !== taskId);
@@ -26,8 +29,9 @@ export function Kanban({ columns, onMove, onAddTask, labelsByTask = {}, onCardCl
 
   const handleDrop = (col: KanbanColumn) => (e: DragEvent) => {
     e.preventDefault();
-    const id = e.dataTransfer.getData("text/plain");
+    const id = droppedTaskId(e);
     if (!id) return;
+    draggingTaskIdRef.current = null;
     const last = col.tasks[col.tasks.length - 1];
     const sortOrder = computeSortOrder(last ? last.sortOrder : null, null);
     onMove(id, col.status, sortOrder);
@@ -43,8 +47,9 @@ export function Kanban({ columns, onMove, onAddTask, labelsByTask = {}, onCardCl
   const handleCardDrop = (col: KanbanColumn, targetTaskId: string) => (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    const id = e.dataTransfer.getData("text/plain");
+    const id = droppedTaskId(e);
     if (!id) return;
+    draggingTaskIdRef.current = null;
     const rect = e.currentTarget.getBoundingClientRect();
     const pointerY = e.clientY || e.pageY || e.screenY;
     const position = pointerY < rect.top + rect.height / 2 ? "before" : "after";
@@ -86,7 +91,15 @@ export function Kanban({ columns, onMove, onAddTask, labelsByTask = {}, onCardCl
               <div
                 key={t.id}
                 draggable
-                onDragStart={(e) => e.dataTransfer.setData("text/plain", String(t.id))}
+                onDragStart={(e) => {
+                  draggingTaskIdRef.current = t.id;
+                  e.dataTransfer.effectAllowed = "move";
+                  e.dataTransfer.setData("text/plain", t.id);
+                  e.dataTransfer.setData("application/x-work-vault-task", t.id);
+                }}
+                onDragEnd={() => {
+                  draggingTaskIdRef.current = null;
+                }}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleCardDrop(col, t.id)}
                 onClick={() => onCardClick?.(t.id)}
