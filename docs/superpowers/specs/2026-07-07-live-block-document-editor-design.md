@@ -45,6 +45,7 @@ Work Vault will store two document representations:
    - remains the compatibility/export/search body
    - continues to satisfy the user's "save as Markdown" requirement
    - generated from the editor on each save
+   - is the canonical format for external sharing outside Work Vault
 
 2. `blocks`: BlockNote JSON string
    - becomes the lossless editor source
@@ -53,9 +54,34 @@ Work Vault will store two document representations:
 
 Markdown alone is not sufficient for the full requested scope because complex tables, block IDs, image display metadata, nested block properties, and collaborative state can be lossy when converted to Markdown.
 
+## External Markdown Sharing
+
+When a user shares a Work Vault document outside the app, the shared artifact must be Markdown generated from the latest editor state.
+
+The external Markdown contract is:
+
+- use `Document.body` as the source for copy/export/share
+- keep the body current on every editor save
+- serialize supported content to portable Markdown: headings, paragraphs, lists, checklists, quotes, code blocks, tables, links, and images
+- write uploaded document images as Markdown image references
+- prefer relative or app-exportable asset paths when generating a share package
+- never require another Work Vault user to read `editorBody` just to view the Markdown content
+
+Some rich editor state is intentionally not guaranteed in external Markdown:
+
+- block IDs
+- active collaboration cursor state
+- custom block UI state
+- advanced table presentation metadata that Markdown cannot represent
+- internal asset IDs beyond the image/file URL needed by Markdown
+
+This means Markdown sharing is portable and readable, while reopening inside Work Vault uses `editorBody` for the full editing experience.
+
 ## Data Model
 
 Extend the document model with optional editor metadata.
+
+The existing Rust `Document` already has an inline `blocks: Vec<Block>` field used by the older block API. The BlockNote editor should not repurpose that field because its shape is not equivalent to BlockNote JSON. Add explicit editor metadata fields instead and keep the existing block API backward compatible.
 
 Frontend `Document`:
 
