@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
@@ -14,11 +14,10 @@ export interface TerminalProps {
   onClose: () => void;
 }
 
-/** xterm.js는 출력 렌더러로만 쓰고, 입력은 일반 textarea로 받아 macOS IME를 보존한다. */
+/** SSH PTY 입출력을 xterm.js에 직접 연결한다. */
 export function Terminal({ server, onClose }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-  const composingRef = useRef(false);
+  const xtermRef = useRef<XTerm | null>(null);
   const [snippets, setSnippets] = useState<CommandSnippet[]>([]);
 
   const write = useCallback(
@@ -28,19 +27,6 @@ export function Terminal({ server, onClose }: TerminalProps) {
     },
     [server.id],
   );
-
-  const clearInput = useCallback(() => {
-    if (inputRef.current) {
-      inputRef.current.value = "";
-    }
-  }, []);
-
-  const flushInput = useCallback(() => {
-    const value = inputRef.current?.value ?? "";
-    if (!value) return;
-    write(value);
-    clearInput();
-  }, [clearInput, write]);
 
   const reloadSnippets = useCallback(async () => {
     try {
@@ -57,7 +43,7 @@ export function Terminal({ server, onClose }: TerminalProps) {
   useEffect(() => {
     const id = server.id;
     const term = new XTerm({
-      disableStdin: true,
+      disableStdin: false,
       fontFamily: TERMINAL_FONT_FAMILY,
       fontSize: 13,
       cursorBlink: true,
@@ -65,14 +51,26 @@ export function Terminal({ server, onClose }: TerminalProps) {
       theme: { background: "#0d0d0c", foreground: "#d8d8cf" },
     });
     const fit = new FitAddon();
+    xtermRef.current = term;
     term.loadAddon(fit);
     if (terminalRef.current) term.open(terminalRef.current);
-    window.setTimeout(() => inputRef.current?.focus(), 0);
-    try {
-      fit.fit();
-    } catch {
-      /* 레이아웃 준비 전 */
-    }
+    const dataDisposable = term.onData(write);
+
+    const fitAndResize = () => {
+      try {
+        fit.fit();
+        void api.ssh.resize(id, term.rows, term.cols);
+      } catch {
+        /* 레이아웃 준비 전 */
+      }
+    };
+    const scheduleFit = () => {
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(fitAndResize);
+      });
+    };
+    scheduleFit();
+    window.setTimeout(() => term.focus(), 0);
 
     const dataPromise = listen<string>(`terminal://data/${id}`, (e) => term.write(e.payload));
     const exitPromise = listen(`terminal://exit/${id}`, () =>
@@ -81,67 +79,30 @@ export function Terminal({ server, onClose }: TerminalProps) {
 
     void api.ssh
       .connect(id)
-      .then(() => api.ssh.resize(id, term.rows, term.cols))
+      .then(() => {
+        fitAndResize();
+      })
       .catch((err) => term.write(`\x1b[31m연결 실패: ${String(err)}\x1b[0m\r\n`));
 
-    const onResize = () => {
-      try {
-        fit.fit();
-        void api.ssh.resize(id, term.rows, term.cols);
-      } catch {
-        /* noop */
-      }
-    };
-    window.addEventListener("resize", onResize);
+    window.addEventListener("resize", scheduleFit);
+    const terminalElement = terminalRef.current;
+    const resizeObserver =
+      typeof ResizeObserver === "undefined" || !terminalElement
+        ? null
+        : new ResizeObserver(scheduleFit);
+    if (terminalElement) resizeObserver?.observe(terminalElement);
 
     return () => {
-      window.removeEventListener("resize", onResize);
+      window.removeEventListener("resize", scheduleFit);
+      resizeObserver?.disconnect();
+      dataDisposable.dispose();
       void dataPromise.then((f) => f());
       void exitPromise.then((f) => f());
       void api.ssh.disconnect(id);
       term.dispose();
+      xtermRef.current = null;
     };
-  }, [server.id]);
-
-  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (composingRef.current) return;
-
-    if (event.ctrlKey && !event.metaKey && !event.altKey && event.key.length === 1) {
-      const code = event.key.toUpperCase().charCodeAt(0) - 64;
-      if (code >= 1 && code <= 26) {
-        event.preventDefault();
-        clearInput();
-        write(String.fromCharCode(code));
-        return;
-      }
-    }
-
-    const keyMap: Record<string, string> = {
-      Enter: "\r",
-      Backspace: "\x7f",
-      Tab: "\t",
-      Escape: "\x1b",
-      ArrowUp: "\x1b[A",
-      ArrowDown: "\x1b[B",
-      ArrowRight: "\x1b[C",
-      ArrowLeft: "\x1b[D",
-      Delete: "\x1b[3~",
-      Home: "\x1b[H",
-      End: "\x1b[F",
-      PageUp: "\x1b[5~",
-      PageDown: "\x1b[6~",
-    };
-    const sequence = keyMap[event.key];
-    if (sequence) {
-      event.preventDefault();
-      flushInput();
-      write(sequence);
-    }
-  };
-
-  const focusInput = () => {
-    window.setTimeout(() => inputRef.current?.focus(), 0);
-  };
+  }, [server.id, write]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "#0d0d0c" }}>
@@ -182,47 +143,12 @@ export function Terminal({ server, onClose }: TerminalProps) {
         onCreate={(name, command) => void api.snippet.create(server.id, name, command).then(reloadSnippets)}
         onDelete={(id) => void api.snippet.delete(id).then(reloadSnippets)}
       />
-      <textarea
-        ref={inputRef}
-        aria-label="터미널 입력"
-        rows={1}
-        spellCheck={false}
-        placeholder="터미널 입력"
-        onCompositionStart={() => {
-          composingRef.current = true;
-        }}
-        onCompositionEnd={() => {
-          composingRef.current = false;
-          window.setTimeout(flushInput, 0);
-        }}
-        onInput={() => {
-          if (!composingRef.current) flushInput();
-        }}
-        onKeyDown={handleKeyDown}
-        style={inputCapture}
-      />
       <div
         ref={terminalRef}
         className="ssh-terminal-host"
-        onMouseDown={focusInput}
-        style={{ flex: 1, minHeight: 0, padding: 8, overflow: "hidden" }}
+        onMouseDown={() => xtermRef.current?.focus()}
+        style={{ flex: 1, minHeight: 0, overflow: "hidden" }}
       />
     </div>
   );
 }
-
-const inputCapture: CSSProperties = {
-  flex: "none",
-  height: 30,
-  resize: "none",
-  outline: "none",
-  border: "none",
-  borderBottom: "1px solid #26261f",
-  background: "#10100e",
-  color: "#d8d8cf",
-  caretColor: "#d8d8cf",
-  padding: "6px 14px",
-  fontFamily: TERMINAL_FONT_FAMILY,
-  fontSize: 13,
-  lineHeight: "18px",
-};
