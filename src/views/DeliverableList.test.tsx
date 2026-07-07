@@ -1,8 +1,49 @@
-import { describe, it, expect, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { beforeEach, describe, it, expect, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DeliverableList } from "./DeliverableList";
+import { DeliverablesView } from "./DeliverablesView";
 import type { Deliverable } from "../domain/types";
+
+const mocks = vi.hoisted(() => ({
+  dragDropHandler: null as null | ((event: { payload: unknown }) => void),
+  onDragDropEvent: vi.fn(),
+  unlistenDragDrop: vi.fn(),
+  openDialog: vi.fn(),
+  upload: vi.fn(),
+  setStatus: vi.fn(),
+  rename: vi.fn(),
+  move: vi.fn(),
+  open: vi.fn(),
+  archive: vi.fn(),
+  reload: vi.fn(),
+  uploading: false,
+}));
+
+vi.mock("@tauri-apps/api/webview", () => ({
+  getCurrentWebview: () => ({
+    onDragDropEvent: mocks.onDragDropEvent,
+  }),
+}));
+
+vi.mock("@tauri-apps/plugin-dialog", () => ({
+  open: mocks.openDialog,
+}));
+
+vi.mock("../hooks/useDeliverables", () => ({
+  useDeliverables: () => ({
+    deliverables: [],
+    error: null,
+    uploading: mocks.uploading,
+    reload: mocks.reload,
+    upload: mocks.upload,
+    rename: mocks.rename,
+    setStatus: mocks.setStatus,
+    open: mocks.open,
+    archive: mocks.archive,
+    move: mocks.move,
+  }),
+}));
 
 const deliv = (id: string, over: Partial<Deliverable> = {}): Deliverable => ({
   id,
@@ -35,6 +76,26 @@ function setup(over: Partial<Parameters<typeof DeliverableList>[0]> = {}) {
 }
 
 describe("DeliverableList", () => {
+  beforeEach(() => {
+    mocks.dragDropHandler = null;
+    mocks.uploading = false;
+    mocks.onDragDropEvent.mockReset();
+    mocks.onDragDropEvent.mockImplementation(async (handler: (event: { payload: unknown }) => void) => {
+      mocks.dragDropHandler = handler;
+      return mocks.unlistenDragDrop;
+    });
+    mocks.unlistenDragDrop.mockReset();
+    mocks.openDialog.mockReset();
+    mocks.upload.mockReset();
+    mocks.upload.mockResolvedValue(undefined);
+    mocks.setStatus.mockReset();
+    mocks.rename.mockReset();
+    mocks.move.mockReset();
+    mocks.open.mockReset();
+    mocks.archive.mockReset();
+    mocks.reload.mockReset();
+  });
+
   it("업로드된 파일을 행으로 렌더(파일명·크기·업로드일)", () => {
     setup();
     const row = screen.getByTestId("deliv-1");
@@ -87,27 +148,50 @@ describe("DeliverableList", () => {
     expect(screen.getByRole("button", { name: "보고서1.pdf 열기" })).toBeDisabled();
   });
 
-  it("드롭한 파일 경로를 onDropFiles에 전달", () => {
-    const onDropFiles = vi.fn();
-    setup({ onDropFiles });
-    const first = new File(["a"], "a.pdf", { type: "application/pdf" }) as File & { path?: string };
-    first.path = "/tmp/a.pdf";
-    const missingPath = new File(["b"], "b.pdf", { type: "application/pdf" });
-    const second = new File(["c"], "c.pdf", { type: "application/pdf" }) as File & { path?: string };
-    second.path = "/tmp/c.pdf";
+  it("dragActive일 때 드롭 안내 오버레이를 표시", () => {
+    setup({ dragActive: true });
+    expect(screen.getByText("여기에 파일을 놓아 업로드")).toBeInTheDocument();
+  });
+});
 
-    fireEvent.drop(screen.getByTestId("deliverable-drop-zone"), {
-      dataTransfer: { files: [first, missingPath, second] },
+describe("DeliverablesView drag and drop", () => {
+  beforeEach(() => {
+    mocks.dragDropHandler = null;
+    mocks.uploading = false;
+    mocks.onDragDropEvent.mockReset();
+    mocks.onDragDropEvent.mockImplementation(async (handler: (event: { payload: unknown }) => void) => {
+      mocks.dragDropHandler = handler;
+      return mocks.unlistenDragDrop;
     });
-
-    expect(onDropFiles).toHaveBeenCalledWith(["/tmp/a.pdf", "/tmp/c.pdf"]);
+    mocks.unlistenDragDrop.mockReset();
+    mocks.upload.mockReset();
+    mocks.upload.mockResolvedValue(undefined);
   });
 
-  it("드래그 오버 중 드롭 안내 오버레이를 표시", () => {
-    setup({ onDropFiles: vi.fn() });
+  it("Tauri drop paths를 현재 선택 폴더로 업로드", async () => {
+    render(<DeliverablesView businessId="biz-1" projectId="project-1" selectedFolderId="folder-1" onChanged={vi.fn()} />);
 
-    fireEvent.dragOver(screen.getByTestId("deliverable-drop-zone"));
+    await waitFor(() => expect(mocks.onDragDropEvent).toHaveBeenCalled());
+    mocks.dragDropHandler?.({
+      payload: { type: "drop", paths: ["/tmp/a.pdf", "/tmp/b.pdf"], position: { x: 0, y: 0 } },
+    });
 
-    expect(screen.getByText("여기에 파일을 놓아 업로드")).toBeInTheDocument();
+    expect(mocks.upload).toHaveBeenCalledWith(["/tmp/a.pdf", "/tmp/b.pdf"], "folder-1");
+  });
+
+  it("업로드 중에는 Tauri 드래그 오버와 드롭을 무시", async () => {
+    mocks.uploading = true;
+    render(<DeliverablesView businessId="biz-1" projectId="project-1" selectedFolderId="folder-1" onChanged={vi.fn()} />);
+
+    await waitFor(() => expect(mocks.onDragDropEvent).toHaveBeenCalled());
+    mocks.dragDropHandler?.({
+      payload: { type: "over", position: { x: 0, y: 0 } },
+    });
+    mocks.dragDropHandler?.({
+      payload: { type: "drop", paths: ["/tmp/a.pdf"], position: { x: 0, y: 0 } },
+    });
+
+    expect(screen.queryByText("여기에 파일을 놓아 업로드")).not.toBeInTheDocument();
+    expect(mocks.upload).not.toHaveBeenCalled();
   });
 });
