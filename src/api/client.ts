@@ -8,6 +8,8 @@ import type {
   DateString,
   Deliverable,
   DeliverableStatus,
+  DocumentAsset,
+  DocumentEditorBodyFormat,
   Document,
   EntityStatus,
   Folder,
@@ -72,6 +74,12 @@ export interface TaskMoveInput {
   status: TaskStatus;
   sortOrder: number;
 }
+export interface DocumentEditorBodyInput {
+  body: string;
+  editorBody: string;
+  editorBodyFormat: DocumentEditorBodyFormat;
+  collaborationState?: string | null;
+}
 
 export const api = {
   business: {
@@ -106,6 +114,16 @@ export const api = {
       invoke<Document>("document_move", { id, folderId: folderId ?? null }),
     /** 본문(마크다운) 저장. */
     setBody: (id: string, body: string) => invoke<void>("document_set_body", { id, body }),
+    setEditorBody: (id: string, input: DocumentEditorBodyInput) =>
+      invoke<void>("document_set_editor_body", {
+        id,
+        body: input.body,
+        editorBody: input.editorBody,
+        editorBodyFormat: input.editorBodyFormat,
+        collaborationState: input.collaborationState ?? null,
+      }),
+    uploadAsset: (documentId: string, fileName: string, bytes: number[]) =>
+      invoke<DocumentAsset>("document_asset_upload", { documentId, fileName, bytes }),
     archive: (id: string) => invoke<void>("document_archive", { id }),
   },
   block: {

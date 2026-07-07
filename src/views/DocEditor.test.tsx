@@ -7,8 +7,38 @@ vi.mock("../api/client", () => ({
   api: {
     document: {
       get: vi.fn().mockResolvedValue({ body: "# 안녕\n본문" }),
-      setBody: vi.fn().mockResolvedValue(undefined),
+      setEditorBody: vi.fn().mockResolvedValue(undefined),
     },
+  },
+}));
+
+vi.mock("./document-editor/BlockDocumentEditor", () => ({
+  BlockDocumentEditor: ({
+    initialMarkdown,
+    onChange,
+    onBlur,
+  }: {
+    initialMarkdown: string;
+    onChange: (payload: { markdown: string; blocks: unknown[]; collaborationState?: string | null }) => void;
+    onBlur: () => void;
+  }) => {
+    if (initialMarkdown === "# crash") {
+      throw new Error("editor boot failed");
+    }
+    return (
+      <textarea
+        aria-label="라이브 문서 본문"
+        defaultValue={initialMarkdown}
+        onChange={(event) =>
+          onChange({
+            markdown: event.currentTarget.value,
+            blocks: [{ type: "paragraph", content: event.currentTarget.value }],
+            collaborationState: null,
+          })
+        }
+        onBlur={onBlur}
+      />
+    );
   },
 }));
 
@@ -27,42 +57,54 @@ const doc: Document = {
   createdAt: "2026-06-22T00:00:00Z",
 };
 
-describe("DocEditor (markdown)", () => {
-  it("마운트 시 최신 본문을 불러와 textarea에 표시", async () => {
+describe("DocEditor (live block editor)", () => {
+  it("마운트 시 최신 본문을 라이브 에디터에 전달", async () => {
     render(<DocEditor document={doc} />);
-    const ta = screen.getByLabelText("문서 본문") as HTMLTextAreaElement;
-    await waitFor(() => expect(ta.value).toBe("# 안녕\n본문"));
+    const editor = (await screen.findByLabelText("라이브 문서 본문")) as HTMLTextAreaElement;
+    expect(editor.value).toBe("# 안녕\n본문");
   });
 
-  it("미리보기 토글 시 마크다운을 렌더", async () => {
+  it("입력 후 blur 시 Markdown과 BlockNote JSON을 함께 저장", async () => {
     render(<DocEditor document={doc} />);
-    const ta = screen.getByLabelText("문서 본문") as HTMLTextAreaElement;
-    await waitFor(() => expect(ta.value).toBe("# 안녕\n본문"));
-    await userEvent.click(screen.getByRole("button", { name: "미리보기" }));
-    expect(screen.getByRole("heading", { level: 1, name: "안녕" })).toBeInTheDocument();
+    const editor = (await screen.findByLabelText("라이브 문서 본문")) as HTMLTextAreaElement;
+    expect(editor.value).toBe("# 안녕\n본문");
+
+    await userEvent.type(editor, " 끝");
+    editor.blur();
+
+    await waitFor(() =>
+      expect(api.document.setEditorBody).toHaveBeenCalledWith("1", {
+        body: "# 안녕\n본문 끝",
+        editorBody: JSON.stringify([{ type: "paragraph", content: "# 안녕\n본문 끝" }]),
+        editorBodyFormat: "blocknote-json",
+        collaborationState: null,
+      }),
+    );
+    expect(await screen.findByText("저장됨")).toBeInTheDocument();
   });
 
-  it("미리보기에서 위험한 HTML을 제거(sanitize)한다", async () => {
+  it("깨진 editorBody는 Markdown 본문으로 열고 경고를 표시", async () => {
     vi.mocked(api.document.get).mockResolvedValueOnce({
-      body: '텍스트 <img src=x onerror="alert(1)"> 끝\n\n[클릭](javascript:alert(2))',
+      body: "# 복구",
+      editorBody: "{broken",
+      editorBodyFormat: "blocknote-json",
     } as never);
+
     render(<DocEditor document={{ ...doc, body: "" }} />);
-    const ta = screen.getByLabelText("문서 본문") as HTMLTextAreaElement;
-    await waitFor(() => expect(ta.value).toContain("onerror"));
-    await userEvent.click(screen.getByRole("button", { name: "미리보기" }));
-    const preview = document.querySelector(".md-preview") as HTMLElement;
-    // onerror 핸들러 제거 + 링크에서 javascript: 스킴 제거
-    expect(preview.innerHTML).not.toContain("onerror");
-    const link = preview.querySelector("a");
-    expect(link?.getAttribute("href") ?? "").not.toContain("javascript:");
+
+    const editor = (await screen.findByLabelText("라이브 문서 본문")) as HTMLTextAreaElement;
+    expect(editor.value).toBe("# 복구");
+    expect(screen.getByText(/블록 문서를 읽지 못해/)).toBeInTheDocument();
   });
 
-  it("입력 후 blur 시 setBody로 저장", async () => {
-    render(<DocEditor document={doc} />);
-    const ta = screen.getByLabelText("문서 본문") as HTMLTextAreaElement;
-    await waitFor(() => expect(ta.value).toBe("# 안녕\n본문"));
-    await userEvent.type(ta, " 끝");
-    ta.blur();
-    expect(api.document.setBody).toHaveBeenCalledWith("1", "# 안녕\n본문 끝");
+  it("에디터 렌더 오류가 앱 흰 화면으로 번지지 않도록 오류 메시지를 표시", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(api.document.get).mockResolvedValueOnce({ body: "# crash" } as never);
+
+    render(<DocEditor document={{ ...doc, body: "" }} />);
+
+    expect(await screen.findByText(/문서 편집기를 열지 못했습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/editor boot failed/)).toBeInTheDocument();
+    consoleError.mockRestore();
   });
 });

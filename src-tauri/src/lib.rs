@@ -54,6 +54,8 @@ pub fn run() {
             commands::document_archive,
             commands::document_get,
             commands::document_set_body,
+            commands::document_set_editor_body,
+            commands::document_asset_upload,
             commands::block_list,
             commands::block_create,
             commands::block_update,

@@ -1,7 +1,7 @@
 // 도메인 타입 — docs/02-데이터모델.md / schema.sql 기준.
 // 계층: 사업(business) > 프로젝트(project). 문서·산출물·서버는 사업 또는 프로젝트에 부착.
 
-export type BusinessType = "si" | "internal" | "ops" | "etc";
+export type BusinessType = string;
 
 /** 사업/프로젝트 진행 상태 */
 export type EntityStatus = "active" | "onhold" | "done";
@@ -110,9 +110,22 @@ export interface Document {
   title: string;
   icon?: string | null;
   body: string;
+  editorBody?: string | null;
+  editorBodyFormat?: DocumentEditorBodyFormat | null;
+  collaborationState?: string | null;
   sortOrder: number;
   archivedAt?: Timestamp | null;
   createdAt: Timestamp;
+}
+
+export type DocumentEditorBodyFormat = "blocknote-json";
+
+export interface DocumentAsset {
+  id: string;
+  documentId: string;
+  fileName: string;
+  filePath: string;
+  url: string;
 }
 
 export interface Label {

@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./api/client";
+import { businessTypeOptions, normalizeBusinessType } from "./domain/businessTypes";
 import { buildTree, rowId, type TreeRow } from "./domain/tree";
 import type { Business, BusinessType, Folder, FolderKind, Project } from "./domain/types";
 import { Sidebar, type AddKind } from "./components/Sidebar";
+import type { BusinessEditorInput } from "./components/BusinessEditorPopover";
 import { GlobalSearch } from "./components/GlobalSearch";
 import type { SearchHit } from "./domain/types";
 import { businessColor } from "./ui/colors";
@@ -21,10 +23,10 @@ export default function App() {
   const [pendingDocId, setPendingDocId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { theme, toggle: toggleTheme } = useTheme();
-  const [typeFilter, setTypeFilter] = useState<Set<BusinessType>>(new Set());
+  const [typeFilter, setTypeFilter] = useState<Set<string>>(new Set());
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  const onToggleType = useCallback((t: BusinessType) => {
+  const onToggleType = useCallback((t: string) => {
     setTypeFilter((prev) => {
       const next = new Set(prev);
       if (next.has(t)) next.delete(t);
@@ -71,9 +73,14 @@ export default function App() {
   }, []);
 
   const visibleBusinesses = useMemo(
-    () => (typeFilter.size === 0 ? businesses : businesses.filter((b) => typeFilter.has(b.type))),
+    () =>
+      typeFilter.size === 0
+        ? businesses
+        : businesses.filter((b) => typeFilter.has(normalizeBusinessType(b.type))),
     [businesses, typeFilter],
   );
+
+  const typeOptions = useMemo(() => businessTypeOptions(businesses), [businesses]);
 
   const tree = useMemo(
     () => buildTree({ businesses: visibleBusinesses, projects, folders, expanded }),
@@ -128,6 +135,18 @@ export default function App() {
       }
     },
     [loadBusinesses, loadProjects],
+  );
+
+  const onUpdateBusiness = useCallback(
+    async (input: BusinessEditorInput) => {
+      try {
+        await api.business.update(input);
+        await loadBusinesses();
+      } catch (e) {
+        setError(String(e));
+      }
+    },
+    [loadBusinesses],
   );
 
   const onAddChild = useCallback(
@@ -350,12 +369,15 @@ export default function App() {
           rows={tree}
           selectedId={selectedId}
           header={<GlobalSearch onSearch={(q) => api.search(q)} onPick={navigateTo} />}
+          businessTypeOptions={typeOptions}
+          businesses={businesses}
           typeFilter={typeFilter}
           onToggleType={onToggleType}
           colorFor={colorFor}
           onSelect={onSelect}
           onToggle={onToggle}
           onAddBusiness={onAddBusiness}
+          onUpdateBusiness={onUpdateBusiness}
           onAddChild={onAddChild}
           onRename={onRename}
           onArchive={onArchive}

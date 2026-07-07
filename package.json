@@ -1,7 +1,7 @@
 {
   "name": "projectmanger",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,6 +13,9 @@
     "test:cov": "vitest run --coverage"
   },
   "dependencies": {
+    "@blocknote/core": "^0.51.4",
+    "@blocknote/mantine": "^0.51.4",
+    "@blocknote/react": "^0.51.4",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-opener": "^2",
@@ -21,7 +24,9 @@
     "dompurify": "^3.4.11",
     "marked": "^15.0.12",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "y-webrtc": "^10.3.0",
+    "yjs": "^13.6.31"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",

@@ -1,6 +1,6 @@
-import { useState, type CSSProperties } from "react";
+import { useId, useState, type CSSProperties } from "react";
+import { normalizeBusinessType, type BusinessTypeOption } from "../domain/businessTypes";
 import type { BusinessType } from "../domain/types";
-import { TYPE_COLOR, TYPE_LABEL } from "../ui/colors";
 import { Icon, type IconName } from "../ui/icons/Icon";
 
 /** 노드에 추가할 수 있는 하위 항목 종류 */
@@ -13,12 +13,11 @@ const KIND_META: Record<AddKind, { label: string; icon: IconName }> = {
   folder: { label: "폴더", icon: "folder" },
 };
 
-const BIZ_TYPES: BusinessType[] = ["si", "internal", "ops", "etc"];
-
 export interface CreatePopoverProps {
   x: number;
   y: number;
   variant: "business" | "child";
+  businessTypeOptions?: BusinessTypeOption[];
   /** child 변형에서 선택 가능한 종류 */
   allowedKinds?: AddKind[];
   onCreateBusiness?: (type: BusinessType, name: string) => void;
@@ -28,18 +27,34 @@ export interface CreatePopoverProps {
 
 /** 추가 생성 폼 — 사용자가 이름(과 사업 유형)을 직접 입력해서 만든다. */
 export function CreatePopover(props: CreatePopoverProps) {
-  const { x, y, variant, allowedKinds = [], onCreateBusiness, onCreateChild, onClose } = props;
+  const {
+    x,
+    y,
+    variant,
+    businessTypeOptions = [],
+    allowedKinds = [],
+    onCreateBusiness,
+    onCreateChild,
+    onClose,
+  } = props;
   const [name, setName] = useState("");
-  const [type, setType] = useState<BusinessType>("etc");
+  const [type, setType] = useState<BusinessType>("");
   const [kind, setKind] = useState<AddKind>(allowedKinds[0] ?? "document");
+  const datalistId = useId();
 
   const title = variant === "business" ? "새 사업" : "새 항목";
+  const normalizedType = normalizeBusinessType(type);
+  const disabled = !name.trim() || (variant === "business" && !normalizedType);
 
   const submit = () => {
     const n = name.trim();
     if (!n) return;
-    if (variant === "business") onCreateBusiness?.(type, n);
-    else onCreateChild?.(kind, n);
+    if (variant === "business") {
+      if (!normalizedType) return;
+      onCreateBusiness?.(normalizedType, n);
+    } else {
+      onCreateChild?.(kind, n);
+    }
     onClose();
   };
 
@@ -56,22 +71,44 @@ export function CreatePopover(props: CreatePopoverProps) {
         </div>
 
         {variant === "business" ? (
-          <div style={chips}>
-            {BIZ_TYPES.map((t) => {
-              const active = t === type;
-              return (
-                <button
-                  key={t}
-                  aria-pressed={active}
-                  onClick={() => setType(t)}
-                  style={chip(active, TYPE_COLOR[t])}
-                >
-                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: TYPE_COLOR[t] }} />
-                  {TYPE_LABEL[t]}
-                </button>
-              );
-            })}
-          </div>
+          <>
+            {businessTypeOptions.length > 0 && (
+              <div style={chips}>
+                {businessTypeOptions.map((option) => {
+                  const active = option.type === normalizedType;
+                  return (
+                    <button
+                      key={option.type}
+                      aria-pressed={active}
+                      onClick={() => setType(option.type)}
+                      style={chip(active, option.color)}
+                    >
+                      <span style={{ width: 7, height: 7, borderRadius: "50%", background: option.color }} />
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <input
+              autoFocus
+              aria-label="사업 유형"
+              placeholder="사업 유형"
+              list={datalistId}
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submit();
+                else if (e.key === "Escape") onClose();
+              }}
+              style={{ ...input, width: "100%", marginTop: businessTypeOptions.length > 0 ? 10 : 0 }}
+            />
+            <datalist id={datalistId}>
+              {businessTypeOptions.map((option) => (
+                <option key={option.type} value={option.type} />
+              ))}
+            </datalist>
+          </>
         ) : (
           <div style={chips}>
             {allowedKinds.map((k) => {
@@ -93,7 +130,7 @@ export function CreatePopover(props: CreatePopoverProps) {
 
         <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
           <input
-            autoFocus
+            autoFocus={variant !== "business"}
             aria-label="이름"
             placeholder={variant === "business" ? "사업 이름" : `${KIND_META[kind].label} 이름`}
             value={name}
@@ -104,7 +141,7 @@ export function CreatePopover(props: CreatePopoverProps) {
             }}
             style={input}
           />
-          <button onClick={submit} disabled={!name.trim()} style={createBtn(!name.trim())}>
+          <button onClick={submit} disabled={disabled} style={createBtn(disabled)}>
             만들기
           </button>
         </div>

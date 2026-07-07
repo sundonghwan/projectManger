@@ -10,6 +10,7 @@ export interface DashboardProps {
 
 export function Dashboard({ business, stats }: DashboardProps) {
   const pct = Math.round(stats.doneRatio * 100);
+  const typeLabel = TYPE_LABEL[business.type] ?? business.type;
   return (
     <div style={{ padding: "24px 28px", maxWidth: 1000 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
@@ -24,7 +25,7 @@ export function Dashboard({ business, stats }: DashboardProps) {
             color: businessColor(business.type, business.color),
           }}
         >
-          {TYPE_LABEL[business.type]}
+          {typeLabel}
         </span>
       </div>
       {business.description && (

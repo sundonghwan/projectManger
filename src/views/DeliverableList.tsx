@@ -13,6 +13,7 @@ export interface DeliverableListProps {
   folders?: Folder[];
   /** 현재 보고 있는 폴더 id (표시용) */
   currentFolderId?: string | null;
+  dragActive?: boolean;
   onUpload: () => void;
   onSetStatus: (id: string, status: DeliverableStatus) => void;
   onRename: (id: string, title: string) => void;
@@ -25,7 +26,7 @@ export interface DeliverableListProps {
 const STATUSES: DeliverableStatus[] = ["draft", "review", "done"];
 
 export function DeliverableList(props: DeliverableListProps) {
-  const { deliverables, error, uploading, folders = [], onUpload, onSetStatus, onRename, onMove, onOpen, onArchive } = props;
+  const { deliverables, error, uploading, folders = [], dragActive = false, onUpload, onSetStatus, onRename, onMove, onOpen, onArchive } = props;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const renameDone = useRef(false); // Enter→blur 중복 커밋 방지
@@ -49,7 +50,15 @@ export function DeliverableList(props: DeliverableListProps) {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+    <div
+      data-testid="deliverable-drop-zone"
+      style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, position: "relative" }}
+    >
+      {dragActive && (
+        <div style={dropOverlay}>
+          여기에 파일을 놓아 업로드
+        </div>
+      )}
       <div style={{ display: "flex", alignItems: "center", padding: "12px 20px" }}>
         <span style={{ fontSize: 15, fontWeight: 600, flex: 1 }}>산출물</span>
         <button onClick={onUpload} disabled={uploading} style={{ ...uploadBtn, opacity: uploading ? 0.6 : 1 }}>
@@ -255,4 +264,19 @@ const errorBar: CSSProperties = {
   background: "rgba(239,68,68,.1)",
   color: "#ef4444",
   fontSize: 12,
+};
+const dropOverlay: CSSProperties = {
+  position: "absolute",
+  inset: 8,
+  zIndex: 2,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  border: "1px dashed var(--accent)",
+  borderRadius: "var(--radius-md)",
+  background: "rgba(15, 23, 42, 0.08)",
+  color: "var(--accent)",
+  fontSize: 13,
+  fontWeight: 600,
+  pointerEvents: "none",
 };

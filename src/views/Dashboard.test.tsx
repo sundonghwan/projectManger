@@ -27,6 +27,11 @@ describe("Dashboard", () => {
     expect(screen.getByText("SI")).toBeInTheDocument();
   });
 
+  it("커스텀 사업 유형은 유형 문자열을 그대로 표시", () => {
+    render(<Dashboard business={{ ...business, type: "철도" }} stats={dashboardStats([])} />);
+    expect(screen.getByText("철도")).toBeInTheDocument();
+  });
+
   it("상태별 카운트와 진행률을 표시", () => {
     const stats = dashboardStats([
       task({ id: "1", status: "done" }),
