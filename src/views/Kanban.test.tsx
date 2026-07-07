@@ -99,4 +99,31 @@ describe("Kanban", () => {
     fireEvent.drop(target, { dataTransfer: { getData: () => "" } });
     expect(onMove).toHaveBeenCalledWith("1", "doing", expect.any(Number));
   });
+
+  it("dragEnd가 drop보다 먼저 와도 내부 drag id로 상태를 이동한다", () => {
+    const { onMove } = setup([
+      task({ id: "1", status: "todo", sortOrder: 1 }),
+      task({ id: "2", status: "doing", sortOrder: 3 }),
+    ]);
+    const dragged = screen.getByTestId("card-1");
+    const target = screen.getByTestId("card-2");
+    fireEvent.dragStart(dragged, { dataTransfer: { setData: vi.fn(), getData: vi.fn() } });
+    fireEvent.dragEnd(dragged);
+    fireEvent.drop(target, { dataTransfer: { getData: () => "" } });
+    expect(onMove).toHaveBeenCalledWith("1", "doing", expect.any(Number));
+  });
+
+  it("custom drag MIME 값만 있어도 대상 컬럼 상태로 이동한다", () => {
+    const { onMove } = setup([
+      task({ id: "1", status: "todo", sortOrder: 1 }),
+      task({ id: "2", status: "doing", sortOrder: 3 }),
+    ]);
+    const target = screen.getByTestId("card-2");
+    fireEvent.drop(target, {
+      dataTransfer: {
+        getData: (type: string) => (type === "application/x-work-vault-task" ? "1" : ""),
+      },
+    });
+    expect(onMove).toHaveBeenCalledWith("1", "doing", expect.any(Number));
+  });
 });

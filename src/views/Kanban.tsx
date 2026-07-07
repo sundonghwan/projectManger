@@ -5,6 +5,8 @@ import { computeSortOrder } from "../domain/sortOrder";
 import { TASK_STATUS_COLOR, TASK_STATUS_LABEL, priorityColor, priorityLabel } from "../ui/colors";
 import { LabelChips } from "./LabelChips";
 
+const TASK_DRAG_MIME = "application/x-work-vault-task";
+
 export interface KanbanProps {
   columns: KanbanColumn[];
   onMove: (taskId: string, status: TaskStatus, sortOrder: number) => void;
@@ -15,7 +17,23 @@ export interface KanbanProps {
 
 export function Kanban({ columns, onMove, onAddTask, labelsByTask = {}, onCardClick }: KanbanProps) {
   const draggingTaskIdRef = useRef<string | null>(null);
-  const droppedTaskId = (e: DragEvent): string => e.dataTransfer.getData("text/plain") || draggingTaskIdRef.current || "";
+  const droppedTaskId = (e: DragEvent): string =>
+    e.dataTransfer.getData(TASK_DRAG_MIME) ||
+    e.dataTransfer.getData("text/plain") ||
+    e.dataTransfer.getData("text") ||
+    draggingTaskIdRef.current ||
+    "";
+
+  const allowDrop = (e: DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const clearDraggingTaskSoon = (taskId: string) => {
+    window.setTimeout(() => {
+      if (draggingTaskIdRef.current === taskId) draggingTaskIdRef.current = null;
+    }, 750);
+  };
 
   const moveBetween = (taskId: string, col: KanbanColumn, targetTaskId: string, position: "before" | "after") => {
     if (taskId === targetTaskId) return;
@@ -62,7 +80,7 @@ export function Kanban({ columns, onMove, onAddTask, labelsByTask = {}, onCardCl
         <div
           key={col.status}
           data-testid={`col-${col.status}`}
-          onDragOver={(e) => e.preventDefault()}
+          onDragOver={allowDrop}
           onDrop={handleDrop(col)}
           style={columnStyle}
         >
@@ -86,7 +104,11 @@ export function Kanban({ columns, onMove, onAddTask, labelsByTask = {}, onCardCl
               +
             </button>
           </div>
-          <div style={{ flex: 1, overflowY: "auto", padding: "0 8px 8px", display: "flex", flexDirection: "column", gap: 8 }}>
+          <div
+            onDragOver={allowDrop}
+            onDrop={handleDrop(col)}
+            style={{ flex: 1, overflowY: "auto", padding: "0 8px 8px", display: "flex", flexDirection: "column", gap: 8 }}
+          >
             {col.tasks.map((t) => (
               <div
                 key={t.id}
@@ -94,13 +116,14 @@ export function Kanban({ columns, onMove, onAddTask, labelsByTask = {}, onCardCl
                 onDragStart={(e) => {
                   draggingTaskIdRef.current = t.id;
                   e.dataTransfer.effectAllowed = "move";
+                  e.dataTransfer.setData(TASK_DRAG_MIME, t.id);
                   e.dataTransfer.setData("text/plain", t.id);
-                  e.dataTransfer.setData("application/x-work-vault-task", t.id);
+                  e.dataTransfer.setData("text", t.id);
                 }}
                 onDragEnd={() => {
-                  draggingTaskIdRef.current = null;
+                  clearDraggingTaskSoon(t.id);
                 }}
-                onDragOver={(e) => e.preventDefault()}
+                onDragOver={allowDrop}
                 onDrop={handleCardDrop(col, t.id)}
                 onClick={() => onCardClick?.(t.id)}
                 data-testid={`card-${t.id}`}
