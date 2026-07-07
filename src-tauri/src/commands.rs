@@ -1,4 +1,4 @@
-use crate::error::Result;
+use crate::error::{AppError, Result};
 use crate::secrets;
 use crate::store::model::{
     Block, Business, Deliverable, DeliverableVersion, Document, Folder, Label, Memo, Project,
@@ -8,7 +8,9 @@ use crate::store::ops;
 use crate::store::ops::label::TaskLabelView;
 use crate::store::ops::search::SearchHit;
 use crate::store::ops::trash::TrashItem;
+use crate::store::Store;
 use serde::Deserialize;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use tauri::State;
 
@@ -401,22 +403,110 @@ pub fn deliverable_archive(state: State<AppState>, id: String) -> Result<()> {
     ops::deliverable::archive(&mut store, &id)
 }
 
+fn deliverable_files_root(store_root: &Path) -> PathBuf {
+    store_root.join("files").join("deliverables")
+}
+
+fn legacy_deliverable_files_root(app_data_dir: &Path) -> PathBuf {
+    app_data_dir.join("deliverables")
+}
+
+fn resolve_deliverable_open_path(
+    app_data_dir: &Path,
+    store_root: &Path,
+    stored_path: &str,
+) -> Result<PathBuf> {
+    let allowed_roots = [
+        deliverable_files_root(store_root),
+        legacy_deliverable_files_root(app_data_dir),
+    ];
+    let allowed_roots: Vec<PathBuf> = allowed_roots
+        .iter()
+        .filter_map(|root| root.canonicalize().ok())
+        .collect();
+    if allowed_roots.is_empty() {
+        return Err(AppError::Invalid("산출물 저장 폴더를 찾을 수 없습니다".into()));
+    }
+    let file = Path::new(stored_path)
+        .canonicalize()
+        .map_err(|_| AppError::Invalid("산출물 파일을 찾을 수 없습니다".into()))?;
+    if !file.is_file() || !allowed_roots.iter().any(|root| file.starts_with(root)) {
+        return Err(AppError::Invalid("허용되지 않은 산출물 파일 경로입니다".into()));
+    }
+    Ok(file)
+}
+
+pub(crate) fn migrate_legacy_deliverable_files(app_data_dir: &Path, store: &mut Store) -> Result<usize> {
+    let legacy_root = legacy_deliverable_files_root(app_data_dir);
+    let legacy_root = match legacy_root.canonicalize() {
+        Ok(path) => path,
+        Err(_) => return Ok(0),
+    };
+    let target_root = deliverable_files_root(&store.root);
+    let mut migrated = 0;
+
+    for deliverable in store.deliverables.list() {
+        let Some(file_path) = deliverable.file_path.as_deref() else {
+            continue;
+        };
+        let source = match Path::new(file_path).canonicalize() {
+            Ok(path) => path,
+            Err(_) => continue,
+        };
+        if !source.is_file() || !source.starts_with(&legacy_root) {
+            continue;
+        }
+        let Some(file_name) = source.file_name() else {
+            continue;
+        };
+        let target_dir = target_root.join(&deliverable.id);
+        std::fs::create_dir_all(&target_dir)
+            .map_err(|_| AppError::Invalid("산출물 저장 폴더를 만들 수 없습니다".into()))?;
+        let target = target_dir.join(file_name);
+        if !target.exists() {
+            std::fs::copy(&source, &target)
+                .map_err(|_| AppError::Invalid("산출물 파일을 vault로 복사할 수 없습니다".into()))?;
+        }
+        ops::deliverable::set_file_path(store, &deliverable.id, &target.to_string_lossy())?;
+        migrated += 1;
+    }
+
+    Ok(migrated)
+}
+
+#[tauri::command]
+pub fn deliverable_open(app: tauri::AppHandle, state: State<AppState>, id: String) -> Result<()> {
+    use tauri::Manager;
+    use tauri_plugin_opener::OpenerExt;
+
+    let data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|_| AppError::Invalid("앱 데이터 폴더를 찾을 수 없음".into()))?;
+    let (stored_path, store_root) = {
+        let store = state.store.lock().unwrap();
+        (
+            ops::deliverable::file_path_of(&store, &id)?
+                .ok_or_else(|| AppError::Invalid("파일 경로가 없습니다".into()))?,
+            store.root.clone(),
+        )
+    };
+    let path = resolve_deliverable_open_path(&data_dir, &store_root, &stored_path)?;
+    app.opener()
+        .open_path(path.to_string_lossy().to_string(), None::<String>)
+        .map_err(|_| AppError::Invalid("파일을 열 수 없습니다".into()))
+}
+
 /// 파일 업로드(다중). 프론트가 다이얼로그로 고른 경로들을 받아 앱 데이터 폴더로 복사하고
 /// 각각 산출물 행을 생성한다. 개별 파일 실패는 건너뛰고 성공분만 반환한다.
 #[tauri::command]
 pub fn deliverable_upload(
-    app: tauri::AppHandle,
     state: State<AppState>,
     business_id: String,
     project_id: Option<String>,
     folder_id: Option<String>,
     paths: Vec<String>,
 ) -> Result<Vec<Deliverable>> {
-    use tauri::Manager;
-    let data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|_| crate::error::AppError::Invalid("앱 데이터 폴더를 찾을 수 없음".into()))?;
     let mut store = state.store.lock().unwrap();
     let mut created = Vec::new();
     for path in paths {
@@ -441,7 +531,7 @@ pub fn deliverable_upload(
             Ok(d) => d,
             Err(_) => continue,
         };
-        let dest_dir = data_dir.join("deliverables").join(&d.id);
+        let dest_dir = deliverable_files_root(&store.root).join(&d.id);
         if std::fs::create_dir_all(&dest_dir).is_err() {
             let _ = ops::deliverable::delete(&mut store, &d.id);
             continue;
@@ -948,3 +1038,120 @@ pub fn vault_set(app: tauri::AppHandle, state: State<AppState>, path: String) ->
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use crate::store::ops::{business, deliverable};
+    use crate::store::ids::new_id;
+    use crate::store::Store;
+
+    fn tmp_dir(prefix: &str) -> std::path::PathBuf {
+        let path = std::env::temp_dir().join(format!("{prefix}_{}", new_id()));
+        std::fs::create_dir_all(&path).unwrap();
+        path
+    }
+
+    #[test]
+    fn resolve_deliverable_open_path_accepts_files_under_app_deliverables() {
+        let app_data = tmp_dir("cmd_open_app");
+        let store_root = tmp_dir("cmd_open_store").join(".projectManger");
+        let file_dir = app_data.join("deliverables").join("d1");
+        std::fs::create_dir_all(&file_dir).unwrap();
+        let file = file_dir.join("report.pdf");
+        std::fs::write(&file, b"pdf").unwrap();
+
+        let resolved =
+            super::resolve_deliverable_open_path(&app_data, &store_root, file.to_str().unwrap())
+                .unwrap();
+
+        assert_eq!(resolved, file.canonicalize().unwrap());
+    }
+
+    #[test]
+    fn resolve_deliverable_open_path_accepts_files_under_store_deliverables() {
+        let app_data = tmp_dir("cmd_open_app");
+        let store_root = tmp_dir("cmd_open_store").join(".projectManger");
+        let file_dir = store_root.join("files").join("deliverables").join("d1");
+        std::fs::create_dir_all(&file_dir).unwrap();
+        let file = file_dir.join("report.pdf");
+        std::fs::write(&file, b"pdf").unwrap();
+
+        let resolved =
+            super::resolve_deliverable_open_path(&app_data, &store_root, file.to_str().unwrap())
+                .unwrap();
+
+        assert_eq!(resolved, file.canonicalize().unwrap());
+    }
+
+    #[test]
+    fn resolve_deliverable_open_path_rejects_files_outside_app_deliverables() {
+        let app_data = tmp_dir("cmd_open_app");
+        let store_root = tmp_dir("cmd_open_store").join(".projectManger");
+        let outside = tmp_dir("cmd_open_outside").join("report.pdf");
+        std::fs::write(&outside, b"pdf").unwrap();
+
+        let result =
+            super::resolve_deliverable_open_path(&app_data, &store_root, outside.to_str().unwrap());
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn resolve_deliverable_open_path_rejects_missing_files() {
+        let app_data = tmp_dir("cmd_open_app");
+        let store_root = tmp_dir("cmd_open_store").join(".projectManger");
+        let missing = app_data.join("deliverables").join("d1").join("missing.pdf");
+
+        let result =
+            super::resolve_deliverable_open_path(&app_data, &store_root, missing.to_str().unwrap());
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn deliverable_files_root_lives_under_store_root() {
+        let store_root = tmp_dir("cmd_file_root").join(".projectManger");
+
+        assert_eq!(
+            super::deliverable_files_root(&store_root),
+            store_root.join("files").join("deliverables")
+        );
+    }
+
+    #[test]
+    fn migrate_legacy_deliverable_files_copies_files_into_store_root() {
+        let app_data = tmp_dir("cmd_migrate_app");
+        let store_root = tmp_dir("cmd_migrate_store").join(".projectManger");
+        let mut store = Store::open(store_root.clone()).unwrap();
+        let business_id = business::create(&mut store, "폴라리스AI", "client", None).unwrap().id;
+        let legacy = app_data
+            .join("deliverables")
+            .join("legacy-deliverable")
+            .join("report.pdf");
+        std::fs::create_dir_all(legacy.parent().unwrap()).unwrap();
+        std::fs::write(&legacy, b"pdf").unwrap();
+        let d = deliverable::create_file(
+            &mut store,
+            &business_id,
+            None,
+            None,
+            "report.pdf",
+            "report.pdf",
+            3,
+        )
+        .unwrap();
+        deliverable::set_file_path(&mut store, &d.id, legacy.to_str().unwrap()).unwrap();
+
+        let migrated = super::migrate_legacy_deliverable_files(&app_data, &mut store).unwrap();
+
+        let updated = deliverable::get(&store, &d.id).unwrap();
+        let copied = store_root
+            .join("files")
+            .join("deliverables")
+            .join(&d.id)
+            .join("report.pdf");
+        assert_eq!(migrated, 1);
+        assert_eq!(updated.file_path.as_deref(), copied.to_str());
+        assert_eq!(std::fs::read(copied).unwrap(), b"pdf");
+        assert!(legacy.exists());
+    }
+}

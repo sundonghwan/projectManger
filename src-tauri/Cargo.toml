@@ -1,7 +1,7 @@
 [package]
 name = "projectmanger"
 version = "1.0.0"
-description = "조직 관리 — 사업 단위 프로젝트 관리 데스크톱 앱"
+description = "Work Vault — vault 기반 업무·프로젝트 관리 데스크톱 앱"
 authors = ["sundonghwan"]
 edition = "2021"
 

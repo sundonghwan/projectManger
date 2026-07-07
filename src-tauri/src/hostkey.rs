@@ -14,6 +14,19 @@ pub fn known_hosts_path(app: &tauri::AppHandle) -> Option<PathBuf> {
     Some(dir.join("known_hosts"))
 }
 
+/// OpenSSH `-o Key=value` values are parsed like config text, so spaces inside
+/// paths must be escaped even when the process receives the option as one argv.
+pub fn escape_config_value(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for ch in value.chars() {
+        if ch == '\\' || ch.is_whitespace() {
+            out.push('\\');
+        }
+        out.push(ch);
+    }
+    out
+}
+
 /// ssh-keygen -F 의 호스트 스펙. 표준 포트가 아니면 `[host]:port` 형식.
 fn host_spec(host: &str, port: i64) -> String {
     if port == 22 {
@@ -124,5 +137,13 @@ mod tests {
         let content = std::fs::read_to_string(&kh).unwrap();
         assert!(content.contains("example.com ssh-ed25519"));
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn escape_config_value_escapes_spaces_for_openssh_parser() {
+        assert_eq!(
+            escape_config_value("/Users/me/Library/Application Support/app/known_hosts"),
+            "/Users/me/Library/Application\\ Support/app/known_hosts"
+        );
     }
 }

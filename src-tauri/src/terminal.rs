@@ -22,7 +22,10 @@ pub fn build_ssh_args(server: &Server, known_hosts: Option<&str>) -> Vec<String>
     ];
     if let Some(kh) = known_hosts {
         args.push("-o".to_string());
-        args.push(format!("UserKnownHostsFile={kh}"));
+        args.push(format!(
+            "UserKnownHostsFile={}",
+            crate::hostkey::escape_config_value(kh)
+        ));
     }
     if let Some(key) = &server.key_path {
         if !key.trim().is_empty() {
@@ -32,6 +35,15 @@ pub fn build_ssh_args(server: &Server, known_hosts: Option<&str>) -> Vec<String>
     }
     args.push(format!("{}@{}", server.username, server.host));
     args
+}
+
+fn build_ssh_command(server: &Server, known_hosts: Option<&str>) -> CommandBuilder {
+    let mut cmd = CommandBuilder::new("ssh");
+    cmd.env("TERM", "xterm-256color");
+    for a in build_ssh_args(server, known_hosts) {
+        cmd.arg(a);
+    }
+    cmd
 }
 
 struct Session {
@@ -51,10 +63,7 @@ pub fn connect(app: &AppHandle, manager: &TerminalManager, server: &Server) -> R
         .map_err(|e| AppError::Invalid(format!("PTY 생성 실패: {e}")))?;
 
     let known_hosts = crate::hostkey::known_hosts_path(app).map(|p| p.to_string_lossy().to_string());
-    let mut cmd = CommandBuilder::new("ssh");
-    for a in build_ssh_args(server, known_hosts.as_deref()) {
-        cmd.arg(a);
-    }
+    let cmd = build_ssh_command(server, known_hosts.as_deref());
 
     let mut child = pair
         .slave
@@ -168,5 +177,26 @@ mod tests {
         assert!(args.contains(&"StrictHostKeyChecking=yes".to_string()));
         assert!(args.contains(&"UserKnownHostsFile=/tmp/kh".to_string()));
         assert!(!args.contains(&"StrictHostKeyChecking=accept-new".to_string()));
+    }
+
+    #[test]
+    fn ssh_args_escape_known_hosts_path_for_openssh_config_parser() {
+        let args = build_ssh_args(
+            &server(),
+            Some("/Users/polaris/Library/Application Support/com.app/known_hosts"),
+        );
+        assert!(args.contains(
+            &"UserKnownHostsFile=/Users/polaris/Library/Application\\ Support/com.app/known_hosts"
+                .to_string()
+        ));
+    }
+
+    #[test]
+    fn ssh_command_sets_interactive_terminal_type() {
+        let cmd = build_ssh_command(&server(), Some("/tmp/kh"));
+        assert_eq!(
+            cmd.get_env("TERM").and_then(|v| v.to_str()),
+            Some("xterm-256color")
+        );
     }
 }

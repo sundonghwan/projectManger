@@ -19,8 +19,9 @@ pub fn run() {
             let dir = app.path().app_data_dir().expect("app_data_dir 를 찾을 수 없음");
             std::fs::create_dir_all(&dir).ok();
             let store_root = config::store_root(&dir);
-            let store = store::Store::open(store_root)
+            let mut store = store::Store::open(store_root)
                 .unwrap_or_else(|_| store::Store::open(dir.join(".projectManger")).expect("기본 Store 초기화 실패"));
+            let _ = commands::migrate_legacy_deliverable_files(&dir, &mut store);
             let local_root = dir.join("local");
             let local = store::local::LocalStore::open(local_root).expect("LocalStore 초기화 실패");
             app.manage(commands::AppState {
@@ -69,6 +70,7 @@ pub fn run() {
             commands::deliverable_versions,
             commands::deliverable_archive,
             commands::deliverable_upload,
+            commands::deliverable_open,
             commands::deliverable_rename,
             commands::deliverable_move,
             commands::folder_list,

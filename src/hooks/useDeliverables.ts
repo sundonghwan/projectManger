@@ -93,7 +93,7 @@ export function useDeliverables(
       return;
     }
     try {
-      await api.deliverable.open(d.filePath);
+      await api.deliverable.open(d.id);
     } catch {
       setError("파일을 열 수 없습니다. 파일이 이동되었거나 삭제되었을 수 있습니다.");
     }

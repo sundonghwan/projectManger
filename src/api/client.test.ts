@@ -5,6 +5,9 @@ const invoke = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: (...args: unknown[]) => invoke(...args),
 }));
+vi.mock("@tauri-apps/plugin-opener", () => ({
+  openPath: vi.fn(),
+}));
 
 import { api } from "./client";
 
@@ -57,5 +60,12 @@ describe("api.task", () => {
     expect(invoke).toHaveBeenCalledWith("task_move", {
       input: { id: "1", status: "done", sortOrder: 5 },
     });
+  });
+});
+
+describe("api.deliverable", () => {
+  it("open은 파일 경로 대신 산출물 id만 백엔드에 전달", async () => {
+    await api.deliverable.open("deliv-1");
+    expect(invoke).toHaveBeenCalledWith("deliverable_open", { id: "deliv-1" });
   });
 });

@@ -1,6 +1,5 @@
 // Tauri invoke 래퍼 — 프론트는 이 클라이언트로만 백엔드와 통신.
 import { invoke } from "@tauri-apps/api/core";
-import { openPath } from "@tauri-apps/plugin-opener";
 import type {
   Block,
   Business,
@@ -142,8 +141,8 @@ export const api = {
     /** 산출물을 폴더로 이동(folderId=null 이면 미분류). */
     move: (id: string, folderId: string | null) =>
       invoke<Deliverable>("deliverable_move", { id, folderId: folderId ?? null }),
-    /** 복사 보관된 파일을 OS 기본 앱으로 연다. */
-    open: (path: string) => openPath(path),
+    /** 복사 보관된 파일을 백엔드 경계 검증 후 OS 기본 앱으로 연다. */
+    open: (id: string) => invoke<void>("deliverable_open", { id }),
     archive: (id: string) => invoke<void>("deliverable_archive", { id }),
   },
   memo: {

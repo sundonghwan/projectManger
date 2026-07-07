@@ -55,7 +55,10 @@ pub fn build_sftp_args(server: &Server, known_hosts: Option<&str>) -> Vec<String
     ];
     if let Some(kh) = known_hosts {
         args.push("-o".to_string());
-        args.push(format!("UserKnownHostsFile={kh}"));
+        args.push(format!(
+            "UserKnownHostsFile={}",
+            crate::hostkey::escape_config_value(kh)
+        ));
     }
     if let Some(k) = &server.key_path {
         if !k.trim().is_empty() {
@@ -189,5 +192,17 @@ mod tests {
         assert!(a.contains(&"2222".to_string()));
         assert!(a.contains(&"u@h".to_string()));
         assert!(a.contains(&"/k".to_string()));
+    }
+
+    #[test]
+    fn sftp_args_escape_known_hosts_path_for_openssh_config_parser() {
+        let a = build_sftp_args(
+            &server(),
+            Some("/Users/polaris/Library/Application Support/com.app/known_hosts"),
+        );
+        assert!(a.contains(
+            &"UserKnownHostsFile=/Users/polaris/Library/Application\\ Support/com.app/known_hosts"
+                .to_string()
+        ));
     }
 }

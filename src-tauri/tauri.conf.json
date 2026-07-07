@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "조직 관리",
+  "productName": "Work Vault",
   "version": "1.0.0",
   "identifier": "com.sunehd564.projectmanger",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "조직 관리",
+        "title": "Work Vault",
         "width": 1280,
         "height": 800,
         "minWidth": 960,
@@ -25,11 +25,14 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": "all",
     "category": "Productivity",
-    "shortDescription": "사업 단위 프로젝트 관리",
-    "longDescription": "사업 단위로 할 일·문서·산출물·개발 서버(SSH)를 한 곳에서 관리하는 내부용 데스크톱 앱.",
+    "shortDescription": "프로젝트 vault 기반 업무 관리",
+    "longDescription": "사업 단위로 할 일·문서·산출물·메모·개발 서버(SSH)를 하나의 로컬/클라우드 vault에서 관리하는 내부용 데스크톱 앱.",
     "copyright": "© 2026 sundonghwan",
+    "macOS": {
+      "signingIdentity": "-"
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
