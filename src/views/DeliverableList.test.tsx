@@ -194,4 +194,34 @@ describe("DeliverablesView drag and drop", () => {
     expect(screen.queryByText("여기에 파일을 놓아 업로드")).not.toBeInTheDocument();
     expect(mocks.upload).not.toHaveBeenCalled();
   });
+
+  it("첫 native drop 업로드가 끝나기 전 중복 drop을 무시", async () => {
+    let resolveUpload!: () => void;
+    const pendingUpload = new Promise<void>((resolve) => {
+      resolveUpload = resolve;
+    });
+    mocks.upload.mockReturnValueOnce(pendingUpload);
+    render(<DeliverablesView businessId="biz-1" projectId="project-1" selectedFolderId="folder-1" onChanged={vi.fn()} />);
+
+    await waitFor(() => expect(mocks.onDragDropEvent).toHaveBeenCalled());
+    mocks.dragDropHandler?.({
+      payload: { type: "drop", paths: ["/tmp/a.pdf"], position: { x: 0, y: 0 } },
+    });
+    mocks.dragDropHandler?.({
+      payload: { type: "drop", paths: ["/tmp/b.pdf"], position: { x: 0, y: 0 } },
+    });
+
+    expect(mocks.upload).toHaveBeenCalledTimes(1);
+    expect(mocks.upload).toHaveBeenCalledWith(["/tmp/a.pdf"], "folder-1");
+
+    resolveUpload();
+    await pendingUpload;
+
+    mocks.dragDropHandler?.({
+      payload: { type: "drop", paths: ["/tmp/c.pdf"], position: { x: 0, y: 0 } },
+    });
+
+    expect(mocks.upload).toHaveBeenCalledTimes(2);
+    expect(mocks.upload).toHaveBeenLastCalledWith(["/tmp/c.pdf"], "folder-1");
+  });
 });
