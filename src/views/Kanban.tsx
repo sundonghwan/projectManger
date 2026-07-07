@@ -14,6 +14,16 @@ export interface KanbanProps {
 }
 
 export function Kanban({ columns, onMove, onAddTask, labelsByTask = {}, onCardClick }: KanbanProps) {
+  const moveBetween = (taskId: string, col: KanbanColumn, targetTaskId: string, position: "before" | "after") => {
+    if (taskId === targetTaskId) return;
+    const tasks = col.tasks.filter((t) => t.id !== taskId);
+    const targetIndex = tasks.findIndex((t) => t.id === targetTaskId);
+    if (targetIndex < 0) return;
+    const before = position === "before" ? tasks[targetIndex - 1] : tasks[targetIndex];
+    const after = position === "before" ? tasks[targetIndex] : tasks[targetIndex + 1];
+    onMove(taskId, col.status, computeSortOrder(before?.sortOrder ?? null, after?.sortOrder ?? null));
+  };
+
   const handleDrop = (col: KanbanColumn) => (e: DragEvent) => {
     e.preventDefault();
     const id = e.dataTransfer.getData("text/plain");
@@ -28,6 +38,17 @@ export function Kanban({ columns, onMove, onAddTask, labelsByTask = {}, onCardCl
     const last = target?.tasks[target.tasks.length - 1];
     const sortOrder = computeSortOrder(last ? last.sortOrder : null, null);
     onMove(taskId, status, sortOrder);
+  };
+
+  const handleCardDrop = (col: KanbanColumn, targetTaskId: string) => (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const id = e.dataTransfer.getData("text/plain");
+    if (!id) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pointerY = e.clientY || e.pageY || e.screenY;
+    const position = pointerY < rect.top + rect.height / 2 ? "before" : "after";
+    moveBetween(id, col, targetTaskId, position);
   };
 
   return (
@@ -66,6 +87,8 @@ export function Kanban({ columns, onMove, onAddTask, labelsByTask = {}, onCardCl
                 key={t.id}
                 draggable
                 onDragStart={(e) => e.dataTransfer.setData("text/plain", String(t.id))}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleCardDrop(col, t.id)}
                 onClick={() => onCardClick?.(t.id)}
                 data-testid={`card-${t.id}`}
                 style={cardStyle}
@@ -107,9 +130,11 @@ export function Kanban({ columns, onMove, onAddTask, labelsByTask = {}, onCardCl
                       </option>
                     ))}
                   </select>
-                  {t.dueDate && (
-                    <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text2)" }}>
-                      {t.dueDate}
+                  {(t.startDate || t.dueDate) && (
+                    <span style={dateRange}>
+                      {t.startDate ?? ""}
+                      {t.startDate && t.dueDate ? " → " : ""}
+                      {t.dueDate ?? ""}
                     </span>
                   )}
                 </div>
@@ -170,4 +195,9 @@ const statusSelect: CSSProperties = {
   fontWeight: 600,
   padding: "2px 5px",
   cursor: "pointer",
+};
+const dateRange: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 600,
+  color: "var(--text2)",
 };

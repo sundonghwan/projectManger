@@ -11,7 +11,7 @@ export interface TaskListProps {
   onRowClick?: (taskId: string) => void;
 }
 
-const COLS = "34px 1fr 96px 84px 90px 150px";
+const COLS = "34px 1fr 96px 84px 90px 90px 150px";
 
 export function TaskList({ tasks, onToggleDone, labelsByTask = {}, onRowClick }: TaskListProps) {
   return (
@@ -21,6 +21,7 @@ export function TaskList({ tasks, onToggleDone, labelsByTask = {}, onRowClick }:
         <span>제목</span>
         <span>상태</span>
         <span>우선순위</span>
+        <span>시작</span>
         <span>마감</span>
         <span>라벨</span>
       </div>
@@ -95,6 +96,7 @@ export function TaskList({ tasks, onToggleDone, labelsByTask = {}, onRowClick }:
                 </>
               )}
             </span>
+            <span style={{ fontSize: 12, color: "var(--text2)" }}>{t.startDate ?? ""}</span>
             <span style={{ fontSize: 12, color: "var(--text2)" }}>{t.dueDate ?? ""}</span>
             <span style={{ display: "flex", overflow: "hidden" }}>
               <LabelChips labels={labelsByTask[t.id]} />

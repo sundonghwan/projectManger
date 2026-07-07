@@ -7,6 +7,7 @@ import { LabelChips } from "./LabelChips";
 export interface TaskPatch {
   title: string;
   priority: Priority;
+  startDate: string | null;
   dueDate: string | null;
   description: string | null;
 }
@@ -26,6 +27,7 @@ const LABEL_COLORS = ["#3b82f6", "#22c55e", "#f97316", "#ef4444", "#a855f7", "#9
 export function TaskEditor({ task, labels, onSave, onAddLabel, onRemoveLabel, onArchive, onClose }: TaskEditorProps) {
   const [title, setTitle] = useState(task.title);
   const [priority, setPriority] = useState<Priority>(task.priority);
+  const [startDate, setStartDate] = useState(task.startDate ?? "");
   const [dueDate, setDueDate] = useState(task.dueDate ?? "");
   const [description, setDescription] = useState(task.description ?? "");
   const [labelName, setLabelName] = useState("");
@@ -35,6 +37,7 @@ export function TaskEditor({ task, labels, onSave, onAddLabel, onRemoveLabel, on
     onSave({
       title: title.trim() || task.title,
       priority,
+      startDate: startDate || null,
       dueDate: dueDate || null,
       description: description || null,
     });
@@ -57,7 +60,7 @@ export function TaskEditor({ task, labels, onSave, onAddLabel, onRemoveLabel, on
         <label style={fieldLabel}>제목</label>
         <input aria-label="제목" value={title} onChange={(e) => setTitle(e.target.value)} style={input} />
 
-        <div style={{ display: "flex", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
           <div style={{ flex: 1 }}>
             <label style={fieldLabel}>우선순위</label>
             <select
@@ -72,6 +75,16 @@ export function TaskEditor({ task, labels, onSave, onAddLabel, onRemoveLabel, on
                 </option>
               ))}
             </select>
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={fieldLabel}>시작</label>
+            <input
+              aria-label="시작"
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              style={input}
+            />
           </div>
           <div style={{ flex: 1 }}>
             <label style={fieldLabel}>마감</label>

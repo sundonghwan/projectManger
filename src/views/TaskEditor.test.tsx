@@ -47,6 +47,13 @@ describe("TaskEditor", () => {
     );
   });
 
+  it("시작일을 수정 후 저장하면 patch에 포함한다", async () => {
+    const h = setup();
+    await userEvent.type(screen.getByLabelText("시작"), "2026-06-20");
+    await userEvent.click(screen.getByRole("button", { name: "저장" }));
+    expect(h.onSave).toHaveBeenCalledWith(expect.objectContaining({ startDate: "2026-06-20" }));
+  });
+
   it("새 라벨 추가 시 onAddLabel", async () => {
     const h = setup();
     await userEvent.type(screen.getByLabelText("라벨 이름"), "긴급");

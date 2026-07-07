@@ -96,6 +96,7 @@ export interface Task {
   description?: string | null;
   status: TaskStatus;
   priority: Priority;
+  startDate?: DateString | null;
   dueDate?: DateString | null;
   sortOrder: number;
   completedAt?: Timestamp | null;

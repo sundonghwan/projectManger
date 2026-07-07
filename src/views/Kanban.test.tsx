@@ -60,4 +60,18 @@ describe("Kanban", () => {
     await userEvent.selectOptions(screen.getByLabelText("태스크 1 상태"), "review");
     expect(onMove).toHaveBeenCalledWith("1", "review", expect.any(Number));
   });
+
+  it("카드를 다른 카드 위로 드롭하면 해당 위치의 sortOrder로 이동한다", () => {
+    const { onMove } = setup([
+      task({ id: "1", status: "todo", sortOrder: 1 }),
+      task({ id: "2", status: "todo", sortOrder: 3 }),
+      task({ id: "3", status: "todo", sortOrder: 5 }),
+    ]);
+    const dragged = screen.getByTestId("card-3");
+    const target = screen.getByTestId("card-2");
+    const dt = { getData: () => "3", setData: vi.fn() };
+    fireEvent.dragStart(dragged, { dataTransfer: dt });
+    fireEvent.drop(target, { dataTransfer: dt });
+    expect(onMove).toHaveBeenCalledWith("3", "todo", 4);
+  });
 });

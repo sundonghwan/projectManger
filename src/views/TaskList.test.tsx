@@ -14,9 +14,16 @@ const task = (o: Partial<Task> & Pick<Task, "id" | "status">): Task => ({
 
 describe("TaskList", () => {
   it("태스크 행과 상태를 렌더", () => {
-    render(<TaskList tasks={[task({ id: "1", status: "doing" })]} onToggleDone={vi.fn()} />);
+    render(
+      <TaskList
+        tasks={[task({ id: "1", status: "doing", startDate: "2026-06-20", dueDate: "2026-07-01" })]}
+        onToggleDone={vi.fn()}
+      />,
+    );
     expect(screen.getByText("태스크 1")).toBeInTheDocument();
     expect(screen.getByText("Doing")).toBeInTheDocument();
+    expect(screen.getByText("2026-06-20")).toBeInTheDocument();
+    expect(screen.getByText("2026-07-01")).toBeInTheDocument();
   });
 
   it("빈 목록 안내", () => {

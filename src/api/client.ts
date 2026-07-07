@@ -66,6 +66,7 @@ export interface TaskUpdateInput {
   id: string;
   title: string;
   priority: Priority;
+  startDate?: DateString | null;
   dueDate?: DateString | null;
   description?: string | null;
 }

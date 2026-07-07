@@ -152,6 +152,7 @@ pub struct TaskUpdate {
     pub id: String,
     pub title: String,
     pub priority: i64,
+    pub start_date: Option<String>,
     pub due_date: Option<String>,
     pub description: Option<String>,
 }
@@ -188,6 +189,7 @@ pub fn task_update(state: State<AppState>, input: TaskUpdate) -> Result<Task> {
         &input.id,
         &input.title,
         input.priority,
+        input.start_date.as_deref(),
         input.due_date.as_deref(),
         input.description.as_deref(),
     )

@@ -115,7 +115,7 @@ mod tests {
             id: id.into(), business_id: biz.into(),
             project_id: proj.map(|s| s.to_string()), parent_task_id: None,
             title: "T".into(), description: None, status: "todo".into(), priority: 2,
-            due_date: None, sort_order: 0.0, completed_at: None, archived_at: None,
+            start_date: None, due_date: None, sort_order: 0.0, completed_at: None, archived_at: None,
             created_at: now(), updated_at: now(),
         }
     }

@@ -81,6 +81,7 @@ pub fn create(
         description: None,
         status: "todo".into(),
         priority,
+        start_date: None,
         due_date: None,
         sort_order,
         completed_at: None,
@@ -97,12 +98,14 @@ pub fn update(
     id: &str,
     title: &str,
     priority: i64,
+    start_date: Option<&str>,
     due_date: Option<&str>,
     description: Option<&str>,
 ) -> Result<Task> {
     let mut t = get(store, id)?;
     t.title = title.to_string();
     t.priority = priority;
+    t.start_date = start_date.map(|s| s.to_string());
     t.due_date = due_date.map(|s| s.to_string());
     t.description = description.map(|s| s.to_string());
     t.updated_at = now();
@@ -212,9 +215,10 @@ mod tests {
     fn update_changes_fields() {
         let (mut s, biz, _) = setup();
         let t = create(&mut s, &biz, None, "원래", 2).unwrap();
-        let u = update(&mut s, &t.id, "변경", 4, Some("2026-07-01"), Some("메모")).unwrap();
+        let u = update(&mut s, &t.id, "변경", 4, Some("2026-06-20"), Some("2026-07-01"), Some("메모")).unwrap();
         assert_eq!(u.title, "변경");
         assert_eq!(u.priority, 4);
+        assert_eq!(u.start_date.as_deref(), Some("2026-06-20"));
         assert_eq!(u.due_date.as_deref(), Some("2026-07-01"));
     }
 }
