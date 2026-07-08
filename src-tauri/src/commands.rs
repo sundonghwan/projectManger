@@ -554,6 +554,61 @@ fn ext_of(file_name: &str) -> String {
         .to_string()
 }
 
+/// 폴더 생성 시 디스크 디렉터리 생성(빈 폴더라도). deliverable 종류만 미러링.
+fn mirror_create_folder(store: &Store, store_root: &Path, folder_id: &str) -> Result<()> {
+    let f = store.folders.get(folder_id).ok_or(AppError::NotFound)?;
+    if f.kind != "deliverable" {
+        return Ok(());
+    }
+    let dir = deliverable_dir_abs(store, store_root, &f.business_id, Some(folder_id))?;
+    std::fs::create_dir_all(&dir).map_err(|e| AppError::Invalid(format!("폴더 생성 실패: {e}")))?;
+    Ok(())
+}
+
+/// 폴더 이름변경 시 디스크 디렉터리 rename(메타는 호출측에서 rename). deliverable 종류만.
+fn mirror_rename_folder(store: &Store, store_root: &Path, folder_id: &str, new_name: &str) -> Result<()> {
+    let f = store.folders.get(folder_id).ok_or(AppError::NotFound)?;
+    if f.kind != "deliverable" {
+        return Ok(());
+    }
+    let old_abs = deliverable_dir_abs(store, store_root, &f.business_id, Some(folder_id))?;
+    if !old_abs.exists() {
+        return Ok(());
+    }
+    let parent = old_abs.parent().map(Path::to_path_buf).unwrap_or_else(|| vault_root_of(store_root));
+    let old_name = old_abs.file_name().and_then(|x| x.to_str()).map(|s| s.to_string());
+    let existing: Vec<String> = std::fs::read_dir(&parent)
+        .map(|rd| {
+            rd.filter_map(|e| e.ok())
+                .filter_map(|e| e.file_name().into_string().ok())
+                .filter(|n| Some(n) != old_name.as_ref())
+                .collect()
+        })
+        .unwrap_or_default();
+    let name = layout::unique_name(&existing, &layout::sanitize_component(new_name, folder_id));
+    std::fs::rename(&old_abs, parent.join(&name))
+        .map_err(|e| AppError::Invalid(format!("폴더 이름변경 실패: {e}")))?;
+    Ok(())
+}
+
+/// 폴더째 휴지통(`.projectManger/trash/{folderId}__{name}`)으로 이동. deliverable 종류만.
+fn mirror_trash_folder(store: &Store, store_root: &Path, folder_id: &str) -> Result<()> {
+    let f = store.folders.get(folder_id).ok_or(AppError::NotFound)?;
+    if f.kind != "deliverable" {
+        return Ok(());
+    }
+    let abs = deliverable_dir_abs(store, store_root, &f.business_id, Some(folder_id))?;
+    if !abs.exists() {
+        return Ok(());
+    }
+    let trash = store_root.join("trash");
+    std::fs::create_dir_all(&trash).map_err(|e| AppError::Invalid(format!("휴지통 생성 실패: {e}")))?;
+    let safe = layout::sanitize_component(&f.name, folder_id);
+    let dest = trash.join(format!("{folder_id}__{safe}"));
+    std::fs::rename(&abs, &dest).map_err(|e| AppError::Invalid(format!("폴더 휴지통 이동 실패: {e}")))?;
+    Ok(())
+}
+
 /// 산출물 title 변경 + 디스크 파일도 rename(확장자 유지, 충돌 시 접미).
 fn rename_deliverable_file(
     store: &mut Store,
@@ -974,18 +1029,49 @@ pub fn folder_list(state: State<AppState>, business_id: String) -> Result<Vec<Fo
 #[tauri::command]
 pub fn folder_create(state: State<AppState>, input: FolderCreate) -> Result<Folder> {
     let mut store = state.store.lock().unwrap();
-    ops::folder::create(&mut store, &input.business_id, &input.kind, input.parent_id.as_deref(), &input.name)
+    let sr = store.root.clone();
+    let f = ops::folder::create(&mut store, &input.business_id, &input.kind, input.parent_id.as_deref(), &input.name)?;
+    mirror_create_folder(&store, &sr, &f.id)?;
+    Ok(f)
 }
 
 #[tauri::command]
 pub fn folder_rename(state: State<AppState>, id: String, name: String) -> Result<Folder> {
     let mut store = state.store.lock().unwrap();
+    let sr = store.root.clone();
+    // 디스크 rename 을 먼저(현재 메타의 이름 기준으로 경로 계산) 한 뒤 메타 갱신.
+    mirror_rename_folder(&store, &sr, &id, &name)?;
     ops::folder::rename(&mut store, &id, &name)
 }
 
 #[tauri::command]
 pub fn folder_delete(state: State<AppState>, id: String) -> Result<()> {
     let mut store = state.store.lock().unwrap();
+    let sr = store.root.clone();
+    let f = ops::folder::get(&store, &id)?;
+    if f.kind == "deliverable" {
+        // 1) 디스크: 폴더째 휴지통으로(메타 아직 존재해야 경로 계산 가능)
+        mirror_trash_folder(&store, &sr, &id)?;
+        // 2) 메타: 폴더+직계 자식에 속한 산출물을 archive(개별 복구 가능) + 미분류 처리
+        let mut folder_ids = vec![id.clone()];
+        for child in store.folders.list() {
+            if child.parent_id.as_deref() == Some(id.as_str()) {
+                folder_ids.push(child.id);
+            }
+        }
+        let dels: Vec<String> = store
+            .deliverables
+            .list()
+            .into_iter()
+            .filter(|d| d.folder_id.as_deref().map(|fid| folder_ids.iter().any(|x| x == fid)).unwrap_or(false))
+            .map(|d| d.id)
+            .collect();
+        for did in dels {
+            let _ = ops::deliverable::set_folder(&mut store, &did, None);
+            let _ = ops::deliverable::archive(&mut store, &did);
+        }
+    }
+    // 3) 폴더 메타 제거(문서 폴더는 기존 동작 그대로).
     ops::folder::delete(&mut store, &id)
 }
 
@@ -1446,6 +1532,29 @@ mod tests {
         let path = std::env::temp_dir().join(format!("{prefix}_{}", new_id()));
         std::fs::create_dir_all(&path).unwrap();
         path
+    }
+
+    #[test]
+    fn folder_cascade_create_rename_trash_on_disk() {
+        use crate::store::ops::folder;
+        let root = tmp_dir("cmd_folder_cascade");
+        let store_root = root.join("Work Vault").join(".projectManger");
+        let mut s = Store::open(store_root.clone()).unwrap();
+        let b = business::create(&mut s, "사업A", "si", None).unwrap();
+        let vault = super::vault_root_of(&store_root);
+
+        let cat = folder::create(&mut s, &b.id, "deliverable", None, "설계서").unwrap();
+        super::mirror_create_folder(&s, &store_root, &cat.id).unwrap();
+        assert!(vault.join("사업A").join("산출물").join("설계서").is_dir());
+
+        super::mirror_rename_folder(&s, &store_root, &cat.id, "설계 문서").unwrap();
+        folder::rename(&mut s, &cat.id, "설계 문서").unwrap();
+        assert!(vault.join("사업A").join("산출물").join("설계 문서").is_dir());
+        assert!(!vault.join("사업A").join("산출물").join("설계서").exists());
+
+        super::mirror_trash_folder(&s, &store_root, &cat.id).unwrap();
+        assert!(!vault.join("사업A").join("산출물").join("설계 문서").exists());
+        assert!(store_root.join("trash").read_dir().unwrap().next().is_some());
     }
 
     #[test]
