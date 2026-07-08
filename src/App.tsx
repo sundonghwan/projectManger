@@ -202,7 +202,7 @@ export default function App() {
           await api.project.archive(row.entityId);
           if (p) await loadProjects(p.businessId);
         } else if (row.type === "docFolder" || row.type === "delivFolder") {
-          if (!window.confirm(`폴더 '${row.label}'을(를) 삭제할까요? 안의 항목은 미분류로 이동하고, 하위 폴더도 함께 삭제됩니다.`))
+          if (!window.confirm(`폴더 '${row.label}'을(를) 폴더째 휴지통으로 보낼까요? 안의 파일도 함께 이동하며, 복구할 수 있습니다.`))
             return;
           const f = folders.find((x) => x.id === row.entityId);
           await api.folder.remove(row.entityId);
@@ -338,13 +338,16 @@ export default function App() {
       // 진입 노드/대시보드 의사행은 사업이 펼쳐져 있어야 트리에 존재한다.
       const bizRow = rowId("business", bizId);
       setExpanded((prev) => (prev.has(bizRow) ? prev : new Set(prev).add(bizRow)));
+      // 강제 확장 시 하위 데이터(프로젝트·폴더)도 로드해야 트리에 나타난다.
+      void loadProjects(bizId);
+      void loadFolders(bizId);
       if (v === "doc") setSelectedId(rowId("document", bizId));
       else if (v === "deliverables") setSelectedId(rowId("deliverable", bizId));
       else if (v === "dashboard") setSelectedId(rowId("dashboard", bizId));
       // 칸반/리스트/타임라인/메모/터미널은 사업·프로젝트 단위 — 프로젝트 선택은 유지, 그 외엔 사업 노드로.
       else if (selectedRow?.type !== "project") setSelectedId(bizRow);
     },
-    [selectedBusiness, selectedRow],
+    [selectedBusiness, selectedRow, loadProjects, loadFolders],
   );
 
   return (
