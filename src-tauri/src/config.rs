@@ -25,12 +25,20 @@ pub fn write_vault_path(app_data_dir: &Path, vault_path: Option<&str>) -> Result
         .map_err(|e| AppError::Invalid(format!("config 쓰기 실패: {e}")))
 }
 
-/// 실제 store 루트: vaultPath 있으면 `<vaultPath>/.projectManger`, 없으면 `<appData>/.projectManger`.
-pub fn store_root(app_data_dir: &Path) -> PathBuf {
+/// 앱 Vault 루트 폴더 이름. 사용자가 고른 vault 안에 이 폴더를 만들어 그 아래로 정리한다.
+pub const APP_VAULT_DIR: &str = "Work Vault";
+
+/// 앱 Vault 루트: vaultPath 있으면 `<vaultPath>/Work Vault`, 없으면 `<appData>/Work Vault`.
+pub fn app_vault_root(app_data_dir: &Path) -> PathBuf {
     match read_vault_path(app_data_dir) {
-        Some(p) => PathBuf::from(p).join(".projectManger"),
-        None => app_data_dir.join(".projectManger"),
+        Some(p) => PathBuf::from(p).join(APP_VAULT_DIR),
+        None => app_data_dir.join(APP_VAULT_DIR),
     }
+}
+
+/// 실제 store 루트: `<app_vault_root>/.projectManger`.
+pub fn store_root(app_data_dir: &Path) -> PathBuf {
+    app_vault_root(app_data_dir).join(".projectManger")
 }
 
 #[cfg(test)]
@@ -47,7 +55,8 @@ mod tests {
     fn default_when_unset() {
         let d = tmp();
         assert_eq!(read_vault_path(&d), None);
-        assert_eq!(store_root(&d), d.join(".projectManger"));
+        assert_eq!(app_vault_root(&d), d.join("Work Vault"));
+        assert_eq!(store_root(&d), d.join("Work Vault").join(".projectManger"));
     }
 
     #[test]
@@ -56,10 +65,11 @@ mod tests {
         let vault = tmp();
         write_vault_path(&d, Some(vault.to_str().unwrap())).unwrap();
         assert_eq!(read_vault_path(&d).as_deref(), vault.to_str());
-        assert_eq!(store_root(&d), vault.join(".projectManger"));
+        assert_eq!(app_vault_root(&d), vault.join("Work Vault"));
+        assert_eq!(store_root(&d), vault.join("Work Vault").join(".projectManger"));
         // null 로 초기화하면 기본으로
         write_vault_path(&d, None).unwrap();
         assert_eq!(read_vault_path(&d), None);
-        assert_eq!(store_root(&d), d.join(".projectManger"));
+        assert_eq!(store_root(&d), d.join("Work Vault").join(".projectManger"));
     }
 }
