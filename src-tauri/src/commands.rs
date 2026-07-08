@@ -1052,6 +1052,10 @@ pub(crate) fn migrate_deliverables_to_disk_layout(store: &mut Store) -> Result<u
     for d in store.deliverables.list() {
         let Some(old) = d.file_path.clone() else { continue };
         let old_path = PathBuf::from(&old);
+        // 멱등: 이미 미러 상대경로이고 파일이 그 자리에 있으면 재배치하지 않는다(중복 " (2)" 방지).
+        if !old_path.is_absolute() && vault.join(&old_path).is_file() {
+            continue;
+        }
         let candidate = if old_path.is_absolute() { old_path.clone() } else { vault.join(&old_path) };
         // 저장된 경로가 유효하면 그대로, 아니면(재배치로 절대경로가 낡음) 현재 store 의
         // GUID 폴더(`files/deliverables/{id}/…`)에서 파일을 찾는다.
@@ -1869,6 +1873,28 @@ mod tests {
 
         // 멱등: 재실행은 0건
         assert_eq!(super::migrate_deliverables_to_disk_layout(&mut s).unwrap(), 0);
+    }
+
+    #[test]
+    fn migrate_v2_is_idempotent_without_marker_no_duplicate_files() {
+        // 마커가 없어도(재실행) 이미 미러에 있는 파일은 다시 배치하지 않아야 한다.
+        let root = tmp_dir("cmd_mig_idem");
+        let store_root = root.join("Work Vault").join(".projectManger");
+        let mut s = Store::open(store_root.clone()).unwrap();
+        let b = business::create(&mut s, "사업A", "si", None).unwrap();
+        let d = deliverable::create_file(&mut s, &b.id, None, None, "개요", "그림1.png", 3).unwrap();
+        let guid = super::deliverable_files_root(&store_root).join(&d.id);
+        std::fs::create_dir_all(&guid).unwrap();
+        std::fs::write(guid.join("그림1.png"), b"png").unwrap();
+        deliverable::set_file_path(&mut s, &d.id, &guid.join("그림1.png").to_string_lossy()).unwrap();
+
+        assert_eq!(super::migrate_deliverables_to_disk_layout(&mut s).unwrap(), 1);
+        // 마커 제거 후 재실행 → 0건, 미러엔 파일 1개만(중복 " (2)" 없음)
+        std::fs::remove_file(store_root.join(".migrated-v2")).unwrap();
+        assert_eq!(super::migrate_deliverables_to_disk_layout(&mut s).unwrap(), 0);
+        let dir = super::vault_root_of(&store_root).join("사업A").join("산출물");
+        let count = std::fs::read_dir(&dir).unwrap().filter(|e| e.as_ref().unwrap().path().is_file()).count();
+        assert_eq!(count, 1, "재실행해도 미러 파일은 1개여야 함");
     }
 
     #[test]

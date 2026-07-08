@@ -15,6 +15,8 @@ export interface DeliverableListProps {
   currentFolderId?: string | null;
   dragActive?: boolean;
   onUpload: () => void;
+  /** 디스크 미러와 목록을 수동으로 재조정(Finder에서 직접 추가/삭제한 파일 반영). */
+  onReconcile?: () => void;
   onUploadFiles: (files: File[]) => void;
   onSetStatus: (id: string, status: DeliverableStatus) => void;
   onRename: (id: string, title: string) => void;
@@ -35,6 +37,7 @@ export function DeliverableList(props: DeliverableListProps) {
     folders = [],
     dragActive = false,
     onUpload,
+    onReconcile,
     onUploadFiles,
     onSetStatus,
     onRename,
@@ -110,6 +113,15 @@ export function DeliverableList(props: DeliverableListProps) {
       )}
       <div style={{ display: "flex", alignItems: "center", padding: "12px 20px" }}>
         <span style={{ fontSize: 15, fontWeight: 600, flex: 1 }}>산출물</span>
+        {onReconcile && (
+          <button
+            onClick={onReconcile}
+            style={{ ...uploadBtn, marginRight: 8 }}
+            title="Finder에서 직접 추가/삭제한 파일을 목록에 반영"
+          >
+            <span style={{ fontSize: 14, lineHeight: 1 }}>↻</span> 새로고침
+          </button>
+        )}
         <button onClick={onUpload} disabled={uploading} style={{ ...uploadBtn, opacity: uploading ? 0.6 : 1 }}>
           <Icon name="arrow-up" size={14} /> {uploading ? "업로드 중…" : "파일 업로드"}
         </button>

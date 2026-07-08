@@ -52,6 +52,7 @@ export function DeliverablesView({
       folders={folders}
       currentFolderId={selectedFolderId}
       onUpload={() => void onUpload()}
+      onReconcile={() => void d.reconcile()}
       onUploadFiles={onUploadFiles}
       onSetStatus={(id, s) => void d.setStatus(id, s)}
       onRename={(id, title) => void d.rename(id, title)}
