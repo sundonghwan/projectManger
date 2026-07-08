@@ -18,6 +18,7 @@ pub fn run() {
         .setup(|app| {
             let dir = app.path().app_data_dir().expect("app_data_dir 를 찾을 수 없음");
             std::fs::create_dir_all(&dir).ok();
+            let _ = config::relocate_into_work_vault(&dir);
             let store_root = config::store_root(&dir);
             let mut store = store::Store::open(store_root)
                 .unwrap_or_else(|_| store::Store::open(dir.join(".projectManger")).expect("기본 Store 초기화 실패"));

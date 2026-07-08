@@ -41,6 +41,25 @@ pub fn store_root(app_data_dir: &Path) -> PathBuf {
     app_vault_root(app_data_dir).join(".projectManger")
 }
 
+/// 구 레이아웃(`<vaultPath>/.projectManger`)을 신 레이아웃(`<vaultPath>/Work Vault/.projectManger`)으로
+/// 1회 이동한다. 같은 볼륨이면 rename 은 atomic. Store::open 이전에 호출해야 한다.
+pub fn relocate_into_work_vault(app_data_dir: &Path) -> Result<()> {
+    let Some(vault) = read_vault_path(app_data_dir) else {
+        return Ok(()); // 기본 위치 사용 시 재배치 불필요
+    };
+    let vault = PathBuf::from(vault);
+    let legacy = vault.join(".projectManger");
+    let new_root = vault.join(APP_VAULT_DIR).join(".projectManger");
+    if new_root.exists() || !legacy.exists() {
+        return Ok(()); // 이미 이동됐거나 구 데이터 없음
+    }
+    std::fs::create_dir_all(vault.join(APP_VAULT_DIR))
+        .map_err(|e| AppError::Invalid(format!("Work Vault 생성 실패: {e}")))?;
+    std::fs::rename(&legacy, &new_root)
+        .map_err(|e| AppError::Invalid(format!(".projectManger 이동 실패: {e}")))?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -71,5 +90,25 @@ mod tests {
         write_vault_path(&d, None).unwrap();
         assert_eq!(read_vault_path(&d), None);
         assert_eq!(store_root(&d), d.join("Work Vault").join(".projectManger"));
+    }
+
+    #[test]
+    fn relocate_moves_legacy_projectmanger_into_work_vault() {
+        let d = tmp();
+        let vault = tmp();
+        write_vault_path(&d, Some(vault.to_str().unwrap())).unwrap();
+        // 구 위치 생성
+        let legacy = vault.join(".projectManger");
+        std::fs::create_dir_all(legacy.join("businesses")).unwrap();
+        std::fs::write(legacy.join("businesses").join("x.json"), b"{}").unwrap();
+
+        relocate_into_work_vault(&d).unwrap();
+
+        assert!(!legacy.exists());
+        let moved = vault.join("Work Vault").join(".projectManger").join("businesses").join("x.json");
+        assert!(moved.is_file());
+        // 멱등: 두 번째 호출은 무해
+        relocate_into_work_vault(&d).unwrap();
+        assert!(moved.is_file());
     }
 }
