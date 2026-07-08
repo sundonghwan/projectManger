@@ -544,6 +544,48 @@ fn deliverable_dir_abs(
     Ok(vault_root_of(store_root).join(deliverable_dir_rel(store, business_id, folder_id)?))
 }
 
+/// 확장자 추출("보고서.pdf" -> "pdf", "noext" -> "").
+fn ext_of(file_name: &str) -> String {
+    Path::new(file_name)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_string()
+}
+
+/// 산출물 파일을 미러 레이아웃에 배치한다. 디렉터리 생성 → `title.ext`(충돌 시 접미) 결정 →
+/// writer 로 실제 바이트 쓰기 → 메타의 file_path 를 상대경로로 기록. 상대경로 반환.
+fn place_deliverable_file<W>(
+    store: &mut Store,
+    store_root: &Path,
+    id: &str,
+    ext: &str,
+    writer: W,
+) -> Result<PathBuf>
+where
+    W: FnOnce(&Path) -> std::io::Result<()>,
+{
+    let d = ops::deliverable::get(store, id)?;
+    let dir_abs = deliverable_dir_abs(store, store_root, &d.business_id, d.folder_id.as_deref())?;
+    std::fs::create_dir_all(&dir_abs)
+        .map_err(|e| AppError::Invalid(format!("산출물 폴더 생성 실패: {e}")))?;
+    let base = layout::sanitize_component(&d.title, &d.id);
+    let desired = if ext.is_empty() { base } else { format!("{base}.{ext}") };
+    let existing: Vec<String> = std::fs::read_dir(&dir_abs)
+        .map(|rd| {
+            rd.filter_map(|e| e.ok())
+                .filter_map(|e| e.file_name().into_string().ok())
+                .collect()
+        })
+        .unwrap_or_default();
+    let name = layout::unique_name(&existing, &desired);
+    let dest_abs = dir_abs.join(&name);
+    writer(&dest_abs).map_err(|e| AppError::Invalid(format!("파일 저장 실패: {e}")))?;
+    let rel = deliverable_dir_rel(store, &d.business_id, d.folder_id.as_deref())?.join(&name);
+    ops::deliverable::set_file_path(store, id, &rel.to_string_lossy())?;
+    Ok(rel)
+}
+
 fn document_asset_files_root(store_root: &Path, document_id: &str) -> PathBuf {
     store_root.join("files").join("documents").join(document_id).join("assets")
 }
@@ -707,6 +749,7 @@ pub fn deliverable_upload(
     paths: Vec<String>,
 ) -> Result<Vec<Deliverable>> {
     let mut store = state.store.lock().unwrap();
+    let store_root_owned = store.root.clone();
     let mut created = Vec::new();
     for path in paths {
         let src = std::path::Path::new(&path);
@@ -730,19 +773,14 @@ pub fn deliverable_upload(
             Ok(d) => d,
             Err(_) => continue,
         };
-        let dest_dir = deliverable_files_root(&store.root).join(&d.id);
-        if std::fs::create_dir_all(&dest_dir).is_err() {
+        let ext = ext_of(&filename);
+        let src_path = src.to_path_buf();
+        if place_deliverable_file(&mut store, &store_root_owned, &d.id, &ext, move |dest| {
+            std::fs::copy(&src_path, dest).map(|_| ())
+        })
+        .is_err()
+        {
             let _ = ops::deliverable::delete(&mut store, &d.id);
-            continue;
-        }
-        let dest = dest_dir.join(&filename);
-        if std::fs::copy(src, &dest).is_err() {
-            let _ = ops::deliverable::delete(&mut store, &d.id);
-            let _ = std::fs::remove_dir(&dest_dir);
-            continue;
-        }
-        let dest_str = dest.to_string_lossy().to_string();
-        if ops::deliverable::set_file_path(&mut store, &d.id, &dest_str).is_err() {
             continue;
         }
         created.push(ops::deliverable::get(&store, &d.id)?);
@@ -789,19 +827,15 @@ pub(crate) fn create_deliverables_from_uploaded_files(
             Ok(d) => d,
             Err(_) => continue,
         };
-        let dest_dir = deliverable_files_root(&store.root).join(&d.id);
-        if std::fs::create_dir_all(&dest_dir).is_err() {
+        let store_root_owned = store.root.clone();
+        let ext = ext_of(&filename);
+        let bytes = file.bytes;
+        if place_deliverable_file(store, &store_root_owned, &d.id, &ext, move |dest| {
+            std::fs::write(dest, bytes)
+        })
+        .is_err()
+        {
             let _ = ops::deliverable::delete(store, &d.id);
-            continue;
-        }
-        let dest = dest_dir.join(&filename);
-        if std::fs::write(&dest, file.bytes).is_err() {
-            let _ = ops::deliverable::delete(store, &d.id);
-            let _ = std::fs::remove_dir(&dest_dir);
-            continue;
-        }
-        let dest_str = dest.to_string_lossy().to_string();
-        if ops::deliverable::set_file_path(store, &d.id, &dest_str).is_err() {
             continue;
         }
         created.push(ops::deliverable::get(store, &d.id)?);
@@ -1325,6 +1359,30 @@ mod tests {
         let path = std::env::temp_dir().join(format!("{prefix}_{}", new_id()));
         std::fs::create_dir_all(&path).unwrap();
         path
+    }
+
+    #[test]
+    fn place_deliverable_file_writes_named_by_title_relative_path() {
+        use crate::store::ops::folder;
+        let root = tmp_dir("cmd_place");
+        let store_root = root.join("Work Vault").join(".projectManger");
+        let mut s = Store::open(store_root.clone()).unwrap();
+        let b = business::create(&mut s, "사업A", "si", None).unwrap();
+        let cat = folder::create(&mut s, &b.id, "deliverable", None, "설계서").unwrap();
+        let d = deliverable::create_file(&mut s, &b.id, None, Some(&cat.id), "개요", "그림1.png", 3).unwrap();
+
+        let rel = super::place_deliverable_file(&mut s, &store_root, &d.id, "png", |dest| {
+            std::fs::write(dest, b"png")
+        })
+        .unwrap();
+
+        assert_eq!(rel, std::path::Path::new("사업A").join("산출물").join("설계서").join("개요.png"));
+        let abs = super::vault_root_of(&store_root).join(&rel);
+        assert!(abs.is_file());
+        assert_eq!(
+            deliverable::file_path_of(&s, &d.id).unwrap().as_deref(),
+            rel.to_str()
+        );
     }
 
     #[test]
