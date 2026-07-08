@@ -51,12 +51,18 @@ pub fn business_list(state: State<AppState>) -> Result<Vec<Business>> {
 #[tauri::command]
 pub fn business_create(state: State<AppState>, input: BusinessCreate) -> Result<Business> {
     let mut store = state.store.lock().unwrap();
-    ops::business::create(&mut store, &input.name, &input.type_, input.color.as_deref())
+    let sr = store.root.clone();
+    let b = ops::business::create(&mut store, &input.name, &input.type_, input.color.as_deref())?;
+    mirror_scaffold_business(&store, &sr, &b.id)?;
+    Ok(b)
 }
 
 #[tauri::command]
 pub fn business_update(state: State<AppState>, input: BusinessUpdate) -> Result<Business> {
     let mut store = state.store.lock().unwrap();
+    let sr = store.root.clone();
+    // 이름이 바뀌면 디스크 폴더도 rename(메타 갱신 전에).
+    mirror_rename_business(&store, &sr, &input.id, &input.name)?;
     ops::business::update(
         &mut store,
         &input.id,
@@ -71,13 +77,17 @@ pub fn business_update(state: State<AppState>, input: BusinessUpdate) -> Result<
 #[tauri::command]
 pub fn business_rename(state: State<AppState>, id: String, name: String) -> Result<Business> {
     let mut store = state.store.lock().unwrap();
+    let sr = store.root.clone();
+    mirror_rename_business(&store, &sr, &id, &name)?;
     ops::business::rename(&mut store, &id, &name)
 }
 
 #[tauri::command]
 pub fn business_archive(state: State<AppState>, id: String) -> Result<()> {
     let mut store = state.store.lock().unwrap();
-    ops::business::archive(&mut store, &id)
+    let sr = store.root.clone();
+    ops::business::archive(&mut store, &id)?;
+    mirror_trash_business(&store, &sr, &id)
 }
 
 #[derive(Deserialize)]
@@ -552,6 +562,57 @@ fn ext_of(file_name: &str) -> String {
         .and_then(|e| e.to_str())
         .unwrap_or("")
         .to_string()
+}
+
+/// 사업의 산출물 루트 `{사업}/산출물`(절대).
+fn business_deliverables_root_abs(store: &Store, store_root: &Path, business_id: &str) -> Result<PathBuf> {
+    Ok(vault_root_of(store_root)
+        .join(business_component(store, business_id)?)
+        .join(DELIVERABLES_AREA))
+}
+
+/// 사업 생성 시 `{사업}/산출물/` 스캐폴딩.
+fn mirror_scaffold_business(store: &Store, store_root: &Path, business_id: &str) -> Result<()> {
+    let dir = business_deliverables_root_abs(store, store_root, business_id)?;
+    std::fs::create_dir_all(&dir).map_err(|e| AppError::Invalid(format!("사업 폴더 생성 실패: {e}")))?;
+    Ok(())
+}
+
+/// 사업 폴더 rename(메타는 호출측에서 rename).
+fn mirror_rename_business(store: &Store, store_root: &Path, business_id: &str, new_name: &str) -> Result<()> {
+    let vault = vault_root_of(store_root);
+    let old_abs = vault.join(business_component(store, business_id)?);
+    if !old_abs.exists() {
+        return Ok(());
+    }
+    let old_name = old_abs.file_name().and_then(|x| x.to_str()).map(|s| s.to_string());
+    let existing: Vec<String> = std::fs::read_dir(&vault)
+        .map(|rd| {
+            rd.filter_map(|e| e.ok())
+                .filter_map(|e| e.file_name().into_string().ok())
+                .filter(|n| Some(n) != old_name.as_ref())
+                .filter(|n| n != ".projectManger")
+                .collect()
+        })
+        .unwrap_or_default();
+    let name = layout::unique_name(&existing, &layout::sanitize_component(new_name, business_id));
+    std::fs::rename(&old_abs, vault.join(&name))
+        .map_err(|e| AppError::Invalid(format!("사업 폴더 이름변경 실패: {e}")))?;
+    Ok(())
+}
+
+/// 사업 폴더째 휴지통 이동.
+fn mirror_trash_business(store: &Store, store_root: &Path, business_id: &str) -> Result<()> {
+    let vault = vault_root_of(store_root);
+    let abs = vault.join(business_component(store, business_id)?);
+    if !abs.exists() {
+        return Ok(());
+    }
+    let trash = store_root.join("trash");
+    std::fs::create_dir_all(&trash).map_err(|e| AppError::Invalid(format!("휴지통 생성 실패: {e}")))?;
+    let dest = trash.join(format!("biz__{business_id}"));
+    std::fs::rename(&abs, &dest).map_err(|e| AppError::Invalid(format!("사업 폴더 휴지통 이동 실패: {e}")))?;
+    Ok(())
 }
 
 /// 폴더 생성 시 디스크 디렉터리 생성(빈 폴더라도). deliverable 종류만 미러링.
@@ -1532,6 +1593,26 @@ mod tests {
         let path = std::env::temp_dir().join(format!("{prefix}_{}", new_id()));
         std::fs::create_dir_all(&path).unwrap();
         path
+    }
+
+    #[test]
+    fn business_cascade_scaffold_rename_trash() {
+        let root = tmp_dir("cmd_biz_cascade");
+        let store_root = root.join("Work Vault").join(".projectManger");
+        let mut s = Store::open(store_root.clone()).unwrap();
+        let vault = super::vault_root_of(&store_root);
+        let b = business::create(&mut s, "사업A", "si", None).unwrap();
+
+        super::mirror_scaffold_business(&s, &store_root, &b.id).unwrap();
+        assert!(vault.join("사업A").join("산출물").is_dir());
+
+        super::mirror_rename_business(&s, &store_root, &b.id, "사업B").unwrap();
+        assert!(vault.join("사업B").is_dir());
+        assert!(!vault.join("사업A").exists());
+
+        business::rename(&mut s, &b.id, "사업B").unwrap();
+        super::mirror_trash_business(&s, &store_root, &b.id).unwrap();
+        assert!(!vault.join("사업B").exists());
     }
 
     #[test]
