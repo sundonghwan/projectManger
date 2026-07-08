@@ -23,6 +23,7 @@ pub fn run() {
             let mut store = store::Store::open(store_root)
                 .unwrap_or_else(|_| store::Store::open(dir.join(".projectManger")).expect("기본 Store 초기화 실패"));
             let _ = commands::migrate_legacy_deliverable_files(&dir, &mut store);
+            let _ = commands::migrate_deliverables_to_disk_layout(&mut store);
             let local_root = dir.join("local");
             let local = store::local::LocalStore::open(local_root).expect("LocalStore 초기화 실패");
             app.manage(commands::AppState {

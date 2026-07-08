@@ -863,6 +863,50 @@ fn resolve_deliverable_open_path(
     Ok(file)
 }
 
+/// 신버전 최초 1회: 기존 GUID 격리 파일을 `{사업}/산출물/{카테고리}/title.ext` 미러로 복사하고
+/// 메타 경로를 상대경로로 갱신한다. 복사·검증 성공분의 원본만 legacy-backup 으로 이동(무손실).
+pub(crate) fn migrate_deliverables_to_disk_layout(store: &mut Store) -> Result<usize> {
+    let store_root = store.root.clone();
+    let marker = store_root.join(".migrated-v2");
+    if marker.exists() {
+        return Ok(0);
+    }
+    let vault = vault_root_of(&store_root);
+    let backup_root = store_root.join("legacy-backup");
+    let mut migrated = 0usize;
+
+    for d in store.deliverables.list() {
+        let Some(old) = d.file_path.clone() else { continue };
+        let old_path = PathBuf::from(&old);
+        let src_abs = if old_path.is_absolute() { old_path.clone() } else { vault.join(&old_path) };
+        if !src_abs.is_file() {
+            continue; // 접근 불가/오프로드 → 건너뜀
+        }
+        let ext = src_abs.extension().and_then(|e| e.to_str()).unwrap_or("").to_string();
+        // 대상 경로 계산 + 복사(place 규칙과 동일하나 원본은 유지). place 가 메타 경로도 갱신.
+        let src_for_copy = src_abs.clone();
+        let placed = place_deliverable_file(store, &store_root, &d.id, &ext, move |dest| {
+            std::fs::copy(&src_for_copy, dest).map(|_| ())
+        });
+        if placed.is_err() {
+            continue;
+        }
+        // 원본을 legacy-backup 으로 이동(id 기준). store 내부 파일만 대상.
+        if src_abs.starts_with(&store_root) {
+            let backup_dir = backup_root.join(&d.id);
+            let _ = std::fs::create_dir_all(&backup_dir);
+            let fname = src_abs.file_name().map(|f| f.to_os_string()).unwrap_or_default();
+            let _ = std::fs::rename(&src_abs, backup_dir.join(fname));
+            if let Some(parent) = src_abs.parent() {
+                let _ = std::fs::remove_dir(parent); // 빈 GUID 폴더 정리(best-effort)
+            }
+        }
+        migrated += 1;
+    }
+    let _ = std::fs::write(&marker, b"v2");
+    Ok(migrated)
+}
+
 pub(crate) fn migrate_legacy_deliverable_files(app_data_dir: &Path, store: &mut Store) -> Result<usize> {
     let legacy_root = legacy_deliverable_files_root(app_data_dir);
     let legacy_root = match legacy_root.canonicalize() {
@@ -1607,6 +1651,38 @@ mod tests {
         let path = std::env::temp_dir().join(format!("{prefix}_{}", new_id()));
         std::fs::create_dir_all(&path).unwrap();
         path
+    }
+
+    #[test]
+    fn migrate_v2_moves_guid_files_to_mirror_and_backs_up() {
+        use crate::store::ops::folder;
+        let root = tmp_dir("cmd_mig_v2");
+        let store_root = root.join("Work Vault").join(".projectManger");
+        let mut s = Store::open(store_root.clone()).unwrap();
+        let b = business::create(&mut s, "사업A", "si", None).unwrap();
+        let cat = folder::create(&mut s, &b.id, "deliverable", None, "설계서").unwrap();
+        let d = deliverable::create_file(&mut s, &b.id, None, Some(&cat.id), "개요", "그림1.png", 3).unwrap();
+        // 구 GUID 레이아웃으로 파일 배치(절대경로 저장)
+        let guid_dir = super::deliverable_files_root(&store_root).join(&d.id);
+        std::fs::create_dir_all(&guid_dir).unwrap();
+        let guid_file = guid_dir.join("그림1.png");
+        std::fs::write(&guid_file, b"png").unwrap();
+        deliverable::set_file_path(&mut s, &d.id, &guid_file.to_string_lossy()).unwrap();
+
+        let n = super::migrate_deliverables_to_disk_layout(&mut s).unwrap();
+        assert_eq!(n, 1);
+
+        let rel = deliverable::file_path_of(&s, &d.id).unwrap().unwrap();
+        assert_eq!(
+            rel,
+            std::path::Path::new("사업A").join("산출물").join("설계서").join("개요.png").to_string_lossy()
+        );
+        assert!(super::vault_root_of(&store_root).join(&rel).is_file());
+        assert!(store_root.join("legacy-backup").exists());
+        assert!(store_root.join(".migrated-v2").is_file());
+
+        // 멱등: 재실행은 0건
+        assert_eq!(super::migrate_deliverables_to_disk_layout(&mut s).unwrap(), 0);
     }
 
     #[test]
