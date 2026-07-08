@@ -349,6 +349,23 @@ pub fn document_asset_upload(
 }
 
 #[tauri::command]
+pub fn document_show_export_folder(app: tauri::AppHandle, state: State<AppState>, id: String) -> Result<()> {
+    use tauri_plugin_opener::OpenerExt;
+
+    let exported = {
+        let store = state.store.lock().unwrap();
+        let document = ops::document::get(&store, &id)?;
+        export_document_markdown(&store.root, &document)?
+    };
+    if !exported.markdown_path.is_file() {
+        return Err(AppError::Invalid("문서 Markdown 파일을 찾을 수 없습니다".into()));
+    }
+    app.opener()
+        .open_path(exported.folder_path.to_string_lossy().to_string(), None::<String>)
+        .map_err(|_| AppError::Invalid("문서 export 폴더를 열 수 없습니다".into()))
+}
+
+#[tauri::command]
 pub fn block_list(state: State<AppState>, document_id: String) -> Result<Vec<Block>> {
     let store = state.store.lock().unwrap();
     ops::document::list_blocks(&store, &document_id)
@@ -484,6 +501,25 @@ fn document_asset_files_root(store_root: &Path, document_id: &str) -> PathBuf {
     store_root.join("files").join("documents").join(document_id).join("assets")
 }
 
+fn document_export_current_root(store_root: &Path, document_id: &str) -> PathBuf {
+    store_root.join("files").join("documents").join(document_id).join("exports").join("current")
+}
+
+pub(crate) struct DocumentExportPaths {
+    pub folder_path: PathBuf,
+    pub markdown_path: PathBuf,
+}
+
+pub(crate) fn export_document_markdown(store_root: &Path, document: &Document) -> Result<DocumentExportPaths> {
+    let folder_path = document_export_current_root(store_root, &document.id);
+    std::fs::create_dir_all(&folder_path)
+        .map_err(|_| AppError::Invalid("문서 export 폴더를 만들 수 없습니다".into()))?;
+    let markdown_path = folder_path.join("README.md");
+    std::fs::write(&markdown_path, &document.body)
+        .map_err(|_| AppError::Invalid("문서 Markdown 파일을 저장할 수 없습니다".into()))?;
+    Ok(DocumentExportPaths { folder_path, markdown_path })
+}
+
 fn is_supported_document_image(file_name: &str) -> bool {
     let lower = file_name.to_ascii_lowercase();
     lower.ends_with(".png")
@@ -520,6 +556,17 @@ fn resolve_deliverable_open_path(
         return Err(AppError::Invalid("허용되지 않은 산출물 파일 경로입니다".into()));
     }
     Ok(file)
+}
+
+fn resolve_deliverable_folder_path(
+    app_data_dir: &Path,
+    store_root: &Path,
+    stored_path: &str,
+) -> Result<PathBuf> {
+    let file = resolve_deliverable_open_path(app_data_dir, store_root, stored_path)?;
+    file.parent()
+        .map(Path::to_path_buf)
+        .ok_or_else(|| AppError::Invalid("산출물 파일 폴더를 찾을 수 없습니다".into()))
 }
 
 pub(crate) fn migrate_legacy_deliverable_files(app_data_dir: &Path, store: &mut Store) -> Result<usize> {
@@ -583,6 +630,33 @@ pub fn deliverable_open(app: tauri::AppHandle, state: State<AppState>, id: Strin
         .map_err(|_| AppError::Invalid("파일을 열 수 없습니다".into()))
 }
 
+#[tauri::command]
+pub fn deliverable_show_in_folder(
+    app: tauri::AppHandle,
+    state: State<AppState>,
+    id: String,
+) -> Result<()> {
+    use tauri::Manager;
+    use tauri_plugin_opener::OpenerExt;
+
+    let data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|_| AppError::Invalid("앱 데이터 폴더를 찾을 수 없음".into()))?;
+    let (stored_path, store_root) = {
+        let store = state.store.lock().unwrap();
+        (
+            ops::deliverable::file_path_of(&store, &id)?
+                .ok_or_else(|| AppError::Invalid("파일 경로가 없습니다".into()))?,
+            store.root.clone(),
+        )
+    };
+    let folder = resolve_deliverable_folder_path(&data_dir, &store_root, &stored_path)?;
+    app.opener()
+        .open_path(folder.to_string_lossy().to_string(), None::<String>)
+        .map_err(|_| AppError::Invalid("파일 폴더를 열 수 없습니다".into()))
+}
+
 /// 파일 업로드(다중). 프론트가 다이얼로그로 고른 경로들을 받아 앱 데이터 폴더로 복사하고
 /// 각각 산출물 행을 생성한다. 개별 파일 실패는 건너뛰고 성공분만 반환한다.
 #[tauri::command]
@@ -635,6 +709,83 @@ pub fn deliverable_upload(
         created.push(ops::deliverable::get(&store, &d.id)?);
     }
     Ok(created)
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeliverableUploadFile {
+    pub file_name: String,
+    pub bytes: Vec<u8>,
+}
+
+pub(crate) fn create_deliverables_from_uploaded_files(
+    store: &mut Store,
+    business_id: &str,
+    project_id: Option<&str>,
+    folder_id: Option<&str>,
+    files: Vec<DeliverableUploadFile>,
+) -> Result<Vec<Deliverable>> {
+    let mut created = Vec::new();
+    for file in files {
+        let filename = match Path::new(&file.file_name)
+            .file_name()
+            .and_then(|f| f.to_str())
+            .filter(|value| !value.trim().is_empty())
+        {
+            Some(f) => f.to_string(),
+            None => continue,
+        };
+        if file.bytes.is_empty() {
+            continue;
+        }
+        let d = match ops::deliverable::create_file(
+            store,
+            business_id,
+            project_id,
+            folder_id,
+            &filename,
+            &filename,
+            file.bytes.len() as i64,
+        ) {
+            Ok(d) => d,
+            Err(_) => continue,
+        };
+        let dest_dir = deliverable_files_root(&store.root).join(&d.id);
+        if std::fs::create_dir_all(&dest_dir).is_err() {
+            let _ = ops::deliverable::delete(store, &d.id);
+            continue;
+        }
+        let dest = dest_dir.join(&filename);
+        if std::fs::write(&dest, file.bytes).is_err() {
+            let _ = ops::deliverable::delete(store, &d.id);
+            let _ = std::fs::remove_dir(&dest_dir);
+            continue;
+        }
+        let dest_str = dest.to_string_lossy().to_string();
+        if ops::deliverable::set_file_path(store, &d.id, &dest_str).is_err() {
+            continue;
+        }
+        created.push(ops::deliverable::get(store, &d.id)?);
+    }
+    Ok(created)
+}
+
+#[tauri::command]
+pub fn deliverable_upload_files(
+    state: State<AppState>,
+    business_id: String,
+    project_id: Option<String>,
+    folder_id: Option<String>,
+    files: Vec<DeliverableUploadFile>,
+) -> Result<Vec<Deliverable>> {
+    let mut store = state.store.lock().unwrap();
+    create_deliverables_from_uploaded_files(
+        &mut store,
+        &business_id,
+        project_id.as_deref(),
+        folder_id.as_deref(),
+        files,
+    )
 }
 
 #[tauri::command]
@@ -1128,6 +1279,7 @@ pub fn vault_set(app: tauri::AppHandle, state: State<AppState>, path: String) ->
 mod tests {
     use crate::store::ops::{business, deliverable};
     use crate::store::ids::new_id;
+    use crate::store::model::Document;
     use crate::store::Store;
 
     fn tmp_dir(prefix: &str) -> std::path::PathBuf {
@@ -1166,6 +1318,22 @@ mod tests {
                 .unwrap();
 
         assert_eq!(resolved, file.canonicalize().unwrap());
+    }
+
+    #[test]
+    fn resolve_deliverable_folder_path_returns_parent_directory() {
+        let app_data = tmp_dir("cmd_folder_app");
+        let store_root = tmp_dir("cmd_folder_store").join(".projectManger");
+        let file_dir = store_root.join("files").join("deliverables").join("d1");
+        std::fs::create_dir_all(&file_dir).unwrap();
+        let file = file_dir.join("report.pdf");
+        std::fs::write(&file, b"pdf").unwrap();
+
+        let resolved =
+            super::resolve_deliverable_folder_path(&app_data, &store_root, file.to_str().unwrap())
+                .unwrap();
+
+        assert_eq!(resolved, file_dir.canonicalize().unwrap());
     }
 
     #[test]
@@ -1214,6 +1382,34 @@ mod tests {
     }
 
     #[test]
+    fn export_document_markdown_writes_readme_under_current_export_folder() {
+        let store_root = tmp_dir("cmd_document_export_root").join(".projectManger");
+        let doc = Document {
+            id: "doc-1".into(),
+            business_id: "biz-1".into(),
+            project_id: None,
+            folder_id: None,
+            title: "기획/초안.md".into(),
+            icon: None,
+            body: "# 제목\n본문".into(),
+            editor_body: Some("[{}]".into()),
+            editor_body_format: Some("blocknote-json".into()),
+            collaboration_state: Some("old-state".into()),
+            blocks: vec![],
+            sort_order: 1.0,
+            archived_at: None,
+            created_at: "2026-07-08T00:00:00.000Z".into(),
+            updated_at: "2026-07-08T00:00:00.000Z".into(),
+        };
+
+        let exported = super::export_document_markdown(&store_root, &doc).unwrap();
+
+        assert_eq!(exported.folder_path, store_root.join("files").join("documents").join("doc-1").join("exports").join("current"));
+        assert_eq!(exported.markdown_path, exported.folder_path.join("README.md"));
+        assert_eq!(std::fs::read_to_string(exported.markdown_path).unwrap(), "# 제목\n본문");
+    }
+
+    #[test]
     fn is_supported_document_image_accepts_common_images() {
         assert!(super::is_supported_document_image("a.png"));
         assert!(super::is_supported_document_image("a.jpg"));
@@ -1259,5 +1455,38 @@ mod tests {
         assert_eq!(updated.file_path.as_deref(), copied.to_str());
         assert_eq!(std::fs::read(copied).unwrap(), b"pdf");
         assert!(legacy.exists());
+    }
+
+    #[test]
+    fn create_deliverables_from_uploaded_files_writes_bytes_under_store_root() {
+        let store_root = tmp_dir("cmd_upload_files_store").join(".projectManger");
+        let mut store = Store::open(store_root.clone()).unwrap();
+        let business_id = business::create(&mut store, "폴라리스AI", "client", None).unwrap().id;
+
+        let created = super::create_deliverables_from_uploaded_files(
+            &mut store,
+            &business_id,
+            None,
+            None,
+            vec![
+                super::DeliverableUploadFile {
+                    file_name: "../report.pdf".into(),
+                    bytes: b"pdf".to_vec(),
+                },
+                super::DeliverableUploadFile {
+                    file_name: "empty.txt".into(),
+                    bytes: Vec::new(),
+                },
+            ],
+        )
+        .unwrap();
+
+        assert_eq!(created.len(), 1);
+        assert_eq!(created[0].title, "report.pdf");
+        assert_eq!(created[0].original_name.as_deref(), Some("report.pdf"));
+        assert_eq!(created[0].file_size, Some(3));
+        let stored = std::path::PathBuf::from(created[0].file_path.as_deref().unwrap());
+        assert_eq!(stored, store_root.join("files").join("deliverables").join(&created[0].id).join("report.pdf"));
+        assert_eq!(std::fs::read(stored).unwrap(), b"pdf");
     }
 }

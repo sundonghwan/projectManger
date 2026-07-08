@@ -1,4 +1,4 @@
-import { useRef, useState, type CSSProperties } from "react";
+import { useRef, useState, type CSSProperties, type DragEvent } from "react";
 import type { Deliverable, DeliverableStatus, Folder } from "../domain/types";
 import { DELIVERABLE_STATUS_COLOR, DELIVERABLE_STATUS_LABEL } from "../ui/colors";
 import { formatBytes } from "../domain/format";
@@ -15,20 +15,38 @@ export interface DeliverableListProps {
   currentFolderId?: string | null;
   dragActive?: boolean;
   onUpload: () => void;
+  onUploadFiles: (files: File[]) => void;
   onSetStatus: (id: string, status: DeliverableStatus) => void;
   onRename: (id: string, title: string) => void;
   /** 폴더 이동 (folderId=null 이면 미분류). 제공 시 폴더 열을 노출한다. */
   onMove?: (id: string, folderId: string | null) => void;
   onOpen: (d: Deliverable) => void;
+  onShowInFolder: (d: Deliverable) => void;
   onArchive: (id: string) => void;
 }
 
 const STATUSES: DeliverableStatus[] = ["draft", "review", "done"];
 
 export function DeliverableList(props: DeliverableListProps) {
-  const { deliverables, error, uploading, folders = [], dragActive = false, onUpload, onSetStatus, onRename, onMove, onOpen, onArchive } = props;
+  const {
+    deliverables,
+    error,
+    uploading,
+    folders = [],
+    dragActive = false,
+    onUpload,
+    onUploadFiles,
+    onSetStatus,
+    onRename,
+    onMove,
+    onOpen,
+    onShowInFolder,
+    onArchive,
+  } = props;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [fileDragActive, setFileDragActive] = useState(false);
+  const dragDepth = useRef(0);
   const renameDone = useRef(false); // Enter→blur 중복 커밋 방지
 
   const showFolders = !!onMove; // 폴더 이동 핸들러가 있을 때만 폴더 열 노출
@@ -48,13 +66,44 @@ export function DeliverableList(props: DeliverableListProps) {
     if (name && name !== d.title) onRename(d.id, name);
     setEditingId(null);
   };
+  const isFileDrag = (event: DragEvent) =>
+    Array.from(event.dataTransfer.types ?? []).includes("Files") || event.dataTransfer.files.length > 0;
+  const handleDragOver = (event: DragEvent) => {
+    if (!isFileDrag(event) || uploading) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  };
+  const handleDragEnter = (event: DragEvent) => {
+    if (!isFileDrag(event) || uploading) return;
+    event.preventDefault();
+    dragDepth.current += 1;
+    setFileDragActive(true);
+  };
+  const handleDragLeave = (event: DragEvent) => {
+    if (!isFileDrag(event)) return;
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) setFileDragActive(false);
+  };
+  const handleDrop = (event: DragEvent) => {
+    if (!isFileDrag(event) || uploading) return;
+    event.preventDefault();
+    dragDepth.current = 0;
+    setFileDragActive(false);
+    const files = Array.from(event.dataTransfer.files).filter((file) => file.size > 0);
+    if (files.length === 0) return;
+    onUploadFiles(files);
+  };
 
   return (
     <div
       data-testid="deliverable-drop-zone"
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
       style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, position: "relative" }}
     >
-      {dragActive && (
+      {(dragActive || fileDragActive) && (
         <div style={dropOverlay}>
           여기에 파일을 놓아 업로드
         </div>
@@ -172,6 +221,15 @@ export function DeliverableList(props: DeliverableListProps) {
                   title="열기"
                 >
                   열기
+                </button>
+                <button
+                  onClick={() => onShowInFolder(d)}
+                  disabled={!d.filePath}
+                  style={{ ...iconAction, opacity: d.filePath ? 1 : 0.4, padding: "0 6px" }}
+                  aria-label={`${d.title} 폴더 열기`}
+                  title="Finder에서 보기"
+                >
+                  <Icon name="folder" size={14} />
                 </button>
                 <button
                   onClick={() => onArchive(d.id)}

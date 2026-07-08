@@ -64,30 +64,28 @@ describe("api.task", () => {
 });
 
 describe("api.deliverable", () => {
+  it("uploadFiles는 DOM drop 파일 payload를 백엔드에 전달", async () => {
+    await api.deliverable.uploadFiles("biz-1", "project-1", [{ fileName: "a.pdf", bytes: [1, 2] }], "folder-1");
+    expect(invoke).toHaveBeenCalledWith("deliverable_upload_files", {
+      businessId: "biz-1",
+      projectId: "project-1",
+      folderId: "folder-1",
+      files: [{ fileName: "a.pdf", bytes: [1, 2] }],
+    });
+  });
+
   it("open은 파일 경로 대신 산출물 id만 백엔드에 전달", async () => {
     await api.deliverable.open("deliv-1");
     expect(invoke).toHaveBeenCalledWith("deliverable_open", { id: "deliv-1" });
   });
+
+  it("showInFolder는 산출물 id만 백엔드에 전달", async () => {
+    await api.deliverable.showInFolder("deliv-1");
+    expect(invoke).toHaveBeenCalledWith("deliverable_show_in_folder", { id: "deliv-1" });
+  });
 });
 
-describe("api.document editor body", () => {
-  it("saves markdown and block editor metadata together", async () => {
-    await api.document.setEditorBody("doc-1", {
-      body: "# 공유용",
-      editorBody: '[{"type":"paragraph","content":"공유용"}]',
-      editorBodyFormat: "blocknote-json",
-      collaborationState: "snapshot",
-    });
-
-    expect(invoke).toHaveBeenCalledWith("document_set_editor_body", {
-      id: "doc-1",
-      body: "# 공유용",
-      editorBody: '[{"type":"paragraph","content":"공유용"}]',
-      editorBodyFormat: "blocknote-json",
-      collaborationState: "snapshot",
-    });
-  });
-
+describe("api.document markdown body", () => {
   it("uploads a document asset", async () => {
     await api.document.uploadAsset("doc-1", "image.png", [1, 2, 3]);
 
@@ -96,5 +94,10 @@ describe("api.document editor body", () => {
       fileName: "image.png",
       bytes: [1, 2, 3],
     });
+  });
+
+  it("opens the generated Markdown export folder by document id", async () => {
+    await api.document.showExportFolder("doc-1");
+    expect(invoke).toHaveBeenCalledWith("document_show_export_folder", { id: "doc-1" });
   });
 });

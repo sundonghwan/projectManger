@@ -48,6 +48,29 @@ export function useDeliverables(
     },
     [businessId, projectId, reload, onChanged],
   );
+  const uploadFiles = useCallback(
+    async (files: File[], folderId?: string | null) => {
+      if (businessId == null || files.length === 0) return;
+      setUploading(true);
+      try {
+        const inputs = await Promise.all(files.map(async (file) => ({
+          fileName: file.name,
+          bytes: Array.from(new Uint8Array(await file.arrayBuffer())),
+        })));
+        const created = await api.deliverable.uploadFiles(businessId, projectId, inputs, folderId ?? null);
+        await reload();
+        onChanged?.();
+        if (created.length < files.length) {
+          setError(`${files.length}개 중 ${created.length}개만 업로드되었습니다. (빈 파일·저장 실패 등 제외)`);
+        }
+      } catch (e) {
+        setError(String(e));
+      } finally {
+        setUploading(false);
+      }
+    },
+    [businessId, projectId, reload, onChanged],
+  );
 
   const move = useCallback(
     async (id: string, folderId: string | null) => {
@@ -99,6 +122,18 @@ export function useDeliverables(
     }
   }, []);
 
+  const showInFolder = useCallback(async (d: Deliverable) => {
+    if (!d.filePath) {
+      setError("파일 경로가 없습니다.");
+      return;
+    }
+    try {
+      await api.deliverable.showInFolder(d.id);
+    } catch {
+      setError("파일 폴더를 열 수 없습니다. 파일이 이동되었거나 삭제되었을 수 있습니다.");
+    }
+  }, []);
+
   const archive = useCallback(
     async (id: string) => {
       try {
@@ -112,5 +147,5 @@ export function useDeliverables(
     [reload, onChanged],
   );
 
-  return { deliverables, error, uploading, reload, upload, rename, setStatus, open, archive, move };
+  return { deliverables, error, uploading, reload, upload, uploadFiles, rename, setStatus, open, showInFolder, archive, move };
 }

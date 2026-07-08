@@ -111,15 +111,15 @@ export interface Document {
   title: string;
   icon?: string | null;
   body: string;
+  /** 레거시 블록 에디터 저장값. 새 Markdown 에디터는 body만 사용한다. */
   editorBody?: string | null;
-  editorBodyFormat?: DocumentEditorBodyFormat | null;
+  editorBodyFormat?: string | null;
+  /** 레거시 협업 snapshot. 새 Markdown 에디터는 사용하지 않는다. */
   collaborationState?: string | null;
   sortOrder: number;
   archivedAt?: Timestamp | null;
   createdAt: Timestamp;
 }
-
-export type DocumentEditorBodyFormat = "blocknote-json";
 
 export interface DocumentAsset {
   id: string;

@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from "react";
-import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { useRef } from "react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useDeliverables } from "../hooks/useDeliverables";
 import { DeliverableList } from "./DeliverableList";
@@ -24,53 +23,7 @@ export function DeliverablesView({
   selectedFolderId = null,
 }: DeliverablesViewProps) {
   const d = useDeliverables(businessId, projectId, onChanged);
-  const [dragActive, setDragActive] = useState(false);
-  const selectedFolderIdRef = useRef(selectedFolderId);
-  const uploadRef = useRef(d.upload);
-  const uploadingRef = useRef(d.uploading);
   const dropInFlightRef = useRef(false);
-
-  useEffect(() => {
-    selectedFolderIdRef.current = selectedFolderId;
-  }, [selectedFolderId]);
-
-  useEffect(() => {
-    uploadRef.current = d.upload;
-  }, [d.upload]);
-
-  useEffect(() => {
-    uploadingRef.current = d.uploading;
-    if (!d.uploading) dropInFlightRef.current = false;
-  }, [d.uploading]);
-
-  useEffect(() => {
-    let disposed = false;
-    let unlistenDragDrop: (() => void) | null = null;
-
-    void getCurrentWebview().onDragDropEvent((event) => {
-      const busy = uploadingRef.current || dropInFlightRef.current;
-      if (event.payload.type === "over" || event.payload.type === "enter") {
-        setDragActive(!busy);
-        return;
-      }
-
-      setDragActive(false);
-      if (event.payload.type !== "drop" || busy || event.payload.paths.length === 0) return;
-
-      dropInFlightRef.current = true;
-      void Promise.resolve(uploadRef.current(event.payload.paths, selectedFolderIdRef.current)).finally(() => {
-        dropInFlightRef.current = false;
-      });
-    }).then((unlisten) => {
-      if (disposed) unlisten();
-      else unlistenDragDrop = unlisten;
-    });
-
-    return () => {
-      disposed = true;
-      unlistenDragDrop?.();
-    };
-  }, []);
 
   // 선택된 폴더가 있으면 그 폴더 직속만, 없으면 전체.
   const shown = selectedFolderId == null
@@ -83,6 +36,13 @@ export function DeliverablesView({
     const paths = Array.isArray(selected) ? selected : [selected];
     await d.upload(paths, selectedFolderId);
   };
+  const onUploadFiles = (files: File[]) => {
+    if (d.uploading || dropInFlightRef.current || files.length === 0) return;
+    dropInFlightRef.current = true;
+    void Promise.resolve(d.uploadFiles(files, selectedFolderId)).finally(() => {
+      dropInFlightRef.current = false;
+    });
+  };
 
   return (
     <DeliverableList
@@ -91,12 +51,13 @@ export function DeliverablesView({
       uploading={d.uploading}
       folders={folders}
       currentFolderId={selectedFolderId}
-      dragActive={dragActive}
       onUpload={() => void onUpload()}
+      onUploadFiles={onUploadFiles}
       onSetStatus={(id, s) => void d.setStatus(id, s)}
       onRename={(id, title) => void d.rename(id, title)}
       onMove={(id, folderId) => void d.move(id, folderId)}
       onOpen={(deliv) => void d.open(deliv)}
+      onShowInFolder={(deliv) => void d.showInFolder(deliv)}
       onArchive={(id) => {
         if (window.confirm("이 산출물을 삭제할까요? (휴지통에서 복구 가능)")) void d.archive(id);
       }}

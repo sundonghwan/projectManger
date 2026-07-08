@@ -161,25 +161,6 @@ body {
 .md-preview th, .md-preview td { border: 1px solid var(--border); padding: 6px 10px; }
 .md-preview img { max-width: 100%; }
 
-.block-document-editor {
-  height: 100%;
-  min-height: 0;
-  overflow: auto;
-  background: var(--bg);
-}
-
-.block-document-editor .bn-container {
-  min-height: 100%;
-  background: var(--bg);
-  color: var(--text);
-}
-
-.block-document-editor .bn-editor {
-  max-width: 860px;
-  margin: 0 auto;
-  padding: 20px 24px 80px;
-}
-
 /* xterm viewport keeps scrollback, but the desktop terminal surface should not show a draggable scrollbar. */
 .ssh-terminal-host .xterm {
   height: 100%;

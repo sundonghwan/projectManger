@@ -9,7 +9,6 @@ import type {
   Deliverable,
   DeliverableStatus,
   DocumentAsset,
-  DocumentEditorBodyFormat,
   Document,
   EntityStatus,
   Folder,
@@ -75,13 +74,10 @@ export interface TaskMoveInput {
   status: TaskStatus;
   sortOrder: number;
 }
-export interface DocumentEditorBodyInput {
-  body: string;
-  editorBody: string;
-  editorBodyFormat: DocumentEditorBodyFormat;
-  collaborationState?: string | null;
+export interface DeliverableUploadFileInput {
+  fileName: string;
+  bytes: number[];
 }
-
 export const api = {
   business: {
     list: () => invoke<Business[]>("business_list"),
@@ -115,16 +111,9 @@ export const api = {
       invoke<Document>("document_move", { id, folderId: folderId ?? null }),
     /** 본문(마크다운) 저장. */
     setBody: (id: string, body: string) => invoke<void>("document_set_body", { id, body }),
-    setEditorBody: (id: string, input: DocumentEditorBodyInput) =>
-      invoke<void>("document_set_editor_body", {
-        id,
-        body: input.body,
-        editorBody: input.editorBody,
-        editorBodyFormat: input.editorBodyFormat,
-        collaborationState: input.collaborationState ?? null,
-      }),
     uploadAsset: (documentId: string, fileName: string, bytes: number[]) =>
       invoke<DocumentAsset>("document_asset_upload", { documentId, fileName, bytes }),
+    showExportFolder: (id: string) => invoke<void>("document_show_export_folder", { id }),
     archive: (id: string) => invoke<void>("document_archive", { id }),
   },
   block: {
@@ -153,6 +142,18 @@ export const api = {
         folderId: folderId ?? null,
         paths,
       }),
+    uploadFiles: (
+      businessId: string,
+      projectId: string | null,
+      files: DeliverableUploadFileInput[],
+      folderId?: string | null,
+    ) =>
+      invoke<Deliverable[]>("deliverable_upload_files", {
+        businessId,
+        projectId: projectId ?? null,
+        folderId: folderId ?? null,
+        files,
+      }),
     rename: (id: string, title: string) =>
       invoke<Deliverable>("deliverable_rename", { id, title }),
     setStatus: (id: string, status: DeliverableStatus) =>
@@ -162,6 +163,8 @@ export const api = {
       invoke<Deliverable>("deliverable_move", { id, folderId: folderId ?? null }),
     /** 복사 보관된 파일을 백엔드 경계 검증 후 OS 기본 앱으로 연다. */
     open: (id: string) => invoke<void>("deliverable_open", { id }),
+    /** 복사 보관된 파일이 들어있는 폴더를 백엔드 경계 검증 후 OS 파일 탐색기로 연다. */
+    showInFolder: (id: string) => invoke<void>("deliverable_show_in_folder", { id }),
     archive: (id: string) => invoke<void>("deliverable_archive", { id }),
   },
   memo: {
