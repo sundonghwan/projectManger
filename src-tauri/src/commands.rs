@@ -672,8 +672,8 @@ fn collect_area_files(dir: &Path, chain: &[String], biz_comp: &str, out: &mut Ve
     let Ok(rd) = std::fs::read_dir(dir) else { return };
     for e in rd.filter_map(|e| e.ok()) {
         let Ok(name) = e.file_name().into_string() else { continue };
-        if name.starts_with('.') {
-            continue; // .DS_Store / .icloud 스텁 / 기타 숨김
+        if name.starts_with('.') || name.starts_with("~$") || name.starts_with(".~") {
+            continue; // .DS_Store / .icloud 스텁 / Office 임시 잠금(~$...) / 기타 숨김
         }
         let path = e.path();
         if path.is_dir() {
@@ -1962,8 +1962,11 @@ mod tests {
         std::fs::create_dir_all(&cat_dir).unwrap();
         std::fs::write(cat_dir.join("외부추가.pdf"), b"ext").unwrap();
 
+        // Office 임시 잠금 파일(~$...)은 import 대상이 아니어야 한다.
+        std::fs::write(cat_dir.join("~$외부추가.pdf"), b"lock").unwrap();
+
         let (imported, removed) = super::reconcile_deliverables(&mut s, &store_root).unwrap();
-        assert_eq!(imported, 1, "외부추가.pdf 1건 import");
+        assert_eq!(imported, 1, "외부추가.pdf 1건만 import(~$ 잠금 제외)");
         assert_eq!(removed, 1, "gone.txt 1건 제거");
 
         let active = deliverable::list_by_business(&s, &b.id).unwrap();
