@@ -564,6 +564,20 @@ fn ext_of(file_name: &str) -> String {
         .to_string()
 }
 
+/// 정규화된 base(=title)와 파일 ext 로 최종 파일명 결정.
+/// title 이 이미 ".ext" 로 끝나면 그대로(이중 확장자 방지), 아니면 append.
+fn compose_file_name(base: &str, ext: &str) -> String {
+    if ext.is_empty() {
+        return base.to_string();
+    }
+    let suffix = format!(".{}", ext.to_lowercase());
+    if base.to_lowercase().ends_with(&suffix) {
+        base.to_string()
+    } else {
+        format!("{base}.{ext}")
+    }
+}
+
 /// 사업의 산출물 루트 `{사업}/산출물`(절대).
 fn business_deliverables_root_abs(store: &Store, store_root: &Path, business_id: &str) -> Result<PathBuf> {
     Ok(vault_root_of(store_root)
@@ -690,7 +704,7 @@ fn rename_deliverable_file(
                 .to_string();
             let dir_abs = old_abs.parent().map(Path::to_path_buf).unwrap_or(vault.clone());
             let base = layout::sanitize_component(&updated.title, &updated.id);
-            let desired = if ext.is_empty() { base } else { format!("{base}.{ext}") };
+            let desired = compose_file_name(&base, &ext);
             let old_name = old_abs.file_name().and_then(|f| f.to_str()).map(|s| s.to_string());
             let existing: Vec<String> = std::fs::read_dir(&dir_abs)
                 .map(|rd| {
@@ -772,7 +786,7 @@ where
     std::fs::create_dir_all(&dir_abs)
         .map_err(|e| AppError::Invalid(format!("산출물 폴더 생성 실패: {e}")))?;
     let base = layout::sanitize_component(&d.title, &d.id);
-    let desired = if ext.is_empty() { base } else { format!("{base}.{ext}") };
+    let desired = compose_file_name(&base, ext);
     let existing: Vec<String> = std::fs::read_dir(&dir_abs)
         .map(|rd| {
             rd.filter_map(|e| e.ok())
@@ -1707,6 +1721,20 @@ mod tests {
     }
 
     #[test]
+    fn place_deliverable_file_does_not_double_extension_when_title_has_ext() {
+        let root = tmp_dir("cmd_place_ext");
+        let store_root = root.join("Work Vault").join(".projectManger");
+        let mut s = Store::open(store_root.clone()).unwrap();
+        let b = business::create(&mut s, "사업A", "si", None).unwrap();
+        // title 이 이미 확장자 포함(실제 데이터 형태)
+        let d = deliverable::create_file(&mut s, &b.id, None, None, "이상탐지 총 로직.png", "그림1.png", 3).unwrap();
+
+        let rel = super::place_deliverable_file(&mut s, &store_root, &d.id, "png", |p| std::fs::write(p, b"x")).unwrap();
+
+        assert_eq!(rel.file_name().unwrap().to_str().unwrap(), "이상탐지 총 로직.png");
+    }
+
+    #[test]
     fn deliverable_dir_rel_builds_business_area_folder_chain() {
         use crate::store::ops::folder;
         let mut s = Store::open(tmp_dir("cmd_dir_rel").join(".projectManger")).unwrap();
@@ -1905,8 +1933,10 @@ mod tests {
         assert_eq!(created[0].title, "report.pdf");
         assert_eq!(created[0].original_name.as_deref(), Some("report.pdf"));
         assert_eq!(created[0].file_size, Some(3));
-        let stored = std::path::PathBuf::from(created[0].file_path.as_deref().unwrap());
-        assert_eq!(stored, store_root.join("files").join("deliverables").join(&created[0].id).join("report.pdf"));
-        assert_eq!(std::fs::read(stored).unwrap(), b"pdf");
+        // 새 미러 레이아웃: 앱 Vault 루트 기준 상대경로로 저장.
+        let rel = created[0].file_path.as_deref().unwrap();
+        assert_eq!(rel, std::path::Path::new("폴라리스AI").join("산출물").join("report.pdf").to_str().unwrap());
+        let abs = super::vault_root_of(&store_root).join(rel);
+        assert_eq!(std::fs::read(abs).unwrap(), b"pdf");
     }
 }
