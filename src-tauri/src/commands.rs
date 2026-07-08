@@ -4,6 +4,7 @@ use crate::store::model::{
     Block, Business, Deliverable, DeliverableVersion, Document, Folder, Label, Memo, Project,
     RecurringTask, Server, Snippet, Task, Template,
 };
+use crate::store::layout::{self, DELIVERABLES_AREA};
 use crate::store::ops;
 use crate::store::ops::label::TaskLabelView;
 use crate::store::ops::search::SearchHit;
@@ -495,6 +496,52 @@ pub fn deliverable_archive(state: State<AppState>, id: String) -> Result<()> {
 
 fn deliverable_files_root(store_root: &Path) -> PathBuf {
     store_root.join("files").join("deliverables")
+}
+
+/// store_root(`.../Work Vault/.projectManger`)의 부모 = 앱 Vault 루트(`.../Work Vault`).
+fn vault_root_of(store_root: &Path) -> PathBuf {
+    store_root
+        .parent()
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| store_root.to_path_buf())
+}
+
+/// 사업 폴더명(정규화). 사업이 없으면 에러.
+fn business_component(store: &Store, business_id: &str) -> Result<String> {
+    let b = store.businesses.get(business_id).ok_or(AppError::NotFound)?;
+    Ok(layout::sanitize_component(&b.name, &b.id))
+}
+
+/// 폴더 체인(루트→리프) 이름을 정규화해 반환(최대 2단계).
+fn folder_chain_components(store: &Store, folder_id: Option<&str>) -> Result<Vec<String>> {
+    let Some(fid) = folder_id else { return Ok(vec![]) };
+    let f = store.folders.get(fid).ok_or(AppError::NotFound)?;
+    let mut chain = vec![layout::sanitize_component(&f.name, &f.id)];
+    if let Some(pid) = &f.parent_id {
+        if let Some(parent) = store.folders.get(pid) {
+            chain.insert(0, layout::sanitize_component(&parent.name, &parent.id));
+        }
+    }
+    Ok(chain)
+}
+
+/// 앱 Vault 루트 기준 산출물 디렉터리 상대경로(파일명 제외).
+fn deliverable_dir_rel(store: &Store, business_id: &str, folder_id: Option<&str>) -> Result<PathBuf> {
+    let mut p = PathBuf::from(business_component(store, business_id)?).join(DELIVERABLES_AREA);
+    for c in folder_chain_components(store, folder_id)? {
+        p = p.join(c);
+    }
+    Ok(p)
+}
+
+/// 절대 산출물 디렉터리.
+fn deliverable_dir_abs(
+    store: &Store,
+    store_root: &Path,
+    business_id: &str,
+    folder_id: Option<&str>,
+) -> Result<PathBuf> {
+    Ok(vault_root_of(store_root).join(deliverable_dir_rel(store, business_id, folder_id)?))
 }
 
 fn document_asset_files_root(store_root: &Path, document_id: &str) -> PathBuf {
@@ -1278,6 +1325,24 @@ mod tests {
         let path = std::env::temp_dir().join(format!("{prefix}_{}", new_id()));
         std::fs::create_dir_all(&path).unwrap();
         path
+    }
+
+    #[test]
+    fn deliverable_dir_rel_builds_business_area_folder_chain() {
+        use crate::store::ops::folder;
+        let mut s = Store::open(tmp_dir("cmd_dir_rel").join(".projectManger")).unwrap();
+        let b = business::create(&mut s, "철도청 이상탐지", "si", None).unwrap();
+        let root = folder::create(&mut s, &b.id, "deliverable", None, "설계서").unwrap();
+        let sub = folder::create(&mut s, &b.id, "deliverable", Some(&root.id), "1차").unwrap();
+
+        let unfiled = super::deliverable_dir_rel(&s, &b.id, None).unwrap();
+        assert_eq!(unfiled, std::path::Path::new("철도청 이상탐지").join("산출물"));
+
+        let in_root = super::deliverable_dir_rel(&s, &b.id, Some(&root.id)).unwrap();
+        assert_eq!(in_root, std::path::Path::new("철도청 이상탐지").join("산출물").join("설계서"));
+
+        let in_sub = super::deliverable_dir_rel(&s, &b.id, Some(&sub.id)).unwrap();
+        assert_eq!(in_sub, std::path::Path::new("철도청 이상탐지").join("산출물").join("설계서").join("1차"));
     }
 
     #[test]
