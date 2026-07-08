@@ -51,7 +51,7 @@ export function DeliverableList(props: DeliverableListProps) {
 
   const showFolders = !!onMove; // 폴더 이동 핸들러가 있을 때만 폴더 열 노출
   const opts = folderOptions(folders);
-  const cols = showFolders ? "78px 1fr 84px 150px 92px 84px" : "78px 1fr 90px 100px 92px";
+  const cols = showFolders ? "78px 1fr 84px 150px 92px 112px" : "78px 1fr 90px 100px 112px";
   const grid = { ...rowGrid, gridTemplateColumns: cols };
 
   const startEdit = (d: Deliverable) => {
@@ -311,6 +311,8 @@ const iconAction: CSSProperties = {
   borderRadius: "var(--radius-sm)",
   fontSize: 12,
   cursor: "pointer",
+  whiteSpace: "nowrap",
+  flexShrink: 0,
 };
 const errorBar: CSSProperties = {
   display: "flex",

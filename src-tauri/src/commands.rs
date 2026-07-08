@@ -558,17 +558,6 @@ fn resolve_deliverable_open_path(
     Ok(file)
 }
 
-fn resolve_deliverable_folder_path(
-    app_data_dir: &Path,
-    store_root: &Path,
-    stored_path: &str,
-) -> Result<PathBuf> {
-    let file = resolve_deliverable_open_path(app_data_dir, store_root, stored_path)?;
-    file.parent()
-        .map(Path::to_path_buf)
-        .ok_or_else(|| AppError::Invalid("산출물 파일 폴더를 찾을 수 없습니다".into()))
-}
-
 pub(crate) fn migrate_legacy_deliverable_files(app_data_dir: &Path, store: &mut Store) -> Result<usize> {
     let legacy_root = legacy_deliverable_files_root(app_data_dir);
     let legacy_root = match legacy_root.canonicalize() {
@@ -651,10 +640,13 @@ pub fn deliverable_show_in_folder(
             store.root.clone(),
         )
     };
-    let folder = resolve_deliverable_folder_path(&data_dir, &store_root, &stored_path)?;
+    // 파일이 든 폴더를 "여는" 대신 파일 자체를 Finder에서 선택(reveal)한다.
+    // 각 산출물은 고유 id 폴더에 개별 저장되므로 폴더를 열면 원본 파일 하나만 보이고,
+    // iCloud 오프로드 시 폴더가 비어 보이는 문제도 reveal 로 파일을 지정하면 해소된다.
+    let file = resolve_deliverable_open_path(&data_dir, &store_root, &stored_path)?;
     app.opener()
-        .open_path(folder.to_string_lossy().to_string(), None::<String>)
-        .map_err(|_| AppError::Invalid("파일 폴더를 열 수 없습니다".into()))
+        .reveal_item_in_dir(&file)
+        .map_err(|_| AppError::Invalid("파일을 Finder에서 열 수 없습니다".into()))
 }
 
 /// 파일 업로드(다중). 프론트가 다이얼로그로 고른 경로들을 받아 앱 데이터 폴더로 복사하고
@@ -1318,22 +1310,6 @@ mod tests {
                 .unwrap();
 
         assert_eq!(resolved, file.canonicalize().unwrap());
-    }
-
-    #[test]
-    fn resolve_deliverable_folder_path_returns_parent_directory() {
-        let app_data = tmp_dir("cmd_folder_app");
-        let store_root = tmp_dir("cmd_folder_store").join(".projectManger");
-        let file_dir = store_root.join("files").join("deliverables").join("d1");
-        std::fs::create_dir_all(&file_dir).unwrap();
-        let file = file_dir.join("report.pdf");
-        std::fs::write(&file, b"pdf").unwrap();
-
-        let resolved =
-            super::resolve_deliverable_folder_path(&app_data, &store_root, file.to_str().unwrap())
-                .unwrap();
-
-        assert_eq!(resolved, file_dir.canonicalize().unwrap());
     }
 
     #[test]

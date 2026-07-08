@@ -328,6 +328,25 @@ export default function App() {
     [folders, selectedBusiness],
   );
 
+  // 상단 탭 전환 시 사이드바 선택도 대응 노드로 동기화한다.
+  // (탭은 view 만 바꾸고, 사이드바 하이라이트는 selectedId 로 별도 관리되므로 명시적으로 맞춰준다.)
+  const handleViewChange = useCallback(
+    (v: ViewKind) => {
+      setView(v);
+      const bizId = selectedBusiness?.id;
+      if (!bizId) return;
+      // 진입 노드/대시보드 의사행은 사업이 펼쳐져 있어야 트리에 존재한다.
+      const bizRow = rowId("business", bizId);
+      setExpanded((prev) => (prev.has(bizRow) ? prev : new Set(prev).add(bizRow)));
+      if (v === "doc") setSelectedId(rowId("document", bizId));
+      else if (v === "deliverables") setSelectedId(rowId("deliverable", bizId));
+      else if (v === "dashboard") setSelectedId(rowId("dashboard", bizId));
+      // 칸반/리스트/타임라인/메모/터미널은 사업·프로젝트 단위 — 프로젝트 선택은 유지, 그 외엔 사업 노드로.
+      else if (selectedRow?.type !== "project") setSelectedId(bizRow);
+    },
+    [selectedBusiness, selectedRow],
+  );
+
   return (
     <div style={{ display: "flex", height: "100%", overflow: "hidden" }}>
       {sidebarCollapsed ? (
@@ -388,7 +407,7 @@ export default function App() {
         business={selectedBusiness}
         project={selectedProject}
         view={view}
-        onViewChange={setView}
+        onViewChange={handleViewChange}
         error={error}
         theme={theme}
         onToggleTheme={toggleTheme}
