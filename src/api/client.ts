@@ -166,6 +166,8 @@ export const api = {
     /** 복사 보관된 파일이 들어있는 폴더를 백엔드 경계 검증 후 OS 파일 탐색기로 연다. */
     showInFolder: (id: string) => invoke<void>("deliverable_show_in_folder", { id }),
     archive: (id: string) => invoke<void>("deliverable_archive", { id }),
+    /** 디스크 미러와 메타를 재조정(외부 Finder 추가/삭제 반영). 뷰 진입 시 호출. */
+    reconcile: () => invoke<void>("deliverable_reconcile"),
   },
   memo: {
     list: (businessId: string) => invoke<Memo[]>("memo_list", { businessId }),

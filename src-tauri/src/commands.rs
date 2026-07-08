@@ -508,6 +508,14 @@ pub fn deliverable_archive(state: State<AppState>, id: String) -> Result<()> {
     mirror_trash_deliverable(&store, &sr, &id)
 }
 
+/// 디스크 미러와 산출물 메타를 재조정한다(외부 Finder 추가/삭제 반영). 프론트가 뷰 진입 시 호출.
+#[tauri::command]
+pub fn deliverable_reconcile(state: State<AppState>) -> Result<()> {
+    let mut store = state.store.lock().unwrap();
+    let sr = store.root.clone();
+    reconcile_deliverables(&mut store, &sr).map(|_| ())
+}
+
 fn deliverable_files_root(store_root: &Path) -> PathBuf {
     store_root.join("files").join("deliverables")
 }
@@ -643,6 +651,130 @@ fn mirror_trash_business(store: &Store, store_root: &Path, business_id: &str) ->
     let dest = trash.join(format!("biz__{business_id}"));
     std::fs::rename(&abs, &dest).map_err(|e| AppError::Invalid(format!("사업 폴더 휴지통 이동 실패: {e}")))?;
     Ok(())
+}
+
+/// 파일이 로컬에 있거나 iCloud 오프로드 스텁(`.{name}.icloud`)이 있으면 "존재"로 본다.
+fn deliverable_file_exists_offload_safe(abs: &Path) -> bool {
+    if abs.exists() {
+        return true;
+    }
+    if let (Some(dir), Some(name)) = (abs.parent(), abs.file_name().and_then(|n| n.to_str())) {
+        if dir.join(format!(".{name}.icloud")).exists() {
+            return true;
+        }
+    }
+    false
+}
+
+/// `{사업}/산출물` 트리(최대 2단계 폴더)를 훑어 실제 파일을 수집.
+/// 각 항목: (앱Vault 기준 상대경로, 폴더명 체인, 파일명, 크기). 숨김(.*)은 제외.
+fn collect_area_files(dir: &Path, chain: &[String], biz_comp: &str, out: &mut Vec<(String, Vec<String>, String, i64)>) {
+    let Ok(rd) = std::fs::read_dir(dir) else { return };
+    for e in rd.filter_map(|e| e.ok()) {
+        let Ok(name) = e.file_name().into_string() else { continue };
+        if name.starts_with('.') {
+            continue; // .DS_Store / .icloud 스텁 / 기타 숨김
+        }
+        let path = e.path();
+        if path.is_dir() {
+            if chain.len() >= 2 {
+                continue; // 폴더는 2단계까지
+            }
+            let mut c = chain.to_vec();
+            c.push(name);
+            collect_area_files(&path, &c, biz_comp, out);
+        } else if path.is_file() {
+            let size = std::fs::metadata(&path).map(|m| m.len() as i64).unwrap_or(0);
+            let mut rel = PathBuf::from(biz_comp).join(DELIVERABLES_AREA);
+            for c in chain {
+                rel = rel.join(c);
+            }
+            rel = rel.join(&name);
+            out.push((rel.to_string_lossy().to_string(), chain.to_vec(), name, size));
+        }
+    }
+}
+
+/// 이름으로 산출물 폴더를 찾고 없으면 만든다(정규화 이름 비교).
+fn find_or_create_deliverable_folder(store: &mut Store, business_id: &str, parent_id: Option<&str>, name: &str) -> Result<String> {
+    let existing = store.folders.list().into_iter().find(|f| {
+        f.business_id == business_id
+            && f.kind == "deliverable"
+            && f.archived_at.is_none()
+            && f.parent_id.as_deref() == parent_id
+            && layout::sanitize_component(&f.name, &f.id) == name
+    });
+    if let Some(f) = existing {
+        return Ok(f.id);
+    }
+    let f = ops::folder::create(store, business_id, "deliverable", parent_id, name)?;
+    Ok(f.id)
+}
+
+/// 폴더명 체인(0~2) → 폴더 id(없으면 생성). 빈 체인이면 None(미분류).
+fn resolve_or_create_deliverable_folder(store: &mut Store, business_id: &str, chain: &[String]) -> Result<Option<String>> {
+    if chain.is_empty() {
+        return Ok(None);
+    }
+    let root_id = find_or_create_deliverable_folder(store, business_id, None, &chain[0])?;
+    if chain.len() == 1 {
+        return Ok(Some(root_id));
+    }
+    let sub_id = find_or_create_deliverable_folder(store, business_id, Some(&root_id), &chain[1])?;
+    Ok(Some(sub_id))
+}
+
+/// 디스크 미러 ↔ 산출물 메타 재조정(스캔 기반).
+/// - 디스크에 있는데 메타에 없는 파일 → import(상태 기본, 폴더는 경로대로 생성/연결)
+/// - 메타에 있는데 디스크에서 진짜 사라진 파일 → archive(오프로드 스텁은 존재로 간주)
+/// 반환: (import 건수, 제거 건수).
+pub(crate) fn reconcile_deliverables(store: &mut Store, store_root: &Path) -> Result<(usize, usize)> {
+    let vault = vault_root_of(store_root);
+    let mut imported = 0usize;
+    let mut removed = 0usize;
+    let businesses: Vec<_> = store
+        .businesses
+        .list()
+        .into_iter()
+        .filter(|b| b.archived_at.is_none())
+        .collect();
+
+    for b in businesses {
+        let biz_comp = layout::sanitize_component(&b.name, &b.id);
+        let area = vault.join(&biz_comp).join(DELIVERABLES_AREA);
+        let mut disk: Vec<(String, Vec<String>, String, i64)> = Vec::new();
+        if area.is_dir() {
+            collect_area_files(&area, &[], &biz_comp, &mut disk);
+        }
+        let metas: Vec<_> = store
+            .deliverables
+            .list()
+            .into_iter()
+            .filter(|d| d.business_id == b.id && d.archived_at.is_none() && d.kind == "file")
+            .collect();
+        let meta_paths: std::collections::HashSet<String> =
+            metas.iter().filter_map(|d| d.file_path.clone()).collect();
+
+        // 1) import new disk files
+        for (rel, chain, fname, size) in &disk {
+            if !meta_paths.contains(rel) {
+                let folder_id = resolve_or_create_deliverable_folder(store, &b.id, chain)?;
+                let d = ops::deliverable::create_file(store, &b.id, None, folder_id.as_deref(), fname, fname, *size)?;
+                ops::deliverable::set_file_path(store, &d.id, rel)?;
+                imported += 1;
+            }
+        }
+        // 2) archive metadata whose file truly vanished (offload-safe)
+        for d in &metas {
+            if let Some(fp) = &d.file_path {
+                if !deliverable_file_exists_offload_safe(&vault.join(fp)) {
+                    ops::deliverable::archive(store, &d.id)?;
+                    removed += 1;
+                }
+            }
+        }
+    }
+    Ok((imported, removed))
 }
 
 /// 산출물 개별 휴지통 디렉터리: `.projectManger/trash/deliverable/{id}`.
@@ -1779,6 +1911,44 @@ mod tests {
         business::rename(&mut s, &b.id, "사업B").unwrap();
         super::mirror_trash_business(&s, &store_root, &b.id).unwrap();
         assert!(!vault.join("사업B").exists());
+    }
+
+    #[test]
+    fn reconcile_imports_new_disk_files_and_removes_missing() {
+        use crate::store::ops::folder;
+        let root = tmp_dir("cmd_reconcile");
+        let store_root = root.join("Work Vault").join(".projectManger");
+        let mut s = Store::open(store_root.clone()).unwrap();
+        let b = business::create(&mut s, "사업A", "si", None).unwrap();
+        let vault = super::vault_root_of(&store_root);
+
+        // 기존 산출물 1개(정상 미러 배치)
+        let keep = deliverable::create_file(&mut s, &b.id, None, None, "유지", "keep.txt", 3).unwrap();
+        super::place_deliverable_file(&mut s, &store_root, &keep.id, "txt", |p| std::fs::write(p, b"k")).unwrap();
+
+        // 메타엔 있지만 디스크에서 사라진 산출물 1개
+        let gone = deliverable::create_file(&mut s, &b.id, None, None, "사라짐", "gone.txt", 3).unwrap();
+        deliverable::set_file_path(&mut s, &gone.id, &std::path::Path::new("사업A").join("산출물").join("gone.txt").to_string_lossy()).unwrap();
+        // (파일을 만들지 않음 → 디스크에 없음)
+
+        // Finder 로 직접 추가한 것처럼: 카테고리 폴더 + 파일을 디스크에만 생성
+        let cat_dir = vault.join("사업A").join("산출물").join("신규폴더");
+        std::fs::create_dir_all(&cat_dir).unwrap();
+        std::fs::write(cat_dir.join("외부추가.pdf"), b"ext").unwrap();
+
+        let (imported, removed) = super::reconcile_deliverables(&mut s, &store_root).unwrap();
+        assert_eq!(imported, 1, "외부추가.pdf 1건 import");
+        assert_eq!(removed, 1, "gone.txt 1건 제거");
+
+        let active = deliverable::list_by_business(&s, &b.id).unwrap();
+        let titles: Vec<&str> = active.iter().map(|d| d.title.as_str()).collect();
+        assert!(titles.contains(&"유지"));
+        assert!(titles.contains(&"외부추가.pdf"));
+        assert!(!titles.contains(&"사라짐"));
+        // import 된 것은 폴더도 생성/연결됨
+        let imported_d = active.iter().find(|d| d.title == "외부추가.pdf").unwrap();
+        let fid = imported_d.folder_id.as_deref().unwrap();
+        assert_eq!(folder::get(&s, fid).unwrap().name, "신규폴더");
     }
 
     #[test]

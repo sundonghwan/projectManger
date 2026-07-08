@@ -24,6 +24,8 @@ pub fn run() {
                 .unwrap_or_else(|_| store::Store::open(dir.join(".projectManger")).expect("기본 Store 초기화 실패"));
             let _ = commands::migrate_legacy_deliverable_files(&dir, &mut store);
             let _ = commands::migrate_deliverables_to_disk_layout(&mut store);
+            let store_root_for_reconcile = config::store_root(&dir);
+            let _ = commands::reconcile_deliverables(&mut store, &store_root_for_reconcile);
             let local_root = dir.join("local");
             let local = store::local::LocalStore::open(local_root).expect("LocalStore 초기화 실패");
             app.manage(commands::AppState {
@@ -74,6 +76,7 @@ pub fn run() {
             commands::deliverable_add_version,
             commands::deliverable_versions,
             commands::deliverable_archive,
+            commands::deliverable_reconcile,
             commands::deliverable_upload,
             commands::deliverable_upload_files,
             commands::deliverable_open,

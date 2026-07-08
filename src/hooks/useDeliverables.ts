@@ -25,9 +25,24 @@ export function useDeliverables(
     }
   }, [businessId]);
 
+  // 뷰 진입/사업 전환 시 디스크 미러와 메타를 재조정한 뒤 목록을 불러온다.
+  // (Finder 등에서 직접 추가/삭제한 파일을 반영. 실패해도 목록 로딩은 진행.)
   useEffect(() => {
-    void reload();
-  }, [reload]);
+    let alive = true;
+    (async () => {
+      if (businessId != null) {
+        try {
+          await api.deliverable.reconcile();
+        } catch {
+          /* reconcile 실패는 무시하고 목록은 그대로 로드 */
+        }
+      }
+      if (alive) await reload();
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [reload, businessId]);
 
   const upload = useCallback(
     async (paths: string[], folderId?: string | null) => {
