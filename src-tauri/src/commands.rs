@@ -866,10 +866,21 @@ pub(crate) fn migrate_deliverables_to_disk_layout(store: &mut Store) -> Result<u
     for d in store.deliverables.list() {
         let Some(old) = d.file_path.clone() else { continue };
         let old_path = PathBuf::from(&old);
-        let src_abs = if old_path.is_absolute() { old_path.clone() } else { vault.join(&old_path) };
-        if !src_abs.is_file() {
-            continue; // 접근 불가/오프로드 → 건너뜀
-        }
+        let candidate = if old_path.is_absolute() { old_path.clone() } else { vault.join(&old_path) };
+        // 저장된 경로가 유효하면 그대로, 아니면(재배치로 절대경로가 낡음) 현재 store 의
+        // GUID 폴더(`files/deliverables/{id}/…`)에서 파일을 찾는다.
+        let src_abs = if candidate.is_file() {
+            candidate
+        } else {
+            let guid_dir = deliverable_files_root(&store_root).join(&d.id);
+            let found = std::fs::read_dir(&guid_dir)
+                .ok()
+                .and_then(|rd| rd.filter_map(|e| e.ok()).map(|e| e.path()).find(|p| p.is_file()));
+            match found {
+                Some(p) => p,
+                None => continue, // 접근 불가/오프로드/원본 없음 → 건너뜀
+            }
+        };
         let ext = src_abs.extension().and_then(|e| e.to_str()).unwrap_or("").to_string();
         // 대상 경로 계산 + 복사(place 규칙과 동일하나 원본은 유지). place 가 메타 경로도 갱신.
         let src_for_copy = src_abs.clone();
@@ -1674,6 +1685,28 @@ mod tests {
 
         // 멱등: 재실행은 0건
         assert_eq!(super::migrate_deliverables_to_disk_layout(&mut s).unwrap(), 0);
+    }
+
+    #[test]
+    fn migrate_v2_finds_file_via_guid_dir_when_stored_path_is_stale() {
+        // 재배치로 메타의 절대 file_path 가 낡았지만 실제 파일은 store GUID 폴더에 있는 경우.
+        let root = tmp_dir("cmd_mig_stale");
+        let store_root = root.join("Work Vault").join(".projectManger");
+        let mut s = Store::open(store_root.clone()).unwrap();
+        let b = business::create(&mut s, "사업A", "si", None).unwrap();
+        let d = deliverable::create_file(&mut s, &b.id, None, None, "개요.png", "그림1.png", 3).unwrap();
+        // 실제 파일은 현재 store GUID 폴더에 존재
+        let guid_dir = super::deliverable_files_root(&store_root).join(&d.id);
+        std::fs::create_dir_all(&guid_dir).unwrap();
+        std::fs::write(guid_dir.join("그림1.png"), b"png").unwrap();
+        // 그러나 메타 경로는 존재하지 않는 낡은 절대경로
+        deliverable::set_file_path(&mut s, &d.id, "/nonexistent/old/.projectManger/files/deliverables/x/그림1.png").unwrap();
+
+        let n = super::migrate_deliverables_to_disk_layout(&mut s).unwrap();
+        assert_eq!(n, 1);
+        let rel = deliverable::file_path_of(&s, &d.id).unwrap().unwrap();
+        assert_eq!(rel, std::path::Path::new("사업A").join("산출물").join("개요.png").to_string_lossy());
+        assert!(super::vault_root_of(&store_root).join(&rel).is_file());
     }
 
     #[test]
