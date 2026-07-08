@@ -555,6 +555,19 @@ fn deliverable_dir_abs(
     Ok(vault_root_of(store_root).join(deliverable_dir_rel(store, business_id, folder_id)?))
 }
 
+/// deliverable file_path(상대=vault 기준, 또는 절대 하위호환)를 실제 절대경로로 해석.
+fn resolve_deliverable_path(store_root: &Path, stored: &str) -> Result<PathBuf> {
+    let p = PathBuf::from(stored);
+    let abs = if p.is_absolute() { p } else { vault_root_of(store_root).join(p) };
+    let canon = abs
+        .canonicalize()
+        .map_err(|_| AppError::Invalid("산출물 파일을 찾을 수 없습니다".into()))?;
+    if !canon.is_file() {
+        return Err(AppError::Invalid("산출물 파일을 찾을 수 없습니다".into()));
+    }
+    Ok(canon)
+}
+
 /// 확장자 추출("보고서.pdf" -> "pdf", "noext" -> "").
 fn ext_of(file_name: &str) -> String {
     Path::new(file_name)
@@ -838,31 +851,6 @@ fn legacy_deliverable_files_root(app_data_dir: &Path) -> PathBuf {
     app_data_dir.join("deliverables")
 }
 
-fn resolve_deliverable_open_path(
-    app_data_dir: &Path,
-    store_root: &Path,
-    stored_path: &str,
-) -> Result<PathBuf> {
-    let allowed_roots = [
-        deliverable_files_root(store_root),
-        legacy_deliverable_files_root(app_data_dir),
-    ];
-    let allowed_roots: Vec<PathBuf> = allowed_roots
-        .iter()
-        .filter_map(|root| root.canonicalize().ok())
-        .collect();
-    if allowed_roots.is_empty() {
-        return Err(AppError::Invalid("산출물 저장 폴더를 찾을 수 없습니다".into()));
-    }
-    let file = Path::new(stored_path)
-        .canonicalize()
-        .map_err(|_| AppError::Invalid("산출물 파일을 찾을 수 없습니다".into()))?;
-    if !file.is_file() || !allowed_roots.iter().any(|root| file.starts_with(root)) {
-        return Err(AppError::Invalid("허용되지 않은 산출물 파일 경로입니다".into()));
-    }
-    Ok(file)
-}
-
 /// 신버전 최초 1회: 기존 GUID 격리 파일을 `{사업}/산출물/{카테고리}/title.ext` 미러로 복사하고
 /// 메타 경로를 상대경로로 갱신한다. 복사·검증 성공분의 원본만 legacy-backup 으로 이동(무손실).
 pub(crate) fn migrate_deliverables_to_disk_layout(store: &mut Store) -> Result<usize> {
@@ -947,13 +935,8 @@ pub(crate) fn migrate_legacy_deliverable_files(app_data_dir: &Path, store: &mut 
 
 #[tauri::command]
 pub fn deliverable_open(app: tauri::AppHandle, state: State<AppState>, id: String) -> Result<()> {
-    use tauri::Manager;
     use tauri_plugin_opener::OpenerExt;
 
-    let data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|_| AppError::Invalid("앱 데이터 폴더를 찾을 수 없음".into()))?;
     let (stored_path, store_root) = {
         let store = state.store.lock().unwrap();
         (
@@ -962,7 +945,7 @@ pub fn deliverable_open(app: tauri::AppHandle, state: State<AppState>, id: Strin
             store.root.clone(),
         )
     };
-    let path = resolve_deliverable_open_path(&data_dir, &store_root, &stored_path)?;
+    let path = resolve_deliverable_path(&store_root, &stored_path)?;
     app.opener()
         .open_path(path.to_string_lossy().to_string(), None::<String>)
         .map_err(|_| AppError::Invalid("파일을 열 수 없습니다".into()))
@@ -974,13 +957,8 @@ pub fn deliverable_show_in_folder(
     state: State<AppState>,
     id: String,
 ) -> Result<()> {
-    use tauri::Manager;
     use tauri_plugin_opener::OpenerExt;
 
-    let data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|_| AppError::Invalid("앱 데이터 폴더를 찾을 수 없음".into()))?;
     let (stored_path, store_root) = {
         let store = state.store.lock().unwrap();
         (
@@ -990,9 +968,8 @@ pub fn deliverable_show_in_folder(
         )
     };
     // 파일이 든 폴더를 "여는" 대신 파일 자체를 Finder에서 선택(reveal)한다.
-    // 각 산출물은 고유 id 폴더에 개별 저장되므로 폴더를 열면 원본 파일 하나만 보이고,
     // iCloud 오프로드 시 폴더가 비어 보이는 문제도 reveal 로 파일을 지정하면 해소된다.
-    let file = resolve_deliverable_open_path(&data_dir, &store_root, &stored_path)?;
+    let file = resolve_deliverable_path(&store_root, &stored_path)?;
     app.opener()
         .reveal_item_in_dir(&file)
         .map_err(|_| AppError::Invalid("파일을 Finder에서 열 수 없습니다".into()))
@@ -1654,6 +1631,20 @@ mod tests {
     }
 
     #[test]
+    fn resolve_open_path_accepts_relative_under_vault() {
+        let root = tmp_dir("cmd_resolve_rel");
+        let store_root = root.join("Work Vault").join(".projectManger");
+        let vault = super::vault_root_of(&store_root);
+        let file = vault.join("사업A").join("산출물").join("개요.png");
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        std::fs::write(&file, b"x").unwrap();
+
+        let rel = std::path::Path::new("사업A").join("산출물").join("개요.png");
+        let resolved = super::resolve_deliverable_path(&store_root, &rel.to_string_lossy()).unwrap();
+        assert_eq!(resolved, file.canonicalize().unwrap());
+    }
+
+    #[test]
     fn migrate_v2_moves_guid_files_to_mirror_and_backs_up() {
         use crate::store::ops::folder;
         let root = tmp_dir("cmd_mig_v2");
@@ -1826,63 +1817,6 @@ mod tests {
 
         let in_sub = super::deliverable_dir_rel(&s, &b.id, Some(&sub.id)).unwrap();
         assert_eq!(in_sub, std::path::Path::new("철도청 이상탐지").join("산출물").join("설계서").join("1차"));
-    }
-
-    #[test]
-    fn resolve_deliverable_open_path_accepts_files_under_app_deliverables() {
-        let app_data = tmp_dir("cmd_open_app");
-        let store_root = tmp_dir("cmd_open_store").join(".projectManger");
-        let file_dir = app_data.join("deliverables").join("d1");
-        std::fs::create_dir_all(&file_dir).unwrap();
-        let file = file_dir.join("report.pdf");
-        std::fs::write(&file, b"pdf").unwrap();
-
-        let resolved =
-            super::resolve_deliverable_open_path(&app_data, &store_root, file.to_str().unwrap())
-                .unwrap();
-
-        assert_eq!(resolved, file.canonicalize().unwrap());
-    }
-
-    #[test]
-    fn resolve_deliverable_open_path_accepts_files_under_store_deliverables() {
-        let app_data = tmp_dir("cmd_open_app");
-        let store_root = tmp_dir("cmd_open_store").join(".projectManger");
-        let file_dir = store_root.join("files").join("deliverables").join("d1");
-        std::fs::create_dir_all(&file_dir).unwrap();
-        let file = file_dir.join("report.pdf");
-        std::fs::write(&file, b"pdf").unwrap();
-
-        let resolved =
-            super::resolve_deliverable_open_path(&app_data, &store_root, file.to_str().unwrap())
-                .unwrap();
-
-        assert_eq!(resolved, file.canonicalize().unwrap());
-    }
-
-    #[test]
-    fn resolve_deliverable_open_path_rejects_files_outside_app_deliverables() {
-        let app_data = tmp_dir("cmd_open_app");
-        let store_root = tmp_dir("cmd_open_store").join(".projectManger");
-        let outside = tmp_dir("cmd_open_outside").join("report.pdf");
-        std::fs::write(&outside, b"pdf").unwrap();
-
-        let result =
-            super::resolve_deliverable_open_path(&app_data, &store_root, outside.to_str().unwrap());
-
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn resolve_deliverable_open_path_rejects_missing_files() {
-        let app_data = tmp_dir("cmd_open_app");
-        let store_root = tmp_dir("cmd_open_store").join(".projectManger");
-        let missing = app_data.join("deliverables").join("d1").join("missing.pdf");
-
-        let result =
-            super::resolve_deliverable_open_path(&app_data, &store_root, missing.to_str().unwrap());
-
-        assert!(result.is_err());
     }
 
     #[test]
