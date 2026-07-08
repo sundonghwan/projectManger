@@ -24,8 +24,7 @@ pub fn run() {
                 .unwrap_or_else(|_| store::Store::open(dir.join(".projectManger")).expect("기본 Store 초기화 실패"));
             let _ = commands::migrate_legacy_deliverable_files(&dir, &mut store);
             let _ = commands::migrate_deliverables_to_disk_layout(&mut store);
-            let store_root_for_reconcile = config::store_root(&dir);
-            let _ = commands::reconcile_deliverables(&mut store, &store_root_for_reconcile);
+            // reconcile 은 자동 실행하지 않는다 — 사용자가 산출물 화면의 '새로고침'을 누를 때만 수행.
             let local_root = dir.join("local");
             let local = store::local::LocalStore::open(local_root).expect("LocalStore 초기화 실패");
             app.manage(commands::AppState {
