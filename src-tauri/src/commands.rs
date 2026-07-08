@@ -502,7 +502,10 @@ pub fn deliverable_versions(state: State<AppState>, deliverable_id: String) -> R
 #[tauri::command]
 pub fn deliverable_archive(state: State<AppState>, id: String) -> Result<()> {
     let mut store = state.store.lock().unwrap();
-    ops::deliverable::archive(&mut store, &id)
+    let sr = store.root.clone();
+    ops::deliverable::archive(&mut store, &id)?;
+    // 물리 파일도 휴지통으로 이동 → iCloud/Finder 에서도 사라진다.
+    mirror_trash_deliverable(&store, &sr, &id)
 }
 
 fn deliverable_files_root(store_root: &Path) -> PathBuf {
@@ -640,6 +643,57 @@ fn mirror_trash_business(store: &Store, store_root: &Path, business_id: &str) ->
     let dest = trash.join(format!("biz__{business_id}"));
     std::fs::rename(&abs, &dest).map_err(|e| AppError::Invalid(format!("사업 폴더 휴지통 이동 실패: {e}")))?;
     Ok(())
+}
+
+/// 산출물 개별 휴지통 디렉터리: `.projectManger/trash/deliverable/{id}`.
+fn deliverable_trash_dir(store_root: &Path, id: &str) -> PathBuf {
+    store_root.join("trash").join("deliverable").join(id)
+}
+
+/// 산출물 삭제(휴지통) 시 물리 파일을 휴지통으로 이동. 메타 file_path 는 유지(복원 시 재계산).
+fn mirror_trash_deliverable(store: &Store, store_root: &Path, id: &str) -> Result<()> {
+    let d = ops::deliverable::get(store, id)?;
+    let Some(rel) = d.file_path.as_deref() else { return Ok(()) };
+    let src = vault_root_of(store_root).join(rel);
+    if !src.is_file() {
+        return Ok(());
+    }
+    let trash_dir = deliverable_trash_dir(store_root, id);
+    std::fs::create_dir_all(&trash_dir)
+        .map_err(|e| AppError::Invalid(format!("휴지통 생성 실패: {e}")))?;
+    let fname = src.file_name().map(|f| f.to_os_string()).unwrap_or_default();
+    std::fs::rename(&src, trash_dir.join(fname))
+        .map_err(|e| AppError::Invalid(format!("파일 휴지통 이동 실패: {e}")))?;
+    Ok(())
+}
+
+/// 복원 시 휴지통의 파일을 현재 사업/폴더 기준 미러 경로로 되돌린다.
+fn mirror_restore_deliverable(store: &mut Store, store_root: &Path, id: &str) -> Result<()> {
+    let d = ops::deliverable::get(store, id)?;
+    let trash_dir = deliverable_trash_dir(store_root, id);
+    let found = std::fs::read_dir(&trash_dir)
+        .ok()
+        .and_then(|rd| rd.filter_map(|e| e.ok()).map(|e| e.path()).find(|p| p.is_file()));
+    let Some(src) = found else { return Ok(()) };
+    let dir_abs = deliverable_dir_abs(store, store_root, &d.business_id, d.folder_id.as_deref())?;
+    std::fs::create_dir_all(&dir_abs)
+        .map_err(|e| AppError::Invalid(format!("복원 폴더 생성 실패: {e}")))?;
+    let fname = src.file_name().and_then(|f| f.to_str()).unwrap_or_default().to_string();
+    let existing: Vec<String> = std::fs::read_dir(&dir_abs)
+        .map(|rd| rd.filter_map(|e| e.ok()).filter_map(|e| e.file_name().into_string().ok()).collect())
+        .unwrap_or_default();
+    let name = layout::unique_name(&existing, &fname);
+    std::fs::rename(&src, dir_abs.join(&name))
+        .map_err(|e| AppError::Invalid(format!("파일 복원 실패: {e}")))?;
+    let _ = std::fs::remove_dir(&trash_dir); // 빈 휴지통 폴더 정리
+    let rel = deliverable_dir_rel(store, &d.business_id, d.folder_id.as_deref())?.join(&name);
+    ops::deliverable::set_file_path(store, id, &rel.to_string_lossy())?;
+    Ok(())
+}
+
+/// 영구삭제 시 휴지통의 물리 파일 제거.
+fn mirror_purge_deliverable(store_root: &Path, id: &str) {
+    let _ = std::fs::remove_dir_all(deliverable_trash_dir(store_root, id));
 }
 
 /// 폴더 생성 시 디스크 디렉터리 생성(빈 폴더라도). deliverable 종류만 미러링.
@@ -1563,25 +1617,23 @@ pub fn trash_list(state: State<AppState>) -> Result<Vec<TrashItem>> {
 #[tauri::command]
 pub fn trash_restore(state: State<AppState>, kind: String, id: String) -> Result<()> {
     let mut store = state.store.lock().unwrap();
-    ops::trash::restore(&mut store, &kind, &id)
+    let sr = store.root.clone();
+    ops::trash::restore(&mut store, &kind, &id)?;
+    if kind == "deliverable" {
+        // 휴지통의 물리 파일을 미러 경로로 되돌린다.
+        mirror_restore_deliverable(&mut store, &sr, &id)?;
+    }
+    Ok(())
 }
 
 #[tauri::command]
 pub fn trash_purge(state: State<AppState>, kind: String, id: String) -> Result<()> {
     let mut store = state.store.lock().unwrap();
-    // 산출물은 영구삭제 시 복사 보관된 물리 파일도 함께 제거한다.
-    let file_path = if kind == "deliverable" {
-        ops::deliverable::file_path_of(&store, &id).ok().flatten()
-    } else {
-        None
-    };
+    let sr = store.root.clone();
     ops::trash::purge(&mut store, &kind, &id)?;
-    if let Some(path) = file_path {
-        let p = std::path::Path::new(&path);
-        let _ = std::fs::remove_file(p);
-        if let Some(parent) = p.parent() {
-            let _ = std::fs::remove_dir(parent);
-        }
+    if kind == "deliverable" {
+        // 휴지통에 보관된 물리 파일 영구 제거.
+        mirror_purge_deliverable(&sr, &id);
     }
     Ok(())
 }
@@ -1727,6 +1779,35 @@ mod tests {
         business::rename(&mut s, &b.id, "사업B").unwrap();
         super::mirror_trash_business(&s, &store_root, &b.id).unwrap();
         assert!(!vault.join("사업B").exists());
+    }
+
+    #[test]
+    fn archive_moves_file_to_trash_and_restore_brings_it_back() {
+        let root = tmp_dir("cmd_deliv_trash");
+        let store_root = root.join("Work Vault").join(".projectManger");
+        let mut s = Store::open(store_root.clone()).unwrap();
+        let b = business::create(&mut s, "사업A", "si", None).unwrap();
+        let d = deliverable::create_file(&mut s, &b.id, None, None, "개요", "그림1.png", 3).unwrap();
+        let rel = super::place_deliverable_file(&mut s, &store_root, &d.id, "png", |p| std::fs::write(p, b"x")).unwrap();
+        let mirror_abs = super::vault_root_of(&store_root).join(&rel);
+        assert!(mirror_abs.is_file());
+
+        // 삭제(휴지통) → 미러에서 사라지고 trash 로 이동
+        deliverable::archive(&mut s, &d.id).unwrap();
+        super::mirror_trash_deliverable(&s, &store_root, &d.id).unwrap();
+        assert!(!mirror_abs.exists(), "미러에서 파일이 사라져야 함(iCloud 반영)");
+        assert!(super::deliverable_trash_dir(&store_root, &d.id).join("개요.png").is_file());
+
+        // 복원 → 미러로 되돌아옴
+        s.deliverables.get(&d.id).cloned().map(|mut x| { x.archived_at = None; s.deliverables.put(x).unwrap(); });
+        super::mirror_restore_deliverable(&mut s, &store_root, &d.id).unwrap();
+        assert!(mirror_abs.exists(), "복원 시 미러로 파일이 돌아와야 함");
+        assert!(!super::deliverable_trash_dir(&store_root, &d.id).join("개요.png").exists());
+
+        // 영구삭제 → 휴지통 파일 제거
+        super::mirror_trash_deliverable(&s, &store_root, &d.id).unwrap();
+        super::mirror_purge_deliverable(&store_root, &d.id);
+        assert!(!super::deliverable_trash_dir(&store_root, &d.id).exists());
     }
 
     #[test]
