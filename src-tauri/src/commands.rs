@@ -467,7 +467,8 @@ pub fn deliverable_create(state: State<AppState>, input: DeliverableCreate) -> R
 #[tauri::command]
 pub fn deliverable_move(state: State<AppState>, id: String, folder_id: Option<String>) -> Result<Deliverable> {
     let mut store = state.store.lock().unwrap();
-    ops::deliverable::set_folder(&mut store, &id, folder_id.as_deref())
+    let sr = store.root.clone();
+    move_deliverable_file(&mut store, &sr, &id, folder_id.as_deref())
 }
 
 #[tauri::command]
@@ -551,6 +552,91 @@ fn ext_of(file_name: &str) -> String {
         .and_then(|e| e.to_str())
         .unwrap_or("")
         .to_string()
+}
+
+/// 산출물 title 변경 + 디스크 파일도 rename(확장자 유지, 충돌 시 접미).
+fn rename_deliverable_file(
+    store: &mut Store,
+    store_root: &Path,
+    id: &str,
+    title: &str,
+) -> Result<Deliverable> {
+    let before = ops::deliverable::get(store, id)?;
+    let updated = ops::deliverable::rename(store, id, title)?;
+    if let Some(old_rel) = before.file_path.as_deref() {
+        let vault = vault_root_of(store_root);
+        let old_abs = vault.join(old_rel);
+        if old_abs.is_file() {
+            let ext = old_abs
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_string();
+            let dir_abs = old_abs.parent().map(Path::to_path_buf).unwrap_or(vault.clone());
+            let base = layout::sanitize_component(&updated.title, &updated.id);
+            let desired = if ext.is_empty() { base } else { format!("{base}.{ext}") };
+            let old_name = old_abs.file_name().and_then(|f| f.to_str()).map(|s| s.to_string());
+            let existing: Vec<String> = std::fs::read_dir(&dir_abs)
+                .map(|rd| {
+                    rd.filter_map(|e| e.ok())
+                        .filter_map(|e| e.file_name().into_string().ok())
+                        .filter(|n| Some(n) != old_name.as_ref())
+                        .collect()
+                })
+                .unwrap_or_default();
+            let name = layout::unique_name(&existing, &desired);
+            let new_abs = dir_abs.join(&name);
+            std::fs::rename(&old_abs, &new_abs)
+                .map_err(|e| AppError::Invalid(format!("파일 이름변경 실패: {e}")))?;
+            let new_rel = Path::new(old_rel)
+                .parent()
+                .map(|p| p.join(&name))
+                .unwrap_or_else(|| PathBuf::from(&name));
+            ops::deliverable::set_file_path(store, id, &new_rel.to_string_lossy())?;
+        }
+    }
+    ops::deliverable::get(store, id)
+}
+
+/// 산출물 folder_id 변경 + 디스크 파일을 새 폴더 디렉터리로 이동(충돌 시 접미).
+fn move_deliverable_file(
+    store: &mut Store,
+    store_root: &Path,
+    id: &str,
+    folder_id: Option<&str>,
+) -> Result<Deliverable> {
+    let before = ops::deliverable::get(store, id)?;
+    let updated = ops::deliverable::set_folder(store, id, folder_id)?;
+    if let Some(old_rel) = before.file_path.as_deref() {
+        let vault = vault_root_of(store_root);
+        let old_abs = vault.join(old_rel);
+        if old_abs.is_file() {
+            let file_name = old_abs
+                .file_name()
+                .and_then(|f| f.to_str())
+                .unwrap_or_default()
+                .to_string();
+            let new_dir_abs =
+                deliverable_dir_abs(store, store_root, &updated.business_id, folder_id)?;
+            std::fs::create_dir_all(&new_dir_abs)
+                .map_err(|e| AppError::Invalid(format!("대상 폴더 생성 실패: {e}")))?;
+            let existing: Vec<String> = std::fs::read_dir(&new_dir_abs)
+                .map(|rd| {
+                    rd.filter_map(|e| e.ok())
+                        .filter_map(|e| e.file_name().into_string().ok())
+                        .collect()
+                })
+                .unwrap_or_default();
+            let name = layout::unique_name(&existing, &file_name);
+            let new_abs = new_dir_abs.join(&name);
+            std::fs::rename(&old_abs, &new_abs)
+                .map_err(|e| AppError::Invalid(format!("파일 이동 실패: {e}")))?;
+            let new_rel =
+                deliverable_dir_rel(store, &updated.business_id, folder_id)?.join(&name);
+            ops::deliverable::set_file_path(store, id, &new_rel.to_string_lossy())?;
+        }
+    }
+    ops::deliverable::get(store, id)
 }
 
 /// 산출물 파일을 미러 레이아웃에 배치한다. 디렉터리 생성 → `title.ext`(충돌 시 접미) 결정 →
@@ -864,7 +950,8 @@ pub fn deliverable_upload_files(
 #[tauri::command]
 pub fn deliverable_rename(state: State<AppState>, id: String, title: String) -> Result<Deliverable> {
     let mut store = state.store.lock().unwrap();
-    ops::deliverable::rename(&mut store, &id, &title)
+    let sr = store.root.clone();
+    rename_deliverable_file(&mut store, &sr, &id, &title)
 }
 
 // ---- 폴더(산출물·문서 분류) ----
@@ -1359,6 +1446,50 @@ mod tests {
         let path = std::env::temp_dir().join(format!("{prefix}_{}", new_id()));
         std::fs::create_dir_all(&path).unwrap();
         path
+    }
+
+    #[test]
+    fn rename_deliverable_renames_disk_file_and_updates_path() {
+        let root = tmp_dir("cmd_rename_file");
+        let store_root = root.join("Work Vault").join(".projectManger");
+        let mut s = Store::open(store_root.clone()).unwrap();
+        let b = business::create(&mut s, "사업A", "si", None).unwrap();
+        let d = deliverable::create_file(&mut s, &b.id, None, None, "옛이름", "그림1.png", 3).unwrap();
+        super::place_deliverable_file(&mut s, &store_root, &d.id, "png", |p| std::fs::write(p, b"x")).unwrap();
+
+        super::rename_deliverable_file(&mut s, &store_root, &d.id, "새 이름").unwrap();
+
+        let rel = deliverable::file_path_of(&s, &d.id).unwrap().unwrap();
+        assert_eq!(
+            std::path::Path::new(&rel).file_name().unwrap().to_str().unwrap(),
+            "새 이름.png"
+        );
+        assert!(super::vault_root_of(&store_root).join(&rel).is_file());
+        assert!(!super::vault_root_of(&store_root)
+            .join("사업A").join("산출물").join("옛이름.png").exists());
+    }
+
+    #[test]
+    fn move_deliverable_moves_disk_file_between_folders() {
+        use crate::store::ops::folder;
+        let root = tmp_dir("cmd_move_file");
+        let store_root = root.join("Work Vault").join(".projectManger");
+        let mut s = Store::open(store_root.clone()).unwrap();
+        let b = business::create(&mut s, "사업A", "si", None).unwrap();
+        let cat = folder::create(&mut s, &b.id, "deliverable", None, "설계서").unwrap();
+        let d = deliverable::create_file(&mut s, &b.id, None, None, "개요", "그림1.png", 3).unwrap();
+        super::place_deliverable_file(&mut s, &store_root, &d.id, "png", |p| std::fs::write(p, b"x")).unwrap();
+
+        super::move_deliverable_file(&mut s, &store_root, &d.id, Some(&cat.id)).unwrap();
+
+        let rel = deliverable::file_path_of(&s, &d.id).unwrap().unwrap();
+        assert_eq!(
+            rel,
+            std::path::Path::new("사업A").join("산출물").join("설계서").join("개요.png").to_string_lossy()
+        );
+        assert!(super::vault_root_of(&store_root).join(&rel).is_file());
+        assert!(!super::vault_root_of(&store_root)
+            .join("사업A").join("산출물").join("개요.png").exists());
     }
 
     #[test]
