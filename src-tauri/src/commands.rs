@@ -1566,7 +1566,7 @@ pub fn ssh_connect(
         let local = state.local.lock().unwrap();
         ops::server::get(&local, &id)?
     };
-    let ports = if server.ai_bridge { Some(bridge.ensure_started()?) } else { None };
+    let ports = if server.ai_bridge { Some(bridge.ensure_started(&app)?) } else { None };
     crate::terminal::connect(&app, &term, &server, ports.as_ref())?;
     let mut local = state.local.lock().unwrap();
     let _ = ops::server::touch_last_used(&mut local, &id);

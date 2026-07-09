@@ -13,6 +13,7 @@ use axum::{
     routing::any,
     Router,
 };
+use tauri::{AppHandle, Emitter};
 use tokio::net::TcpListener;
 
 const ANTHROPIC_UPSTREAM: &str = "https://api.anthropic.com";
@@ -24,23 +25,37 @@ pub enum Provider {
     OpenAi,
 }
 
-#[derive(Clone, Copy)]
-pub struct Ctx {
-    provider: Provider,
-    upstream: &'static str,
-}
-
-pub fn anthropic_ctx() -> Ctx {
-    Ctx {
-        provider: Provider::Anthropic,
-        upstream: ANTHROPIC_UPSTREAM,
+impl Provider {
+    fn as_str(self) -> &'static str {
+        match self {
+            Provider::Anthropic => "anthropic",
+            Provider::OpenAi => "openai",
+        }
     }
 }
 
-pub fn openai_ctx() -> Ctx {
+/// axum `State` 로 공유되는 프록시 컨텍스트. `AppHandle` 은 `Copy` 가 아니므로 `Ctx` 도
+/// `Clone` 만 구현한다(핸들러마다 저비용 클론 — 내부적으로 Arc 기반).
+#[derive(Clone)]
+pub struct Ctx {
+    provider: Provider,
+    upstream: &'static str,
+    app: AppHandle,
+}
+
+pub fn anthropic_ctx(app: AppHandle) -> Ctx {
+    Ctx {
+        provider: Provider::Anthropic,
+        upstream: ANTHROPIC_UPSTREAM,
+        app,
+    }
+}
+
+pub fn openai_ctx(app: AppHandle) -> Ctx {
     Ctx {
         provider: Provider::OpenAi,
         upstream: OPENAI_UPSTREAM,
+        app,
     }
 }
 
@@ -97,6 +112,20 @@ async fn forward(ctx: Ctx, req: Request<Body>) -> Result<Response<Body>> {
         .send()
         .await
         .map_err(|e| AppError::Invalid(format!("upstream: {e}")))?;
+
+    // 인증/쿼터 실패를 감지해 프론트에 알린다. 응답은 그대로 통과시키므로(아래) emit 실패는
+    // 무시한다 — 토큰/헤더 값은 로깅하지 않는다.
+    let kind = match up.status().as_u16() {
+        401 | 403 => Some("auth"),
+        429 => Some("quota"),
+        _ => None,
+    };
+    if let Some(kind) = kind {
+        let _ = ctx.app.emit(
+            "aibridge://alert",
+            serde_json::json!({ "provider": ctx.provider.as_str(), "kind": kind }),
+        );
+    }
 
     // 응답 status/headers 복사 후 body 는 스트림으로 흘려보낸다 (SSE 통과).
     let mut builder = Response::builder().status(up.status());

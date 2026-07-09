@@ -65,7 +65,9 @@ pub fn build_ssh_args(
     args.push(format!("{}@{}", server.username, server.host));
     if let Some(b) = bridge {
         args.push(format!(
-            "ANTHROPIC_BASE_URL=http://127.0.0.1:{a} OPENAI_BASE_URL=http://127.0.0.1:{o} ANTHROPIC_AUTH_TOKEN=bridge exec ${{SHELL:-/bin/sh}} -l",
+            "command -v claude >/dev/null 2>&1 || echo '[bridge] 원격에 claude 미설치'; \
+             command -v codex >/dev/null 2>&1 || echo '[bridge] 원격에 codex 미설치'; \
+             ANTHROPIC_BASE_URL=http://127.0.0.1:{a} OPENAI_BASE_URL=http://127.0.0.1:{o} ANTHROPIC_AUTH_TOKEN=bridge exec ${{SHELL:-/bin/sh}} -l",
             a = b.anthropic_remote, o = b.openai_remote
         ));
     }
@@ -284,6 +286,14 @@ mod tests {
         assert!(cmd.contains("OPENAI_BASE_URL=http://127.0.0.1:8972"));
         assert!(cmd.contains("ANTHROPIC_AUTH_TOKEN=bridge"));
         assert!(cmd.contains("exec"));
+    }
+
+    #[test]
+    fn bridge_command_warns_when_cli_missing() {
+        let args = build_ssh_args(&server(), None, Some(&ports()));
+        let cmd = args.last().unwrap();
+        assert!(cmd.contains("command -v claude"));
+        assert!(cmd.contains("command -v codex"));
     }
 
     #[test]

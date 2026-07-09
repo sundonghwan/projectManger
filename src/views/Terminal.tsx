@@ -16,11 +16,24 @@ export interface TerminalProps {
   local?: boolean;
 }
 
+type BridgeAlertKind = "auth" | "quota";
+
+interface BridgeAlertPayload {
+  provider: "anthropic" | "openai";
+  kind: BridgeAlertKind;
+}
+
+const BRIDGE_ALERT_MESSAGES: Record<BridgeAlertKind, string> = {
+  auth: "인증 만료 — 로컬 터미널에서 재로그인/계정 전환 필요",
+  quota: "쿼터 도달 — 계정 전환 고려",
+};
+
 /** SSH PTY 입출력을 xterm.js에 직접 연결한다. */
 export function Terminal({ server, onClose, local }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const [snippets, setSnippets] = useState<CommandSnippet[]>([]);
+  const [bridgeAlert, setBridgeAlert] = useState<BridgeAlertPayload | null>(null);
 
   const write = useCallback(
     (data: string) => {
@@ -78,6 +91,7 @@ export function Terminal({ server, onClose, local }: TerminalProps) {
     const exitPromise = listen(`terminal://exit/${id}`, () =>
       term.write("\r\n\x1b[2m[연결이 종료되었습니다]\x1b[0m\r\n"),
     );
+    const alertPromise = listen<BridgeAlertPayload>("aibridge://alert", (e) => setBridgeAlert(e.payload));
 
     void (local ? api.ssh.connectLocal(id) : api.ssh.connect(id))
       .then(() => {
@@ -99,6 +113,7 @@ export function Terminal({ server, onClose, local }: TerminalProps) {
       dataDisposable.dispose();
       void dataPromise.then((f) => f());
       void exitPromise.then((f) => f());
+      void alertPromise.then((f) => f());
       void api.ssh.disconnect(id);
       term.dispose();
       xtermRef.current = null;
@@ -141,6 +156,38 @@ export function Terminal({ server, onClose, local }: TerminalProps) {
           종료
         </button>
       </div>
+      {bridgeAlert && (
+        <div
+          style={{
+            flex: "none",
+            display: "flex",
+            alignItems: "center",
+            gap: 9,
+            padding: "6px 14px",
+            borderBottom: "1px solid #4a441f",
+            background: "#241f0f",
+          }}
+        >
+          <span style={{ fontSize: 11.5, color: "#e8c96a", fontFamily: TERMINAL_FONT_FAMILY }}>
+            [{bridgeAlert.provider}] {BRIDGE_ALERT_MESSAGES[bridgeAlert.kind]}
+          </span>
+          <span style={{ flex: 1 }} />
+          <button
+            onClick={() => setBridgeAlert(null)}
+            style={{
+              fontSize: 11,
+              color: "#e8c96a",
+              background: "transparent",
+              border: "1px solid #4a441f",
+              borderRadius: 5,
+              padding: "1px 8px",
+              cursor: "pointer",
+            }}
+          >
+            닫기
+          </button>
+        </div>
+      )}
       <SnippetBar
         snippets={snippets}
         onRun={(cmd) => write(cmd + "\r")}

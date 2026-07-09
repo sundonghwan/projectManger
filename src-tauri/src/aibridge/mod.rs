@@ -5,6 +5,7 @@ pub mod token;
 use crate::error::{AppError, Result};
 use crate::terminal::BridgePorts;
 use std::sync::Mutex;
+use tauri::AppHandle;
 use tokio::net::TcpListener;
 
 /// 원격 AI 자격증명 브리지의 실행 상태. 프록시 서버 기동 여부와 확정된 포트 쌍을 보관.
@@ -15,8 +16,9 @@ pub struct AiBridge {
 
 impl AiBridge {
     /// 미기동이면 두 loopback 프록시(anthropic/openai)를 기동하고 포트를 확정해 반환한다.
-    /// 이미 기동돼 있으면 저장된 포트를 그대로 돌려준다.
-    pub fn ensure_started(&self) -> Result<BridgePorts> {
+    /// 이미 기동돼 있으면 저장된 포트를 그대로 돌려준다. `app` 은 프록시가 인증/쿼터 실패
+    /// 감지 시 `aibridge://alert` 이벤트를 emit 하는 데 쓰인다.
+    pub fn ensure_started(&self, app: &AppHandle) -> Result<BridgePorts> {
         if let Some(p) = *self.ports.lock().unwrap() {
             return Ok(p);
         }
@@ -28,8 +30,8 @@ impl AiBridge {
             openai_remote: 8972,
             openai_local: o_local,
         };
-        tauri::async_runtime::spawn(proxy::serve(a_listener, proxy::anthropic_ctx()));
-        tauri::async_runtime::spawn(proxy::serve(o_listener, proxy::openai_ctx()));
+        tauri::async_runtime::spawn(proxy::serve(a_listener, proxy::anthropic_ctx(app.clone())));
+        tauri::async_runtime::spawn(proxy::serve(o_listener, proxy::openai_ctx(app.clone())));
         *self.ports.lock().unwrap() = Some(ports);
         Ok(ports)
     }
