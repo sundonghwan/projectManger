@@ -75,32 +75,16 @@ pub fn merge_codex_refresh(raw: &str, refreshed: &OauthToken) -> Result<String> 
     Ok(root.to_string())
 }
 
-/// base64url(패딩 有/無 모두 허용) 디코드. 표준 base64 문자셋(`+`/`/`) 은 다루지 않는다(JWT 는 url-safe 사용).
-fn b64url_decode(s: &str) -> Result<Vec<u8>> {
-    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-    let s = s.trim_end_matches('=');
-    let mut out = Vec::with_capacity(s.len() * 3 / 4 + 3);
-    let mut buf = 0u32;
-    let mut bits = 0u32;
-    for c in s.bytes() {
-        let idx = ALPHABET.iter().position(|&a| a == c)
-            .ok_or_else(|| AppError::Invalid("base64url 디코드 실패: 잘못된 문자".into()))?;
-        buf = (buf << 6) | idx as u32;
-        bits += 6;
-        if bits >= 8 {
-            bits -= 8;
-            out.push((buf >> bits) as u8);
-        }
-    }
-    Ok(out)
-}
-
 fn jwt_payload_json(jwt: &str) -> Result<Value> {
+    use base64::Engine;
     let parts: Vec<&str> = jwt.split('.').collect();
     if parts.len() < 2 {
         return Err(AppError::Invalid("JWT 형식 오류: 세그먼트 부족".into()));
     }
-    let raw = b64url_decode(parts[1])?;
+    // JWT 는 url-safe, 패딩 없는 base64 를 사용한다.
+    let raw = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(parts[1])
+        .map_err(|e| AppError::Invalid(format!("base64url 디코드 실패: {e}")))?;
     serde_json::from_slice(&raw).map_err(|e| AppError::Invalid(format!("JWT payload 파싱: {e}")))
 }
 
@@ -174,7 +158,7 @@ async fn refresh_claude(refresh_token: &str) -> Result<OauthToken> {
         "refresh_token": refresh_token,
         "client_id": "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
     });
-    let resp = reqwest::Client::new()
+    let resp = crate::aibridge::HTTP
         .post("https://console.anthropic.com/v1/oauth/token")
         .json(&body).send().await
         .map_err(|e| AppError::Invalid(format!("claude refresh 요청 실패: {e}")))?;
@@ -249,7 +233,7 @@ async fn refresh_codex(refresh_token: &str, client_id: &str) -> Result<OauthToke
         "refresh_token": refresh_token,
         "client_id": client_id,
     });
-    let resp = reqwest::Client::new()
+    let resp = crate::aibridge::HTTP
         .post(CODEX_REFRESH_URL)
         .json(&body).send().await
         .map_err(|e| AppError::Invalid(format!("codex refresh 요청 실패: {e}")))?;
@@ -316,23 +300,8 @@ mod tests {
 
     /// base64url(no padding) 인코더 — 테스트용 JWT 조립 전용 (프로덕션 디코더와는 별개).
     fn b64url_encode(bytes: &[u8]) -> String {
-        const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-        let mut out = String::new();
-        for chunk in bytes.chunks(3) {
-            let b0 = chunk[0] as u32;
-            let b1 = *chunk.get(1).unwrap_or(&0) as u32;
-            let b2 = *chunk.get(2).unwrap_or(&0) as u32;
-            let n = (b0 << 16) | (b1 << 8) | b2;
-            let c0 = ALPHABET[((n >> 18) & 0x3F) as usize] as char;
-            let c1 = ALPHABET[((n >> 12) & 0x3F) as usize] as char;
-            let c2 = ALPHABET[((n >> 6) & 0x3F) as usize] as char;
-            let c3 = ALPHABET[(n & 0x3F) as usize] as char;
-            out.push(c0);
-            out.push(c1);
-            if chunk.len() > 1 { out.push(c2); }
-            if chunk.len() > 2 { out.push(c3); }
-        }
-        out
+        use base64::Engine;
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)
     }
 
     fn make_test_jwt(payload_json: &str) -> String {
