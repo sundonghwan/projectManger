@@ -78,6 +78,15 @@ export interface DeliverableUploadFileInput {
   fileName: string;
   bytes: number[];
 }
+/** cswap 계정 요약 — 백엔드 `aibridge::cswap::Account` 와 대응(camelCase). */
+export interface CswapAccount {
+  number: number;
+  email: string;
+  active: boolean;
+  usageStatus: string;
+  fiveHourPct: number;
+  sevenDayPct: number;
+}
 export const api = {
   business: {
     list: () => invoke<Business[]>("business_list"),
@@ -201,6 +210,7 @@ export const api = {
       username: string;
       authType: AuthType;
       keyPath?: string | null;
+      aiBridge?: boolean;
     }) => invoke<ServerConnection>("server_create", { input }),
     update: (input: {
       id: string;
@@ -210,6 +220,7 @@ export const api = {
       username: string;
       authType: AuthType;
       keyPath?: string | null;
+      aiBridge?: boolean;
     }) => invoke<ServerConnection>("server_update", { input }),
     archive: (id: string) => invoke<void>("server_archive", { id }),
     setSecret: (id: string, secret: string) => invoke<void>("server_set_secret", { id, secret }),
@@ -224,6 +235,8 @@ export const api = {
   },
   ssh: {
     connect: (id: string) => invoke<void>("ssh_connect", { id }),
+    /** 로컬 로그인 셸 탭 — 원격 SSH 없이 로컬에서 `claude login`/`cswap` 등을 실행. */
+    connectLocal: (id: string) => invoke<void>("local_terminal_open", { id }),
     write: (id: string, data: string) => invoke<void>("ssh_write", { id, data }),
     resize: (id: string, rows: number, cols: number) =>
       invoke<void>("ssh_resize", { id, rows, cols }),
@@ -274,6 +287,15 @@ export const api = {
     path: () => invoke<string | null>("vault_path"),
     /** vault 폴더 지정 후 Store 재오픈. */
     set: (path: string) => invoke<void>("vault_set", { path }),
+  },
+  /** cswap(claude-swap) 연동 — 선택적 편의 기능. 브리지 본체는 이 기능과 무관하게 동작. */
+  cswap: {
+    /** `cswap` 설치 여부. */
+    available: () => invoke<boolean>("cswap_available"),
+    /** 계정 목록 조회. */
+    list: () => invoke<CswapAccount[]>("cswap_list"),
+    /** 지정한 계정 번호로 전환. */
+    switchTo: (target: string) => invoke<void>("cswap_switch_to", { target }),
   },
 };
 

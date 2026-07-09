@@ -1,3 +1,4 @@
+mod aibridge;
 mod commands;
 mod config;
 mod error;
@@ -32,6 +33,7 @@ pub fn run() {
                 local: Mutex::new(local),
             });
             app.manage(terminal::TerminalManager::default());
+            app.manage(crate::aibridge::AiBridge::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -106,10 +108,14 @@ pub fn run() {
             commands::ssh_write,
             commands::ssh_resize,
             commands::ssh_disconnect,
+            commands::local_terminal_open,
             commands::ssh_host_status,
             commands::ssh_scan_host,
             commands::ssh_trust_host,
             commands::sftp_list,
+            commands::cswap_available,
+            commands::cswap_list,
+            commands::cswap_switch_to,
             commands::template_list,
             commands::template_create,
             commands::template_delete,

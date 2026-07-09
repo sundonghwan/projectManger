@@ -47,7 +47,7 @@ mod tests {
             ls.servers.put(Server {
                 id: "s1".into(), business_id: "b1".into(), project_id: None, name: "n".into(),
                 host: "h".into(), port: 22, username: "u".into(), auth_type: "key".into(),
-                key_path: None, secret_ref: None, last_used_at: None, archived_at: None,
+                key_path: None, secret_ref: None, last_used_at: None, ai_bridge: false, archived_at: None,
                 created_at: now(), updated_at: now(),
             }).unwrap();
             ls.snippets.put(Snippet {

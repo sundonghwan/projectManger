@@ -88,4 +88,23 @@ describe("ServerPanel", () => {
     await userEvent.click(screen.getByRole("button", { name: "스테이징 보관" }));
     expect(h.onArchive).toHaveBeenCalledWith("1");
   });
+
+  it("AI 브리지 체크박스를 켜고 추가하면 onCreate에 aiBridge: true", async () => {
+    const h = setup([]);
+    await userEvent.type(screen.getByLabelText("이름"), "운영");
+    await userEvent.type(screen.getByLabelText("호스트"), "prod.x");
+    await userEvent.type(screen.getByLabelText("사용자"), "admin");
+    await userEvent.click(screen.getByText("AI 자격증명 브리지 (claude/codex 원격 사용)"));
+    await userEvent.click(screen.getByRole("button", { name: "추가" }));
+    expect(h.onCreate).toHaveBeenCalledWith(expect.objectContaining({ aiBridge: true }));
+  });
+
+  it("AI 브리지를 켜지 않으면 기본값 false로 onCreate", async () => {
+    const h = setup([]);
+    await userEvent.type(screen.getByLabelText("이름"), "운영");
+    await userEvent.type(screen.getByLabelText("호스트"), "prod.x");
+    await userEvent.type(screen.getByLabelText("사용자"), "admin");
+    await userEvent.click(screen.getByRole("button", { name: "추가" }));
+    expect(h.onCreate).toHaveBeenCalledWith(expect.objectContaining({ aiBridge: false }));
+  });
 });

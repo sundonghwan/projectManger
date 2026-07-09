@@ -1,6 +1,6 @@
 [package]
 name = "projectmanger"
-version = "1.0.7"
+version = "1.1.0"
 description = "Work Vault — vault 기반 업무·프로젝트 관리 데스크톱 앱"
 authors = ["sundonghwan"]
 edition = "2021"
@@ -28,3 +28,7 @@ keyring = { version = "3", features = ["apple-native", "windows-native", "sync-s
 portable-pty = "0.8"
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+http = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+axum = { version = "0.7", features = ["http1"] }
+tokio = { version = "1", features = ["rt-multi-thread", "net", "macros", "sync"] }

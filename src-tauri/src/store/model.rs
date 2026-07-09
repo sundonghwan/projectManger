@@ -270,6 +270,8 @@ pub struct Server {
     pub key_path: Option<String>,
     pub secret_ref: Option<String>,
     pub last_used_at: Option<String>,
+    #[serde(default)]
+    pub ai_bridge: bool,
     pub archived_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
@@ -457,6 +459,7 @@ mod tests {
             id: "s1".into(), business_id: "b1".into(), project_id: None, name: "스테이징".into(),
             host: "10.0.0.5".into(), port: 22, username: "deploy".into(), auth_type: "key".into(),
             key_path: Some("/home/u/.ssh/id".into()), secret_ref: None, last_used_at: None,
+            ai_bridge: false,
             archived_at: None, created_at: "2026-01-01T00:00:00.000Z".into(),
             updated_at: "2026-01-02T00:00:00.000Z".into(),
         };

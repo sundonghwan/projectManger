@@ -1437,6 +1437,8 @@ pub struct ServerCreate {
     pub username: String,
     pub auth_type: String,
     pub key_path: Option<String>,
+    #[serde(default)]
+    pub ai_bridge: bool,
 }
 
 #[derive(Deserialize)]
@@ -1449,6 +1451,8 @@ pub struct ServerUpdate {
     pub username: String,
     pub auth_type: String,
     pub key_path: Option<String>,
+    #[serde(default)]
+    pub ai_bridge: bool,
 }
 
 #[tauri::command]
@@ -1470,6 +1474,7 @@ pub fn server_create(state: State<AppState>, input: ServerCreate) -> Result<Serv
         &input.username,
         &input.auth_type,
         input.key_path.as_deref(),
+        input.ai_bridge,
     )
 }
 
@@ -1485,6 +1490,7 @@ pub fn server_update(state: State<AppState>, input: ServerUpdate) -> Result<Serv
         &input.username,
         &input.auth_type,
         input.key_path.as_deref(),
+        input.ai_bridge,
     )
 }
 
@@ -1553,13 +1559,15 @@ pub fn ssh_connect(
     app: tauri::AppHandle,
     state: State<AppState>,
     term: State<crate::terminal::TerminalManager>,
+    bridge: State<crate::aibridge::AiBridge>,
     id: String,
 ) -> Result<()> {
     let server = {
         let local = state.local.lock().unwrap();
         ops::server::get(&local, &id)?
     };
-    crate::terminal::connect(&app, &term, &server)?;
+    let ports = if server.ai_bridge { Some(bridge.ensure_started(&app)?) } else { None };
+    crate::terminal::connect(&app, &term, &server, ports.as_ref())?;
     let mut local = state.local.lock().unwrap();
     let _ = ops::server::touch_last_used(&mut local, &id);
     Ok(())
@@ -1585,6 +1593,18 @@ pub fn ssh_disconnect(term: State<crate::terminal::TerminalManager>, id: String)
     crate::terminal::disconnect(&term, &id)
 }
 
+/// 로컬 셸 탭 — 원격 SSH 없이 `claude login`/`cswap` 등을 로컬에서 직접 실행할 수 있도록
+/// 로컬 로그인 셸 PTY 세션을 연다. write/resize/disconnect 는 기존 ssh_* 커맨드가
+/// 동일한 `TerminalManager` 세션 맵을 id 기준으로 그대로 처리한다.
+#[tauri::command]
+pub fn local_terminal_open(
+    app: tauri::AppHandle,
+    term: State<crate::terminal::TerminalManager>,
+    id: String,
+) -> Result<()> {
+    crate::terminal::connect_local(&app, &term, &id)
+}
+
 /// SFTP 디렉터리 나열 (키 기반 인증).
 #[tauri::command]
 pub fn sftp_list(
@@ -1599,6 +1619,26 @@ pub fn sftp_list(
     };
     let kh = crate::hostkey::known_hosts_path(&app).map(|p| p.to_string_lossy().to_string());
     crate::sftp::list(&server, &path, kh.as_deref())
+}
+
+// ---- cswap 연동 (선택적 편의 기능 — 브리지 본체는 이 기능 유무와 무관) ----
+
+/// `cswap` 이 설치되어 있는지 (`cswap --version` 성공 여부).
+#[tauri::command]
+pub fn cswap_available() -> bool {
+    crate::aibridge::cswap::available()
+}
+
+/// `cswap --list --json` 으로 계정 목록을 조회.
+#[tauri::command]
+pub fn cswap_list() -> Result<Vec<crate::aibridge::cswap::Account>> {
+    crate::aibridge::cswap::list()
+}
+
+/// `cswap --switch-to <target>` 으로 활성 계정을 전환.
+#[tauri::command]
+pub fn cswap_switch_to(target: String) -> Result<()> {
+    crate::aibridge::cswap::switch_to(&target)
 }
 
 // ---- SSH 호스트 키 신뢰 (지문 확인 후 등록) ----

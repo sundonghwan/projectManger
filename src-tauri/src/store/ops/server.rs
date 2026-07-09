@@ -56,6 +56,7 @@ pub fn create(
     username: &str,
     auth_type: &str,
     key_path: Option<&str>,
+    ai_bridge: bool,
 ) -> Result<Server> {
     if name.trim().is_empty() || host.trim().is_empty() || username.trim().is_empty() {
         return Err(AppError::Invalid("이름·호스트·사용자는 필수입니다".into()));
@@ -79,6 +80,7 @@ pub fn create(
         key_path: key_path.map(|s| s.to_string()),
         secret_ref: None,
         last_used_at: None,
+        ai_bridge,
         archived_at: None,
         created_at: ts.clone(),
         updated_at: ts,
@@ -97,6 +99,7 @@ pub fn update(
     username: &str,
     auth_type: &str,
     key_path: Option<&str>,
+    ai_bridge: bool,
 ) -> Result<Server> {
     if name.trim().is_empty() || host.trim().is_empty() || username.trim().is_empty() {
         return Err(AppError::Invalid("이름·호스트·사용자는 필수입니다".into()));
@@ -114,6 +117,7 @@ pub fn update(
     s.username = username.to_string();
     s.auth_type = auth_type.to_string();
     s.key_path = key_path.map(|x| x.to_string());
+    s.ai_bridge = ai_bridge;
     s.updated_at = now();
     local.servers.put(s.clone())?;
     Ok(s)
@@ -159,40 +163,42 @@ mod tests {
     #[test]
     fn create_defaults_no_secret() {
         let mut s = ls();
-        let srv = create(&mut s, "b1", None, "스테이징", "10.0.0.5", 22, "deploy", "key", Some("~/.ssh/id")).unwrap();
+        let srv = create(&mut s, "b1", None, "스테이징", "10.0.0.5", 22, "deploy", "key", Some("~/.ssh/id"), false).unwrap();
         assert_eq!(srv.host, "10.0.0.5");
         assert_eq!(srv.auth_type, "key");
         assert!(srv.secret_ref.is_none());
+        assert!(!srv.ai_bridge);
         assert_eq!(list_by_business(&s, "b1").unwrap().len(), 1);
     }
 
     #[test]
     fn create_validates_required_and_auth() {
         let mut s = ls();
-        assert!(create(&mut s, "b1", None, "", "h", 22, "u", "key", None).is_err());
-        assert!(create(&mut s, "b1", None, "n", "h", 22, "u", "bogus", None).is_err());
+        assert!(create(&mut s, "b1", None, "", "h", 22, "u", "key", None, false).is_err());
+        assert!(create(&mut s, "b1", None, "n", "h", 22, "u", "bogus", None, false).is_err());
     }
 
     #[test]
     fn create_rejects_ssh_arg_injection() {
         let mut s = ls();
-        assert!(create(&mut s, "b1", None, "n", "h", 22, "-oProxyCommand=touch /tmp/x", "key", None).is_err());
-        assert!(create(&mut s, "b1", None, "n", "-Ldanger", 22, "u", "key", None).is_err());
-        assert!(create(&mut s, "b1", None, "n", "h", 22, "u name", "key", None).is_err());
-        assert!(create(&mut s, "b1", None, "n", "h@evil", 22, "u", "key", None).is_err());
-        assert!(create(&mut s, "b1", None, "n", "h", 22, "u", "key", Some("-i/evil")).is_err());
-        assert!(create(&mut s, "b1", None, "n", "example.com", 22, "deploy", "key", Some("/home/u/.ssh/id_ed25519")).is_ok());
+        assert!(create(&mut s, "b1", None, "n", "h", 22, "-oProxyCommand=touch /tmp/x", "key", None, false).is_err());
+        assert!(create(&mut s, "b1", None, "n", "-Ldanger", 22, "u", "key", None, false).is_err());
+        assert!(create(&mut s, "b1", None, "n", "h", 22, "u name", "key", None, false).is_err());
+        assert!(create(&mut s, "b1", None, "n", "h@evil", 22, "u", "key", None, false).is_err());
+        assert!(create(&mut s, "b1", None, "n", "h", 22, "u", "key", Some("-i/evil"), false).is_err());
+        assert!(create(&mut s, "b1", None, "n", "example.com", 22, "deploy", "key", Some("/home/u/.ssh/id_ed25519"), false).is_ok());
     }
 
     #[test]
     fn set_secret_ref_and_update_archive() {
         let mut s = ls();
-        let srv = create(&mut s, "b1", None, "n", "h", 22, "u", "password", None).unwrap();
+        let srv = create(&mut s, "b1", None, "n", "h", 22, "u", "password", None, false).unwrap();
         set_secret_ref(&mut s, &srv.id, Some("ssh/conn-x")).unwrap();
         assert_eq!(get(&s, &srv.id).unwrap().secret_ref.as_deref(), Some("ssh/conn-x"));
-        let u = update(&mut s, &srv.id, "새이름", "h2", 2222, "u2", "agent", None).unwrap();
+        let u = update(&mut s, &srv.id, "새이름", "h2", 2222, "u2", "agent", None, true).unwrap();
         assert_eq!(u.name, "새이름");
         assert_eq!(u.port, 2222);
+        assert!(u.ai_bridge);
         touch_last_used(&mut s, &srv.id).unwrap();
         assert!(get(&s, &srv.id).unwrap().last_used_at.is_some());
         archive(&mut s, &srv.id).unwrap();
@@ -202,8 +208,8 @@ mod tests {
     #[test]
     fn update_rejects_injection_and_missing() {
         let mut s = ls();
-        let srv = create(&mut s, "b1", None, "n", "h", 22, "u", "key", None).unwrap();
-        assert!(update(&mut s, &srv.id, "n", "h", 22, "-oProxyCommand=x", "key", None).is_err());
+        let srv = create(&mut s, "b1", None, "n", "h", 22, "u", "key", None, false).unwrap();
+        assert!(update(&mut s, &srv.id, "n", "h", 22, "-oProxyCommand=x", "key", None, false).is_err());
         assert!(matches!(get(&s, "nope"), Err(AppError::NotFound)));
     }
 }

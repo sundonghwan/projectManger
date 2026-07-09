@@ -6,6 +6,8 @@ import { ServerPanel } from "./ServerPanel";
 import { Terminal } from "./Terminal";
 import { SftpBrowser } from "./SftpBrowser";
 import { Icon } from "../ui/icons/Icon";
+import { EMPTY_TABS, openSsh, openSftp, openLocal, closeTab, type TabsState } from "./tabs";
+import { TabBar } from "./TabBar";
 
 export interface ServerViewProps {
   businessId: string;
@@ -23,12 +25,28 @@ interface TrustPrompt {
 /** SSH 뷰 컨테이너 — 서버 프로파일 관리 + 선택 서버 터미널/SFTP. */
 export function ServerView({ businessId, projectId }: ServerViewProps) {
   const s = useServers(businessId, projectId);
-  const [connecting, setConnecting] = useState<ServerConnection | null>(null);
-  const [browsing, setBrowsing] = useState<ServerConnection | null>(null);
+  const [tabState, setTabState] = useState<TabsState>(EMPTY_TABS);
+  const paneOpen = tabState.tabs.length > 0;
   const [trust, setTrust] = useState<TrustPrompt | null>(null);
   const [trustErr, setTrustErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const paneOpen = connecting || browsing;
+
+  // 로컬 로그인 셸 탭 — 원격 SSH 없이 `claude login`/`cswap` 등을 로컬에서 실행하기 위한
+  // 진입점. Terminal 이 요구하는 필드만 채운 합성 세션을 만들고 local=true 로 연다.
+  const openLocalTerminal = () => {
+    const server: ServerConnection = {
+      id: `local:${crypto.randomUUID()}`,
+      businessId,
+      projectId,
+      name: "로컬",
+      host: "localhost",
+      port: 0,
+      username: "local",
+      authType: "key",
+      aiBridge: false,
+    };
+    setTabState((s) => openLocal(s, server));
+  };
 
   // 접속/파일 열기 전에 호스트 키 신뢰 여부를 확인한다(MITM 방어).
   // 미신뢰 호스트는 지문을 보여주고 사용자가 수락해야 진행.
@@ -77,6 +95,12 @@ export function ServerView({ businessId, projectId }: ServerViewProps) {
             <span>{trustErr}</span>
           </div>
         )}
+        <div style={{ padding: "12px 16px 0" }}>
+          <button onClick={openLocalTerminal} style={localTerminalBtn}>
+            <Icon name="server" size={14} />
+            로컬 터미널
+          </button>
+        </div>
         <ServerPanel
           servers={s.servers}
           onCreate={(d) => void s.create(d)}
@@ -84,28 +108,40 @@ export function ServerView({ businessId, projectId }: ServerViewProps) {
           onArchive={(id) => void s.archive(id)}
           onSetSecret={(id, secret) => void s.setSecret(id, secret)}
           onClearSecret={(id) => void s.clearSecret(id)}
-          onConnect={(srv) =>
-            void gate(srv, () => {
-              setBrowsing(null);
-              setConnecting(srv);
-            })
-          }
-          onBrowse={(srv) =>
-            void gate(srv, () => {
-              setConnecting(null);
-              setBrowsing(srv);
-            })
-          }
+          onConnect={(srv) => void gate(srv, () => setTabState((s) => openSsh(s, srv)))}
+          onBrowse={(srv) => void gate(srv, () => setTabState((s) => openSftp(s, srv)))}
         />
       </div>
-      {connecting && (
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <Terminal server={connecting} onClose={() => setConnecting(null)} />
-        </div>
-      )}
-      {browsing && !connecting && (
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <SftpBrowser server={browsing} onClose={() => setBrowsing(null)} />
+      {paneOpen && (
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+          <TabBar
+            tabs={tabState.tabs}
+            activeKey={tabState.activeKey}
+            onSelect={(key) => setTabState((s) => ({ ...s, activeKey: key }))}
+            onClose={(key) => setTabState((s) => closeTab(s, key))}
+          />
+          <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
+            {tabState.tabs.map((t) => {
+              const active = t.key === tabState.activeKey;
+              return (
+                <div
+                  key={t.key}
+                  style={{ position: "absolute", inset: 0, display: active ? "block" : "none" }}
+                >
+                  {t.kind === "sftp" ? (
+                    <SftpBrowser server={t.server} onClose={() => setTabState((s) => closeTab(s, t.key))} />
+                  ) : (
+                    <Terminal
+                      server={t.server}
+                      local={t.kind === "local"}
+                      active={active}
+                      onClose={() => setTabState((s) => closeTab(s, t.key))}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -137,6 +173,19 @@ export function ServerView({ businessId, projectId }: ServerViewProps) {
   );
 }
 
+const localTerminalBtn: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  border: "1px solid var(--border)",
+  background: "var(--bg)",
+  color: "var(--text2)",
+  borderRadius: "var(--radius-md)",
+  padding: "7px 12px",
+  fontSize: 12.5,
+  fontWeight: 600,
+  cursor: "pointer",
+};
 const overlay: CSSProperties = {
   position: "fixed",
   inset: 0,
