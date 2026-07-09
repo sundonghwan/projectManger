@@ -1,7 +1,10 @@
 //! 로컬 loopback 프록시. 원격 CLI 가 SSH 리버스 터널을 통해 이 포트로 요청을 보내면,
 //! 더미 인증 헤더를 실제 OAuth 토큰으로 교체한 뒤 실제 업스트림 API 로 스트리밍 중계한다.
 //! 요청/응답 body 는 버퍼링 없이 스트림으로 흘려보내 SSE 가 그대로 통과한다.
-use crate::aibridge::{headers, token::ClaudeTokenSource};
+use crate::aibridge::{
+    headers,
+    token::{ClaudeTokenSource, CodexTokenSource},
+};
 use crate::error::{AppError, Result};
 use axum::{
     body::Body,
@@ -79,8 +82,8 @@ async fn forward(ctx: Ctx, req: Request<Body>) -> Result<Response<Body>> {
             headers::apply_anthropic_auth(&mut headers, &tok);
         }
         Provider::OpenAi => {
-            // Task 8: OpenAI(codex) 토큰 소스 + headers::apply_openai_auth 주입 예정.
-            // 지금은 no-op — 더미 인증이 그대로 통과하므로 실제 호출은 실패한다(의도된 스텁).
+            let (tok, acct) = CodexTokenSource.access_and_account().await?;
+            headers::apply_openai_auth(&mut headers, &tok, acct.as_deref());
         }
     }
 
