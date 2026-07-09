@@ -1,3 +1,4 @@
+mod aibridge;
 mod commands;
 mod config;
 mod error;

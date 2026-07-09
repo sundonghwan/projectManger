@@ -2700,6 +2700,7 @@ name = "projectmanger"
 version = "1.0.7"
 dependencies = [
  "chrono",
+ "http",
  "keyring",
  "portable-pty",
  "serde",
