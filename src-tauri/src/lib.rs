@@ -33,6 +33,7 @@ pub fn run() {
                 local: Mutex::new(local),
             });
             app.manage(terminal::TerminalManager::default());
+            app.manage(crate::aibridge::AiBridge::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

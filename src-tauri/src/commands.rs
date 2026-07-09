@@ -1437,6 +1437,8 @@ pub struct ServerCreate {
     pub username: String,
     pub auth_type: String,
     pub key_path: Option<String>,
+    #[serde(default)]
+    pub ai_bridge: bool,
 }
 
 #[derive(Deserialize)]
@@ -1449,6 +1451,8 @@ pub struct ServerUpdate {
     pub username: String,
     pub auth_type: String,
     pub key_path: Option<String>,
+    #[serde(default)]
+    pub ai_bridge: bool,
 }
 
 #[tauri::command]
@@ -1470,6 +1474,7 @@ pub fn server_create(state: State<AppState>, input: ServerCreate) -> Result<Serv
         &input.username,
         &input.auth_type,
         input.key_path.as_deref(),
+        input.ai_bridge,
     )
 }
 
@@ -1485,6 +1490,7 @@ pub fn server_update(state: State<AppState>, input: ServerUpdate) -> Result<Serv
         &input.username,
         &input.auth_type,
         input.key_path.as_deref(),
+        input.ai_bridge,
     )
 }
 
@@ -1553,13 +1559,15 @@ pub fn ssh_connect(
     app: tauri::AppHandle,
     state: State<AppState>,
     term: State<crate::terminal::TerminalManager>,
+    bridge: State<crate::aibridge::AiBridge>,
     id: String,
 ) -> Result<()> {
     let server = {
         let local = state.local.lock().unwrap();
         ops::server::get(&local, &id)?
     };
-    crate::terminal::connect(&app, &term, &server)?;
+    let ports = if server.ai_bridge { Some(bridge.ensure_started()?) } else { None };
+    crate::terminal::connect(&app, &term, &server, ports.as_ref())?;
     let mut local = state.local.lock().unwrap();
     let _ = ops::server::touch_last_used(&mut local, &id);
     Ok(())

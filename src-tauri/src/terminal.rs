@@ -95,14 +95,19 @@ pub struct TerminalManager {
     sessions: Mutex<HashMap<String, Session>>,
 }
 
-pub fn connect(app: &AppHandle, manager: &TerminalManager, server: &Server) -> Result<()> {
+pub fn connect(
+    app: &AppHandle,
+    manager: &TerminalManager,
+    server: &Server,
+    bridge: Option<&BridgePorts>,
+) -> Result<()> {
     let pty = native_pty_system();
     let pair = pty
         .openpty(PtySize { rows: 24, cols: 80, pixel_width: 0, pixel_height: 0 })
         .map_err(|e| AppError::Invalid(format!("PTY 생성 실패: {e}")))?;
 
     let known_hosts = crate::hostkey::known_hosts_path(app).map(|p| p.to_string_lossy().to_string());
-    let cmd = build_ssh_command(server, known_hosts.as_deref(), None);
+    let cmd = build_ssh_command(server, known_hosts.as_deref(), bridge);
 
     let mut child = pair
         .slave
@@ -186,6 +191,7 @@ mod tests {
             key_path: Some("/home/u/.ssh/id_ed25519".into()),
             secret_ref: None,
             last_used_at: None,
+            ai_bridge: false,
             archived_at: None,
             created_at: "2026-01-01T00:00:00.000Z".into(),
             updated_at: "2026-01-01T00:00:00.000Z".into(),
