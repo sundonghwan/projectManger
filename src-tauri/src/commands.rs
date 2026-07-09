@@ -1621,6 +1621,26 @@ pub fn sftp_list(
     crate::sftp::list(&server, &path, kh.as_deref())
 }
 
+// ---- cswap 연동 (선택적 편의 기능 — 브리지 본체는 이 기능 유무와 무관) ----
+
+/// `cswap` 이 설치되어 있는지 (`cswap --version` 성공 여부).
+#[tauri::command]
+pub fn cswap_available() -> bool {
+    crate::aibridge::cswap::available()
+}
+
+/// `cswap --list --json` 으로 계정 목록을 조회.
+#[tauri::command]
+pub fn cswap_list() -> Result<Vec<crate::aibridge::cswap::Account>> {
+    crate::aibridge::cswap::list()
+}
+
+/// `cswap --switch-to <target>` 으로 활성 계정을 전환.
+#[tauri::command]
+pub fn cswap_switch_to(target: String) -> Result<()> {
+    crate::aibridge::cswap::switch_to(&target)
+}
+
 // ---- SSH 호스트 키 신뢰 (지문 확인 후 등록) ----
 
 #[derive(serde::Serialize)]

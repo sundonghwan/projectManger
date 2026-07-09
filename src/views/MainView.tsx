@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { api } from "../api/client";
+import type { CswapAccount } from "../api/client";
 import type { Business, Folder, Project, TrashItem } from "../domain/types";
 import { TrashPanel } from "./TrashPanel";
 import { businessColor } from "../ui/colors";
@@ -103,9 +104,57 @@ export function MainView({
   const [vaultPopover, setVaultPopover] = useState(false);
   const vaultBtnRef = useRef<HTMLButtonElement>(null);
 
+  // cswap(claude-swap) 연동 — 선택적 편의 기능. 미설치면 아무것도 렌더링하지 않는다.
+  const [cswapAvailable, setCswapAvailable] = useState(false);
+  const [cswapEnabled, setCswapEnabled] = useState(
+    () => localStorage.getItem("cswapIntegration") !== "false",
+  );
+  const [cswapAccounts, setCswapAccounts] = useState<CswapAccount[]>([]);
+  const [cswapPopover, setCswapPopover] = useState(false);
+  const [cswapBusy, setCswapBusy] = useState(false);
+  const cswapBtnRef = useRef<HTMLButtonElement>(null);
+
   useEffect(() => {
     api.vault.path().then(setVaultPath).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    api.cswap.available().then(setCswapAvailable).catch(() => setCswapAvailable(false));
+  }, []);
+
+  const refreshCswapAccounts = async () => {
+    try {
+      setCswapAccounts(await api.cswap.list());
+    } catch {
+      setCswapAccounts([]);
+    }
+  };
+
+  useEffect(() => {
+    if (cswapAvailable && cswapEnabled) {
+      void refreshCswapAccounts();
+    }
+  }, [cswapAvailable, cswapEnabled]);
+
+  const toggleCswapEnabled = () => {
+    setCswapEnabled((prev) => {
+      const next = !prev;
+      localStorage.setItem("cswapIntegration", String(next));
+      return next;
+    });
+  };
+
+  const switchCswapAccount = async (number: number) => {
+    setCswapBusy(true);
+    try {
+      await api.cswap.switchTo(String(number));
+      await refreshCswapAccounts();
+    } catch (e) {
+      alert(`cswap 전환 실패: ${e}`);
+    } finally {
+      setCswapBusy(false);
+    }
+  };
 
   const changeVault = async () => {
     try {
@@ -213,6 +262,73 @@ export function MainView({
               </div>
             )}
           </div>
+          {cswapAvailable && (
+            <div style={{ position: "relative" }}>
+              <button
+                ref={cswapBtnRef}
+                onClick={() => setCswapPopover((v) => !v)}
+                style={iconBtn}
+                aria-label="AI 계정 (cswap)"
+                title="AI 계정 (cswap)"
+              >
+                <Icon name="server" size={16} />
+              </button>
+              {cswapPopover && (
+                <div style={vaultPopoverStyle}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>AI 계정 (cswap)</div>
+                    <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--text2)", cursor: "pointer" }}>
+                      <input type="checkbox" checked={cswapEnabled} onChange={toggleCswapEnabled} />
+                      사용
+                    </label>
+                  </div>
+                  {!cswapEnabled ? (
+                    <div style={{ fontSize: 11, color: "var(--text3)" }}>연동이 꺼져 있습니다.</div>
+                  ) : cswapAccounts.length === 0 ? (
+                    <div style={{ fontSize: 11, color: "var(--text3)" }}>계정 정보를 불러올 수 없습니다.</div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {cswapAccounts.map((acc) => (
+                        <div
+                          key={acc.number}
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 2,
+                            padding: "6px 8px",
+                            borderRadius: "var(--radius-md)",
+                            border: "1px solid var(--border)",
+                            background: acc.active ? "rgba(99,102,241,.08)" : "transparent",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", wordBreak: "break-all" }}>
+                              {acc.email}
+                            </span>
+                            {acc.active && (
+                              <span style={{ fontSize: 10, color: "var(--accent)", fontWeight: 600 }}>활성</span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 10, color: "var(--text2)" }}>
+                            {acc.usageStatus} · 5h {acc.fiveHourPct}% / 7d {acc.sevenDayPct}%
+                          </div>
+                          {!acc.active && (
+                            <button
+                              onClick={() => void switchCswapAccount(acc.number)}
+                              disabled={cswapBusy}
+                              style={{ ...vaultChangeBtn, marginTop: 4 }}
+                            >
+                              전환
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           <button onClick={() => void openTrash()} style={iconBtn} aria-label="휴지통" title="휴지통">
             <Icon name="trash" size={16} />
           </button>
