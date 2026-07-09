@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
@@ -8,6 +8,20 @@ import type { CommandSnippet, ServerConnection } from "../domain/types";
 import { SnippetBar } from "./SnippetBar";
 
 const TERMINAL_FONT_FAMILY = 'Menlo, Monaco, "Courier New", monospace';
+
+/** SnippetBar의 runBtn 스타일과 시각적으로 맞춘 런처 버튼(claude/codex). */
+const launcherBtn: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  background: "transparent",
+  border: "1px solid #33332a",
+  borderRadius: 5,
+  color: "#a9c7a0",
+  fontSize: 11,
+  padding: "3px 10px",
+  cursor: "pointer",
+  fontFamily: "var(--font-mono)",
+};
 
 export interface TerminalProps {
   server: ServerConnection;
@@ -34,6 +48,36 @@ export function Terminal({ server, onClose, local }: TerminalProps) {
   const xtermRef = useRef<XTerm | null>(null);
   const [snippets, setSnippets] = useState<CommandSnippet[]>([]);
   const [bridgeAlert, setBridgeAlert] = useState<BridgeAlertPayload | null>(null);
+  const [bridgeOn, setBridgeOn] = useState(!!server.aiBridge);
+  const [bridgeBusy, setBridgeBusy] = useState(false);
+  const [reconnectNonce, setReconnectNonce] = useState(0);
+
+  useEffect(() => {
+    setBridgeOn(!!server.aiBridge);
+  }, [server.aiBridge]);
+
+  const toggleBridge = useCallback(async () => {
+    if (local || bridgeBusy) return;
+    const next = !bridgeOn;
+    setBridgeBusy(true);
+    try {
+      await api.server.update({
+        id: server.id,
+        name: server.name,
+        host: server.host,
+        port: server.port,
+        username: server.username,
+        authType: server.authType,
+        keyPath: server.keyPath ?? null,
+        aiBridge: next,
+      });
+      setBridgeOn(next);
+      await api.ssh.disconnect(server.id);
+      setReconnectNonce((n) => n + 1);
+    } finally {
+      setBridgeBusy(false);
+    }
+  }, [local, bridgeBusy, bridgeOn, server]);
 
   const write = useCallback(
     (data: string) => {
@@ -118,7 +162,7 @@ export function Terminal({ server, onClose, local }: TerminalProps) {
       term.dispose();
       xtermRef.current = null;
     };
-  }, [server.id, write, local]);
+  }, [server.id, write, local, reconnectNonce]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "#0d0d0c" }}>
@@ -137,8 +181,27 @@ export function Terminal({ server, onClose, local }: TerminalProps) {
         <span style={{ fontSize: 12.5, color: "#d8d8cf", fontFamily: TERMINAL_FONT_FAMILY }}>
           {local ? "localhost" : `${server.username}@${server.host}:${server.port}`}
         </span>
-        {server.aiBridge && (
-          <span style={{ fontSize: 10, color: "#c9b458", border: "1px solid #4a441f", borderRadius: 4, padding: "1px 5px" }}>AI 브리지</span>
+        {!local && (
+          <button
+            onClick={() => void toggleBridge()}
+            disabled={bridgeBusy}
+            title={bridgeOn ? "클릭하면 AI 브리지를 끄고 재연결합니다" : "클릭하면 AI 브리지를 켜고 재연결합니다"}
+            style={{
+              fontSize: 10,
+              color: bridgeOn ? "#c9b458" : "#6b6b62",
+              background: "transparent",
+              border: bridgeOn ? "1px solid #4a441f" : "1px solid #2c2c26",
+              borderRadius: 4,
+              padding: "1px 5px",
+              cursor: bridgeBusy ? "default" : "pointer",
+              opacity: bridgeBusy ? 0.6 : 1,
+            }}
+          >
+            {bridgeOn ? "AI 브리지" : "AI 브리지 꺼짐"}
+          </button>
+        )}
+        {bridgeBusy && (
+          <span style={{ fontSize: 10.5, color: "#8a8a80", fontFamily: TERMINAL_FONT_FAMILY }}>재연결 중…</span>
         )}
         <span style={{ flex: 1 }} />
         <button
@@ -185,6 +248,16 @@ export function Terminal({ server, onClose, local }: TerminalProps) {
             }}
           >
             닫기
+          </button>
+        </div>
+      )}
+      {bridgeOn && !local && (
+        <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", borderBottom: "1px solid #26261f", background: "#141412" }}>
+          <button onClick={() => write("claude\r")} style={launcherBtn} title="claude 실행">
+            claude
+          </button>
+          <button onClick={() => write("codex\r")} style={launcherBtn} title="codex 실행">
+            codex
           </button>
         </div>
       )}
