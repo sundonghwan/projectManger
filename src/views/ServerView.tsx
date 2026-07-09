@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { ServerConnection } from "../domain/types";
 import { api } from "../api/client";
 import { useServers } from "../hooks/useServers";
@@ -30,6 +30,18 @@ export function ServerView({ businessId, projectId }: ServerViewProps) {
   const [trust, setTrust] = useState<TrustPrompt | null>(null);
   const [trustErr, setTrustErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // 뷰를 벗어나면(언마운트) 열려 있던 모든 터미널 세션을 정리한다. 탭을 명시적으로
+  // 닫지 않고 다른 뷰로 이동하면 백엔드 PTY 세션이 고아로 남기 때문. (SFTP 는 세션 없음)
+  const tabsRef = useRef(tabState.tabs);
+  tabsRef.current = tabState.tabs;
+  useEffect(() => {
+    return () => {
+      for (const t of tabsRef.current) {
+        if (t.kind !== "sftp") void api.ssh.disconnect(t.key);
+      }
+    };
+  }, []);
 
   // 로컬 로그인 셸 탭 — 원격 SSH 없이 `claude login`/`cswap` 등을 로컬에서 실행하기 위한
   // 진입점. Terminal 이 요구하는 필드만 채운 합성 세션을 만들고 local=true 로 연다.

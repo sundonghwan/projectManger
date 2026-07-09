@@ -104,8 +104,7 @@ async fn forward(ctx: Ctx, req: Request<Body>) -> Result<Response<Body>> {
 
     // 요청 body 를 스트림 그대로 업스트림으로 전달 (버퍼링 금지).
     let req_stream = body.into_data_stream();
-    let client = reqwest::Client::new();
-    let up = client
+    let up = crate::aibridge::HTTP
         .request(parts.method, &url)
         .headers(headers)
         .body(reqwest::Body::wrap_stream(req_stream))
