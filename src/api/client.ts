@@ -226,6 +226,8 @@ export const api = {
   },
   ssh: {
     connect: (id: string) => invoke<void>("ssh_connect", { id }),
+    /** 로컬 로그인 셸 탭 — 원격 SSH 없이 로컬에서 `claude login`/`cswap` 등을 실행. */
+    connectLocal: (id: string) => invoke<void>("local_terminal_open", { id }),
     write: (id: string, data: string) => invoke<void>("ssh_write", { id, data }),
     resize: (id: string, rows: number, cols: number) =>
       invoke<void>("ssh_resize", { id, rows, cols }),

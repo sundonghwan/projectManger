@@ -95,24 +95,29 @@ pub struct TerminalManager {
     sessions: Mutex<HashMap<String, Session>>,
 }
 
-pub fn connect(
-    app: &AppHandle,
-    manager: &TerminalManager,
-    server: &Server,
-    bridge: Option<&BridgePorts>,
-) -> Result<()> {
+/// 로컬 로그인 셸 실행 구성 (순수 함수 — 테스트 대상).
+/// `claude login` / `cswap` 등을 로컬에서 직접 실행할 수 있도록, 원격 브리지와
+/// 무관하게 사용자의 기본 셸을 로그인 셸(`-l`)로 띄운다.
+pub fn build_local_command() -> CommandBuilder {
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".into());
+    let mut cmd = CommandBuilder::new(&shell);
+    cmd.arg("-l");
+    cmd.env("TERM", "xterm-256color");
+    cmd
+}
+
+/// PTY 기동 + 리더 스레드 + 세션 등록 — `connect`(ssh)와 `connect_local`이 공유하는
+/// 하부 로직. 차이는 오직 실행할 `CommandBuilder` 뿐이다.
+fn spawn_session(app: &AppHandle, manager: &TerminalManager, id: &str, cmd: CommandBuilder) -> Result<()> {
     let pty = native_pty_system();
     let pair = pty
         .openpty(PtySize { rows: 24, cols: 80, pixel_width: 0, pixel_height: 0 })
         .map_err(|e| AppError::Invalid(format!("PTY 생성 실패: {e}")))?;
 
-    let known_hosts = crate::hostkey::known_hosts_path(app).map(|p| p.to_string_lossy().to_string());
-    let cmd = build_ssh_command(server, known_hosts.as_deref(), bridge);
-
     let mut child = pair
         .slave
         .spawn_command(cmd)
-        .map_err(|e| AppError::Invalid(format!("ssh 실행 실패: {e}")))?;
+        .map_err(|e| AppError::Invalid(format!("셸 실행 실패: {e}")))?;
     drop(pair.slave);
 
     let mut reader = pair
@@ -124,7 +129,7 @@ pub fn connect(
         .take_writer()
         .map_err(|e| AppError::Invalid(format!("PTY 라이터 오류: {e}")))?;
 
-    let id = server.id.clone();
+    let id = id.to_string();
     let id2 = id.clone();
     let app2 = app.clone();
     std::thread::spawn(move || {
@@ -149,6 +154,24 @@ pub fn connect(
         .unwrap()
         .insert(id, Session { writer, master: pair.master });
     Ok(())
+}
+
+pub fn connect(
+    app: &AppHandle,
+    manager: &TerminalManager,
+    server: &Server,
+    bridge: Option<&BridgePorts>,
+) -> Result<()> {
+    let known_hosts = crate::hostkey::known_hosts_path(app).map(|p| p.to_string_lossy().to_string());
+    let cmd = build_ssh_command(server, known_hosts.as_deref(), bridge);
+    spawn_session(app, manager, &server.id, cmd)
+}
+
+/// 로컬 셸 세션 기동 — 원격 SSH 없이 `claude login`/`cswap` 등을 로컬에서 바로
+/// 실행할 수 있게 한다. `connect`와 동일한 `sessions` 맵에 등록되므로
+/// write/resize/disconnect 는 기존 커맨드가 id 기준으로 그대로 동작한다.
+pub fn connect_local(app: &AppHandle, manager: &TerminalManager, session_id: &str) -> Result<()> {
+    spawn_session(app, manager, session_id, build_local_command())
 }
 
 pub fn write(manager: &TerminalManager, id: &str, data: &str) -> Result<()> {
@@ -268,5 +291,13 @@ mod tests {
         let args = build_ssh_args(&server(), None, None);
         assert!(!args.iter().any(|a| a == "-R"));
         assert_eq!(args.last().unwrap(), "deploy@example.com");
+    }
+
+    #[test]
+    fn local_command_uses_login_shell() {
+        let cmd = build_local_command();
+        assert_eq!(cmd.get_env("TERM").and_then(|v| v.to_str()), Some("xterm-256color"));
+        // 인자에 "-l" 로그인 셸 플래그 포함
+        assert!(cmd.get_argv().iter().any(|a| a == "-l"));
     }
 }

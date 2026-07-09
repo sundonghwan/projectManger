@@ -12,10 +12,12 @@ const TERMINAL_FONT_FAMILY = 'Menlo, Monaco, "Courier New", monospace';
 export interface TerminalProps {
   server: ServerConnection;
   onClose: () => void;
+  /** true 면 원격 SSH 대신 로컬 로그인 셸(PTY)에 연결한다(`claude login`/`cswap` 등). */
+  local?: boolean;
 }
 
 /** SSH PTY 입출력을 xterm.js에 직접 연결한다. */
-export function Terminal({ server, onClose }: TerminalProps) {
+export function Terminal({ server, onClose, local }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const [snippets, setSnippets] = useState<CommandSnippet[]>([]);
@@ -77,8 +79,7 @@ export function Terminal({ server, onClose }: TerminalProps) {
       term.write("\r\n\x1b[2m[연결이 종료되었습니다]\x1b[0m\r\n"),
     );
 
-    void api.ssh
-      .connect(id)
+    void (local ? api.ssh.connectLocal(id) : api.ssh.connect(id))
       .then(() => {
         fitAndResize();
       })
@@ -102,7 +103,7 @@ export function Terminal({ server, onClose }: TerminalProps) {
       term.dispose();
       xtermRef.current = null;
     };
-  }, [server.id, write]);
+  }, [server.id, write, local]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "#0d0d0c" }}>
@@ -119,7 +120,7 @@ export function Terminal({ server, onClose }: TerminalProps) {
       >
         <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e" }} />
         <span style={{ fontSize: 12.5, color: "#d8d8cf", fontFamily: TERMINAL_FONT_FAMILY }}>
-          {server.username}@{server.host}:{server.port}
+          {local ? "localhost" : `${server.username}@${server.host}:${server.port}`}
         </span>
         {server.aiBridge && (
           <span style={{ fontSize: 10, color: "#c9b458", border: "1px solid #4a441f", borderRadius: 4, padding: "1px 5px" }}>AI 브리지</span>

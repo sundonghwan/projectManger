@@ -108,6 +108,7 @@ pub fn run() {
             commands::ssh_write,
             commands::ssh_resize,
             commands::ssh_disconnect,
+            commands::local_terminal_open,
             commands::ssh_host_status,
             commands::ssh_scan_host,
             commands::ssh_trust_host,

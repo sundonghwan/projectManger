@@ -1593,6 +1593,18 @@ pub fn ssh_disconnect(term: State<crate::terminal::TerminalManager>, id: String)
     crate::terminal::disconnect(&term, &id)
 }
 
+/// 로컬 셸 탭 — 원격 SSH 없이 `claude login`/`cswap` 등을 로컬에서 직접 실행할 수 있도록
+/// 로컬 로그인 셸 PTY 세션을 연다. write/resize/disconnect 는 기존 ssh_* 커맨드가
+/// 동일한 `TerminalManager` 세션 맵을 id 기준으로 그대로 처리한다.
+#[tauri::command]
+pub fn local_terminal_open(
+    app: tauri::AppHandle,
+    term: State<crate::terminal::TerminalManager>,
+    id: String,
+) -> Result<()> {
+    crate::terminal::connect_local(&app, &term, &id)
+}
+
 /// SFTP 디렉터리 나열 (키 기반 인증).
 #[tauri::command]
 pub fn sftp_list(
