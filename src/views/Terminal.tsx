@@ -28,6 +28,8 @@ export interface TerminalProps {
   onClose: () => void;
   /** true 면 원격 SSH 대신 로컬 로그인 셸(PTY)에 연결한다(`claude login`/`cswap` 등). */
   local?: boolean;
+  /** 탭에서 현재 보이는지. 미지정 시 항상 활성으로 간주. */
+  active?: boolean;
 }
 
 type BridgeAlertKind = "auth" | "quota";
@@ -43,9 +45,10 @@ const BRIDGE_ALERT_MESSAGES: Record<BridgeAlertKind, string> = {
 };
 
 /** SSH PTY 입출력을 xterm.js에 직접 연결한다. */
-export function Terminal({ server, onClose, local }: TerminalProps) {
+export function Terminal({ server, onClose, local, active }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
+  const fitRef = useRef<FitAddon | null>(null);
   const [snippets, setSnippets] = useState<CommandSnippet[]>([]);
   const [bridgeAlert, setBridgeAlert] = useState<BridgeAlertPayload | null>(null);
   const [bridgeOn, setBridgeOn] = useState(!!server.aiBridge);
@@ -111,6 +114,7 @@ export function Terminal({ server, onClose, local }: TerminalProps) {
     });
     const fit = new FitAddon();
     xtermRef.current = term;
+    fitRef.current = fit;
     term.loadAddon(fit);
     if (terminalRef.current) term.open(terminalRef.current);
     const dataDisposable = term.onData(write);
@@ -161,8 +165,26 @@ export function Terminal({ server, onClose, local }: TerminalProps) {
       void api.ssh.disconnect(id);
       term.dispose();
       xtermRef.current = null;
+      fitRef.current = null;
     };
   }, [server.id, write, local, reconnectNonce]);
+
+  useEffect(() => {
+    if (active === false) return; // 숨겨진 탭이면 아무것도 안 함
+    const term = xtermRef.current;
+    const fit = fitRef.current;
+    if (!term || !fit) return;
+    const raf = window.requestAnimationFrame(() => {
+      try {
+        fit.fit();
+        void api.ssh.resize(server.id, term.rows, term.cols);
+        term.focus();
+      } catch {
+        /* 레이아웃 준비 전 */
+      }
+    });
+    return () => window.cancelAnimationFrame(raf);
+  }, [active, server.id]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "#0d0d0c" }}>
