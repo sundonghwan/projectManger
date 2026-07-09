@@ -250,6 +250,8 @@ export interface ServerConnection {
   keyPath?: string | null;
   /** OS 키체인 참조 키 — 실제 비밀값은 DB에 없음 */
   secretRef?: string | null;
+  /** 원격 AI 자격증명 브리지(claude/codex 원격 사용) 활성화 여부 */
+  aiBridge?: boolean;
   lastUsedAt?: Timestamp | null;
   archivedAt?: Timestamp | null;
 }

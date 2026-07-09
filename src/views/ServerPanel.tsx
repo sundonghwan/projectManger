@@ -9,6 +9,7 @@ export interface ServerFormData {
   username: string;
   authType: AuthType;
   keyPath: string | null;
+  aiBridge: boolean;
 }
 
 export interface ServerPanelProps {
@@ -25,7 +26,7 @@ export interface ServerPanelProps {
 
 const AUTH_LABEL: Record<AuthType, string> = { key: "키 기반", password: "비밀번호", agent: "에이전트" };
 
-const EMPTY: ServerFormData = { name: "", host: "", port: 22, username: "", authType: "key", keyPath: null };
+const EMPTY: ServerFormData = { name: "", host: "", port: 22, username: "", authType: "key", keyPath: null, aiBridge: false };
 
 export function ServerPanel({ servers, onCreate, onUpdate, onArchive, onSetSecret, onClearSecret, onConnect, onBrowse }: ServerPanelProps) {
   const [form, setForm] = useState<ServerFormData>(EMPTY);
@@ -43,6 +44,7 @@ export function ServerPanel({ servers, onCreate, onUpdate, onArchive, onSetSecre
       username: s.username,
       authType: s.authType as AuthType,
       keyPath: s.keyPath ?? null,
+      aiBridge: s.aiBridge ?? false,
     });
   };
   const submitEdit = () => {
@@ -78,6 +80,14 @@ export function ServerPanel({ servers, onCreate, onUpdate, onArchive, onSetSecre
           </select>
           <button onClick={submit} style={primaryBtn}>추가</button>
         </div>
+        <label style={checkboxLabel}>
+          <input
+            type="checkbox"
+            checked={form.aiBridge}
+            onChange={(e) => setForm({ ...form, aiBridge: e.target.checked })}
+          />
+          AI 자격증명 브리지 (claude/codex 원격 사용)
+        </label>
       </div>
 
       {/* 목록 */}
@@ -104,6 +114,14 @@ export function ServerPanel({ servers, onCreate, onUpdate, onArchive, onSetSecre
                   <button onClick={submitEdit} style={primaryBtn}>저장</button>
                   <button onClick={() => setEditingId(null)} style={secondaryBtn}>취소</button>
                 </div>
+                <label style={checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={editForm.aiBridge}
+                    onChange={(e) => setEditForm({ ...editForm, aiBridge: e.target.checked })}
+                  />
+                  AI 자격증명 브리지 (claude/codex 원격 사용)
+                </label>
               </div>
             ) : (
               <>
@@ -242,6 +260,7 @@ const input: CSSProperties = {
   fontFamily: "inherit",
 };
 const authBadge: CSSProperties = { fontSize: 11, fontWeight: 600, color: "var(--text2)", background: "var(--hover)", borderRadius: 4, padding: "2px 7px" };
+const checkboxLabel: CSSProperties = { display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text2)", marginTop: 8, cursor: "pointer" };
 const secretRow: CSSProperties = { display: "flex", gap: 6, alignItems: "center", marginTop: 8, flexWrap: "wrap" };
 const secretHint: CSSProperties = { flex: 1, minWidth: 160, fontSize: 12, color: "var(--text2)" };
 const primaryBtn: CSSProperties = { border: "none", background: "var(--accent)", color: "#fff", borderRadius: "var(--radius-md)", padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 };

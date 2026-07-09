@@ -121,6 +121,9 @@ export function Terminal({ server, onClose }: TerminalProps) {
         <span style={{ fontSize: 12.5, color: "#d8d8cf", fontFamily: TERMINAL_FONT_FAMILY }}>
           {server.username}@{server.host}:{server.port}
         </span>
+        {server.aiBridge && (
+          <span style={{ fontSize: 10, color: "#c9b458", border: "1px solid #4a441f", borderRadius: 4, padding: "1px 5px" }}>AI 브리지</span>
+        )}
         <span style={{ flex: 1 }} />
         <button
           onClick={onClose}

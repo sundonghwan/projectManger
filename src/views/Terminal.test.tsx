@@ -97,4 +97,16 @@ describe("Terminal", () => {
 
     expect(api.ssh.write).toHaveBeenCalledWith("srv-1", "테스트");
   });
+
+  it("aiBridge가 false면 배지를 렌더하지 않음", () => {
+    render(<Terminal server={server} onClose={vi.fn()} />);
+
+    expect(screen.queryByText("AI 브리지")).not.toBeInTheDocument();
+  });
+
+  it("aiBridge가 true면 헤더에 AI 브리지 배지 표시", () => {
+    render(<Terminal server={{ ...server, aiBridge: true }} onClose={vi.fn()} />);
+
+    expect(screen.getByText("AI 브리지")).toBeInTheDocument();
+  });
 });

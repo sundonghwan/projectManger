@@ -201,6 +201,7 @@ export const api = {
       username: string;
       authType: AuthType;
       keyPath?: string | null;
+      aiBridge?: boolean;
     }) => invoke<ServerConnection>("server_create", { input }),
     update: (input: {
       id: string;
@@ -210,6 +211,7 @@ export const api = {
       username: string;
       authType: AuthType;
       keyPath?: string | null;
+      aiBridge?: boolean;
     }) => invoke<ServerConnection>("server_update", { input }),
     archive: (id: string) => invoke<void>("server_archive", { id }),
     setSecret: (id: string, secret: string) => invoke<void>("server_set_secret", { id, secret }),
