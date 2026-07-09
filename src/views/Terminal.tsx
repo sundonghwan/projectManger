@@ -75,8 +75,10 @@ export function Terminal({ server, onClose, local, active }: TerminalProps) {
         aiBridge: next,
       });
       setBridgeOn(next);
-      await api.ssh.disconnect(server.id);
+      // 재연결은 connect effect 가 disconnect→connect 순차로 처리한다(레이스 방지).
       setReconnectNonce((n) => n + 1);
+    } catch (e) {
+      xtermRef.current?.write(`\r\n\x1b[31m브리지 전환 실패: ${String(e)}\x1b[0m\r\n`);
     } finally {
       setBridgeBusy(false);
     }
@@ -141,7 +143,13 @@ export function Terminal({ server, onClose, local, active }: TerminalProps) {
     );
     const alertPromise = listen<BridgeAlertPayload>("aibridge://alert", (e) => setBridgeAlert(e.payload));
 
-    void (local ? api.ssh.connectLocal(id) : api.ssh.connect(id))
+    // 먼저 disconnect 를 await 한 뒤에만 connect 를 보낸다 → 재연결 시 이전 세션을
+    // 확실히 정리하고 새 세션을 띄워, connect 후 뒤늦은 disconnect 가 세션을 지우는
+    // 레이스를 없앤다. (언마운트용 disconnect 는 아래 별도 effect 가 담당)
+    void api.ssh
+      .disconnect(id)
+      .catch(() => {})
+      .then(() => (local ? api.ssh.connectLocal(id) : api.ssh.connect(id)))
       .then(() => {
         fitAndResize();
       })
@@ -162,12 +170,21 @@ export function Terminal({ server, onClose, local, active }: TerminalProps) {
       void dataPromise.then((f) => f());
       void exitPromise.then((f) => f());
       void alertPromise.then((f) => f());
-      void api.ssh.disconnect(id);
+      // disconnect 는 여기서 하지 않는다(재연결 시 setup 의 connect 와 레이스). 언마운트
+      // 정리는 아래 [server.id] effect 가 담당한다.
       term.dispose();
       xtermRef.current = null;
       fitRef.current = null;
     };
   }, [server.id, write, local, reconnectNonce]);
+
+  // 세션 정리는 실제 언마운트(또는 server.id 변경) 시에만 — reconnectNonce 변경으로는
+  // 재실행되지 않으므로 재연결 시 connect 와 disconnect 가 겹치지 않는다.
+  useEffect(() => {
+    return () => {
+      void api.ssh.disconnect(server.id);
+    };
+  }, [server.id]);
 
   useEffect(() => {
     if (active === false) return; // 숨겨진 탭이면 아무것도 안 함
@@ -241,7 +258,7 @@ export function Terminal({ server, onClose, local, active }: TerminalProps) {
           종료
         </button>
       </div>
-      {bridgeAlert && (
+      {bridgeOn && !local && bridgeAlert && (
         <div
           style={{
             flex: "none",
