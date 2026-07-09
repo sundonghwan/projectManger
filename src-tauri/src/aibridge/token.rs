@@ -42,6 +42,18 @@ pub fn parse_codex_authfile(json: &str) -> Result<OauthToken> {
     })
 }
 
+/// 원본 키체인 JSON 을 보존한 채 claudeAiOauth 의 토큰 3개 필드만 갱신한다.
+pub fn merge_claude_refresh(raw: &str, refreshed: &OauthToken) -> Result<String> {
+    let mut root: Value = serde_json::from_str(raw)
+        .map_err(|e| AppError::Invalid(format!("claude 토큰 병합 파싱: {e}")))?;
+    let obj = root.get_mut("claudeAiOauth").and_then(|v| v.as_object_mut())
+        .ok_or_else(|| AppError::Invalid("claudeAiOauth 객체 없음".into()))?;
+    obj.insert("accessToken".into(), serde_json::json!(refreshed.access_token));
+    obj.insert("refreshToken".into(), serde_json::json!(refreshed.refresh_token));
+    obj.insert("expiresAt".into(), serde_json::json!(refreshed.expires_at_ms));
+    Ok(root.to_string())
+}
+
 const CLAUDE_KEYCHAIN_SERVICE: &str = "Claude Code-credentials";
 const REFRESH_SKEW_MS: i64 = 60_000;
 
@@ -67,13 +79,9 @@ impl ClaudeTokenSource {
             return Ok(tok.access_token);
         }
         let refreshed = refresh_claude(&tok.refresh_token).await?;
-        // 키체인 되쓰기 (로컬 세션 동기 유지)
-        let write = serde_json::json!({"claudeAiOauth": {
-            "accessToken": refreshed.access_token,
-            "refreshToken": refreshed.refresh_token,
-            "expiresAt": refreshed.expires_at_ms,
-        }});
-        Self::entry()?.set_password(&write.to_string())
+        // 키체인 되쓰기 (로컬 세션 동기 유지) — 원본 필드 보존, 토큰 3개만 갱신
+        let write = merge_claude_refresh(&raw, &refreshed)?;
+        Self::entry()?.set_password(&write)
             .map_err(|e| AppError::Invalid(format!("claude 자격증명 저장 실패: {e}")))?;
         Ok(refreshed.access_token)
     }
@@ -133,5 +141,19 @@ mod tests {
         // 만료가 충분히 미래면 needs_refresh=false → 네트워크 불필요
         let future = 4_000_000_000_000;
         assert!(!needs_refresh(future, now_ms(), 60_000));
+    }
+
+    #[test]
+    fn merge_preserves_extra_fields_and_updates_tokens() {
+        let raw = r#"{"claudeAiOauth":{"accessToken":"old","refreshToken":"oldr","expiresAt":1,"subscriptionType":"max","scopes":["a"]}}"#;
+        let refreshed = OauthToken { access_token: "new".into(), refresh_token: "newr".into(), expires_at_ms: 999, account_id: None };
+        let out = merge_claude_refresh(raw, &refreshed).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+        let o = &v["claudeAiOauth"];
+        assert_eq!(o["accessToken"], "new");
+        assert_eq!(o["refreshToken"], "newr");
+        assert_eq!(o["expiresAt"], 999);
+        assert_eq!(o["subscriptionType"], "max");   // extra field preserved
+        assert_eq!(o["scopes"][0], "a");            // extra field preserved
     }
 }
