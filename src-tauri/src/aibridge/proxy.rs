@@ -94,11 +94,11 @@ async fn forward(ctx: Ctx, req: Request<Body>) -> Result<Response<Body>> {
     match ctx.provider {
         Provider::Anthropic => {
             let tok = ClaudeTokenSource.access_token().await?;
-            headers::apply_anthropic_auth(&mut headers, &tok);
+            headers::apply_anthropic_auth(&mut headers, &tok)?;
         }
         Provider::OpenAi => {
             let (tok, acct) = CodexTokenSource.access_and_account().await?;
-            headers::apply_openai_auth(&mut headers, &tok, acct.as_deref());
+            headers::apply_openai_auth(&mut headers, &tok, acct.as_deref())?;
         }
     }
 

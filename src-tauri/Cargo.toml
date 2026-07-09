@@ -31,4 +31,4 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 http = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
 axum = { version = "0.7", features = ["http1"] }
-tokio = { version = "1", features = ["rt-multi-thread", "net", "macros"] }
+tokio = { version = "1", features = ["rt-multi-thread", "net", "macros", "sync"] }

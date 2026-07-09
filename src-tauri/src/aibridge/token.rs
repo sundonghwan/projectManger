@@ -2,6 +2,15 @@
 use crate::error::{AppError, Result};
 use keyring::Entry;
 use serde_json::Value;
+use std::sync::LazyLock;
+use tokio::sync::Mutex;
+
+/// per-provider 단일 비행(single-flight) 락. 동시 만료 요청이 각자 refresh 하며
+/// refresh-token 회전으로 서로를 무효화 + 키체인/auth.json 되쓰기를 덮어써 로컬 CLI
+/// 로그인을 손상시키는 레이스를 막는다. 이중 검사(double-checked) 패턴으로 대기자는
+/// 앞선 refresh 결과를 재사용한다.
+static CLAUDE_REFRESH_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+static CODEX_REFRESH_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
 #[derive(Debug, Clone)]
 pub struct OauthToken {
@@ -127,11 +136,23 @@ impl ClaudeTokenSource {
             .map_err(|e| AppError::Invalid(format!("키체인 오류: {e}")))
     }
 
-    pub async fn access_token(&self) -> Result<String> {
+    fn load(&self) -> Result<(String, OauthToken)> {
         let raw = Self::entry()?
             .get_password()
             .map_err(|e| AppError::Invalid(format!("claude 자격증명 로드 실패: {e}")))?;
         let tok = parse_claude_keychain(&raw)?;
+        Ok((raw, tok))
+    }
+
+    pub async fn access_token(&self) -> Result<String> {
+        // 1) fast path: 락 없이 로드 후 신선하면 즉시 반환
+        let (_, tok) = self.load()?;
+        if !needs_refresh(tok.expires_at_ms, now_ms(), REFRESH_SKEW_MS) {
+            return Ok(tok.access_token);
+        }
+        // 2) refresh 필요 — 단일 비행 락 획득 후 이중 검사(다른 태스크가 방금 refresh 했을 수 있음)
+        let _g = CLAUDE_REFRESH_LOCK.lock().await;
+        let (raw, tok) = self.load()?;
         if !needs_refresh(tok.expires_at_ms, now_ms(), REFRESH_SKEW_MS) {
             return Ok(tok.access_token);
         }
@@ -189,11 +210,23 @@ impl CodexTokenSource {
             .map_err(|e| AppError::Invalid(format!("codex 자격증명 저장 실패: {e}")))
     }
 
-    /// 유효한 access_token 과 (있다면) account_id 를 반환한다. 필요 시 refresh 후 파일에 되쓴다.
-    pub async fn access_and_account(&self) -> Result<(String, Option<String>)> {
+    fn load() -> Result<(String, OauthToken, i64)> {
         let raw = Self::read_raw()?;
         let tok = parse_codex_authfile(&raw)?;
         let exp_ms = jwt_exp_ms(&tok.access_token)?;
+        Ok((raw, tok, exp_ms))
+    }
+
+    /// 유효한 access_token 과 (있다면) account_id 를 반환한다. 필요 시 refresh 후 파일에 되쓴다.
+    pub async fn access_and_account(&self) -> Result<(String, Option<String>)> {
+        // 1) fast path: 락 없이 로드 후 신선하면 즉시 반환
+        let (_, tok, exp_ms) = Self::load()?;
+        if !needs_refresh(exp_ms, now_ms(), REFRESH_SKEW_MS) {
+            return Ok((tok.access_token, tok.account_id));
+        }
+        // 2) refresh 필요 — 단일 비행 락 획득 후 이중 검사(다른 태스크가 방금 refresh 했을 수 있음)
+        let _g = CODEX_REFRESH_LOCK.lock().await;
+        let (raw, tok, exp_ms) = Self::load()?;
         if !needs_refresh(exp_ms, now_ms(), REFRESH_SKEW_MS) {
             return Ok((tok.access_token, tok.account_id));
         }
