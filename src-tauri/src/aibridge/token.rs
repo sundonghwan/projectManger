@@ -131,8 +131,11 @@ pub struct ClaudeTokenSource;
 
 impl ClaudeTokenSource {
     fn entry() -> Result<Entry> {
-        // 키체인 account 이름은 실제 저장 시 사용된 값으로 확인 필요(대개 사용자명/고정값).
-        Entry::new(CLAUDE_KEYCHAIN_SERVICE, "default")
+        // Claude Code 는 키체인 generic-password 의 account 로 현재 OS 사용자명을 쓴다.
+        let account = std::env::var("USER")
+            .or_else(|_| std::env::var("LOGNAME"))
+            .map_err(|_| AppError::Invalid("현재 사용자명 확인 실패(USER/LOGNAME 미설정)".into()))?;
+        Entry::new(CLAUDE_KEYCHAIN_SERVICE, &account)
             .map_err(|e| AppError::Invalid(format!("키체인 오류: {e}")))
     }
 
